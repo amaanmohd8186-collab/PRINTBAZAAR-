@@ -1,0 +1,843 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import React, { useState, useEffect } from 'react';
+import { Package, Truck, Calendar, Wallet, CheckCircle, Clock, AlertTriangle, ChevronDown, ChevronUp, FileSpreadsheet, ShieldAlert, Loader2, Download, FileText, RefreshCcw } from 'lucide-react';
+import { motion } from 'motion/react';
+import { jsPDF } from 'jspdf';
+import { Order, OrderStatus, PaymentDetails } from '../types';
+import CashfreeGateway from './CashfreeGateway';
+import CustomerSpendingChart from './CustomerSpendingChart';
+
+function SlaCountdownTimer({ createdAt, status }: { createdAt: string; status: OrderStatus }) {
+  const [timeLeftStr, setTimeLeftStr] = useState('');
+  const [percentLeft, setPercentLeft] = useState(100);
+  const [isExpired, setIsExpired] = useState(false);
+
+  useEffect(() => {
+    if (status === 'Delivered') {
+      setTimeLeftStr('SLA MET: DELIVERED');
+      setPercentLeft(0);
+      return;
+    }
+
+    const calculateTime = () => {
+      const createdDate = new Date(createdAt).getTime();
+      const slaEndDate = createdDate + (48 * 60 * 60 * 1000); // 48 hours SLA
+      const now = Date.now();
+      const difference = slaEndDate - now;
+
+      if (difference <= 0) {
+        setTimeLeftStr('SLA EXPIRED: EMERGENCY DISPATCH PROTOCOL ON');
+        setPercentLeft(0);
+        setIsExpired(true);
+        return;
+      }
+
+      const hours = Math.floor(difference / (1000 * 60 * 60));
+      const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((difference % (1000 * 60)) / 1000);
+
+      setTimeLeftStr(`${hours}h ${minutes}m ${seconds}s remaining`);
+      const pct = (difference / (48 * 60 * 60 * 1000)) * 100;
+      setPercentLeft(pct);
+    };
+
+    calculateTime();
+    const interval = setInterval(calculateTime, 1000);
+    return () => clearInterval(interval);
+  }, [createdAt, status]);
+
+  if (status === 'Delivered') {
+    return (
+      <div className="bg-emerald-50 border border-emerald-250 rounded-[24px] p-5 flex items-center justify-between text-left shadow-2xs">
+        <div className="space-y-0.5">
+          <p className="text-[10px] text-emerald-800 font-extrabold uppercase tracking-widest font-mono">48HR DELIVERY SLA RECORD</p>
+          <p className="text-xs text-emerald-950 font-bold uppercase leading-relaxed">✓ Order delivered safely within SLA timeline</p>
+        </div>
+        <span className="text-[10px] bg-emerald-600 text-white font-black px-3 py-1.5 rounded-full uppercase tracking-wider font-mono">SLA MET</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`rounded-[24px] p-5 border text-left flex flex-col md:flex-row md:items-center justify-between gap-5 shadow-2xs ${
+      isExpired 
+        ? 'bg-rose-50 border-rose-250 text-rose-950' 
+        : 'bg-zinc-900 border-neutral-800 text-white'
+    }`}>
+      <div className="space-y-1">
+        <div className="flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 bg-[#FF4D00] rounded-full animate-ping shrink-0" />
+          <p className={`text-[10px] font-extrabold uppercase tracking-widest font-mono ${
+            isExpired ? 'text-rose-800' : 'text-[#FF4D00]'
+          }`}>
+            48-Hour Delivery SLA Window Countdown
+          </p>
+        </div>
+        <p className="text-xs leading-none font-heavy uppercase inline-block pr-2">
+          Time Remaining: <span className="font-mono text-[#FF4D00] text-sm font-black tracking-normal ml-1">{timeLeftStr}</span>
+        </p>
+      </div>
+
+      <div className="w-full md:w-56 space-y-1.5 self-start md:self-center shrink-0">
+        <div className="flex justify-between text-[9px] font-black uppercase tracking-wider font-mono">
+          <span className={isExpired ? "text-rose-750" : "text-zinc-400"}>PROGRESS</span>
+          <span className={isExpired ? "text-rose-750" : "text-zinc-405"}>{Math.round(percentLeft)}% WINDOW LEFT</span>
+        </div>
+        <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+          <div 
+            className={`h-full transition-all duration-300 ${
+              isExpired ? 'bg-rose-500' : 'bg-[#FF4D00]'
+            }`} 
+            style={{ width: `${percentLeft}%` }} 
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface OrdersTrackerProps {
+  orders: Order[];
+  onPayBalanceSuccess: (orderId: string, payment: PaymentDetails) => void;
+  onReorder?: (order: Order) => void;
+}
+
+export default function OrdersTracker({
+  orders,
+  onPayBalanceSuccess,
+  onReorder
+}: OrdersTrackerProps) {
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const [payingOrderId, setPayingOrderId] = useState<string | null>(null);
+  const [balanceAmountToPay, setBalanceAmountToPay] = useState<number>(0);
+
+  const toggleExpand = (orderId: string) => {
+    setExpandedOrderId(expandedOrderId === orderId ? null : orderId);
+  };
+
+  const handleDownloadReceipt = (order: Order) => {
+    const dateFormatted = new Date(order.createdAt).toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    
+    const separator = "==================================================";
+    const itemsText = order.items.map((item, idx) => {
+      return `${idx + 1}. ${item.productName.toUpperCase()}\n` +
+             `   Size: ${item.selectedSize.name}\n` +
+             `   Material/Finish: ${item.selectedMaterial.name}\n` +
+             `   Quantity: ${item.selectedQuantity} Pcs\n` +
+             `   Subtotal: INR ${item.itemTotal.toLocaleString('en-IN')}\n` +
+             `   Design File: ${item.designFile.name} (${(item.designFile.size / (1024 * 1024)).toFixed(2)} MB)`;
+    }).join("\n\n");
+
+    const paymentsText = order.payments.map((p, idx) => {
+      const stageLabel = idx === 0 ? '100% Upfront Secure Payment' : 'Balance Clearance';
+      return `Payment ${idx + 1} (${stageLabel}):\n` +
+             `   Amount: INR ${p.amount.toLocaleString('en-IN')}\n` +
+             `   Method: ${p.method}\n` +
+             `   Tx ID: ${p.txId || 'N/A'}\n` +
+             `   Timestamp: ${new Date(p.timestamp).toLocaleString('en-IN')}`;
+    }).join("\n\n");
+
+    const receiptContent = `
+${separator}
+            PRINTBAZAAR - SECURE PRINTING SLIP
+${separator}
+Order ID : ${order.id}
+Status   : ${order.status.toUpperCase()}
+Date     : ${dateFormatted}
+
+Customer Info:
+  Name   : ${order.customerName}
+  Email  : ${order.customerEmail}
+
+${separator}
+PRINT ITEM SPECIFICATIONS & DESIGN FILES
+${separator}
+${itemsText}
+
+${separator}
+BILLING & TRANSACT PAYMENTS LOG
+${separator}
+Total Order Value : INR ${order.totalAmount.toLocaleString('en-IN')}
+Upfront Deposit (100%): INR ${order.totalAmount.toLocaleString('en-IN')} (PAID IN FULL)
+Outstanding Balance    : INR 0 (FULLY SETTLED)
+
+Payment Details Log:
+${paymentsText}
+
+${order.trackingNumber ? `
+${separator}
+SHIPPING & DOCKET WAYBILL SUMMARY
+${separator}
+Courier Carrier  : ${order.courierName}
+Docket/Waybill ID: ${order.trackingNumber}
+Status           : TRANSITING
+` : ''}
+
+${separator}
+Thank you for printing with PrintBazaar.
+This receipt is an official transaction invoice.
+${separator}
+    `.trim();
+
+    const blob = new Blob([receiptContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `PrintBazaar_Receipt_${order.id}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadPDFInvoice = (order: Order) => {
+    const doc = new jsPDF();
+    
+    // Header Slate Banner
+    doc.setFillColor(15, 23, 42); 
+    doc.rect(0, 0, 210, 42, 'F');
+
+    // Corporate Title Branding
+    doc.setTextColor(255, 77, 0); 
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(22);
+    doc.text("PRINTBAZAAR", 20, 24);
+
+    doc.setTextColor(148, 163, 184); 
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text("HIGH-VOLUME COMMERCIAL OFFSET PRINT PRESS", 20, 31);
+
+    // Label Indicator
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text("OFFICIAL INVOICE", 146, 24);
+
+    // Order Reference Details Card Box
+    doc.setFillColor(248, 250, 252); 
+    doc.rect(20, 52, 170, 42, 'F');
+    doc.setDrawColor(226, 232, 240); 
+    doc.setLineWidth(0.5);
+    doc.rect(20, 52, 170, 42, 'D');
+
+    // Content inside reference box
+    doc.setTextColor(15, 23, 42); 
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text("ORDER ID:", 25, 62);
+    doc.setFont('helvetica', 'normal');
+    doc.text(order.id, 50, 62);
+
+    doc.setFont('helvetica', 'bold');
+    doc.text("PAY STATUS:", 25, 70);
+    doc.setFont('helvetica', 'normal');
+    doc.text(order.balancePaid ? "FULLY SETTLED" : "100% PAID UPFRONT", 52, 70);
+
+    doc.setFont('helvetica', 'bold');
+    doc.text("DATE PLACED:", 25, 78);
+    doc.setFont('helvetica', 'normal');
+    doc.text(new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }), 55, 78);
+
+    // Bill To Customer Details inside Box
+    doc.setFont('helvetica', 'bold');
+    doc.text("BILL TO CUSTOMER:", 110, 62);
+    doc.setFont('helvetica', 'normal');
+    doc.text(order.customerName, 110, 70);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text(order.customerEmail, 110, 78);
+
+    // Items Section Header
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(255, 77, 0);
+    doc.text("COMMERCIAL PRINT RUN SPECIFICATIONS", 20, 110);
+    
+    doc.setDrawColor(255, 77, 0);
+    doc.setLineWidth(1);
+    doc.line(20, 113, 190, 113);
+
+    let y = 122;
+    order.items.forEach((item, idx) => {
+      if (y > 250) {
+        doc.addPage();
+        y = 20;
+      }
+      doc.setTextColor(15, 23, 42);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.text(`${idx + 1}. ${item.productName.toUpperCase()}`, 20, y);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Size Layout: ${item.selectedSize.name}  |  Media Stock: ${item.selectedMaterial.name}  |  Count: ${item.selectedQuantity} Pcs`, 20, y + 6);
+      doc.text(`Uploaded Asset Vector: ${item.designFile.name} (${(item.designFile.size / (1024 * 1024)).toFixed(2)} MB)`, 20, y + 12);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(15, 23, 42);
+      doc.text(`INR ${item.itemTotal.toLocaleString('en-IN')}`, 162, y);
+
+      y += 24;
+    });
+
+    // Payment History Log
+    if (y > 230) {
+      doc.addPage();
+      y = 20;
+    }
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(255, 77, 0);
+    doc.text("PAYMENT TRANSACTION GATEWAY LOG", 20, y);
+    
+    doc.setDrawColor(255, 77, 0);
+    doc.setLineWidth(1);
+    doc.line(20, y + 3, 190, y + 3);
+    y += 12;
+
+    order.payments.forEach((payment, idx) => {
+      if (y > 260) {
+        doc.addPage();
+        y = 20;
+      }
+      const paymentTag = idx === 0 ? "100% Secure Upfront Deposit" : "Final Settled Balance Payment";
+      
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(15, 23, 42);
+      doc.text(paymentTag, 20, y);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Tx Gateway: ${payment.method}  |  Docket TXID: ${payment.txId || 'TXN_SYSTEM_AUTO'}`, 20, y + 5);
+      doc.text(`Processed Timestamp: ${new Date(payment.timestamp).toLocaleString('en-IN')}`, 20, y + 10);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(15, 23, 42);
+      doc.text(`INR ${payment.amount.toLocaleString('en-IN')}`, 162, y);
+
+      y += 17;
+    });
+
+    // Ledger Summary Box
+    if (y > 240) {
+      doc.addPage();
+      y = 20;
+    }
+    y += 5;
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.5);
+    doc.line(20, y, 190, y);
+    y += 8;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(15, 23, 42);
+    doc.text("TOTAL ORDER CONTRACT VALUE:", 95, y);
+    doc.text(`INR ${order.totalAmount.toLocaleString('en-IN')}`, 162, y);
+
+    y += 6;
+    doc.text("TOTAL CASHFLOWS DISBURSED:", 95, y);
+    const cumulativeDisbursed = order.payments.reduce((sum, p) => sum + p.amount, 0);
+    doc.text(`INR ${cumulativeDisbursed.toLocaleString('en-IN')}`, 162, y);
+
+    y += 6;
+    doc.setTextColor(16, 185, 129); 
+    doc.text("OUTSTANDING ACCOUNT DUES:", 95, y);
+    const outstandingLeft = Math.max(0, order.totalAmount - cumulativeDisbursed);
+    doc.text(`INR ${outstandingLeft.toLocaleString('en-IN')}`, 162, y);
+
+    // Courier Logistics Waybill details if available
+    if (order.trackingNumber) {
+      y += 12;
+      if (y > 260) {
+        doc.addPage();
+        y = 20;
+      }
+      doc.setFillColor(255, 245, 240); 
+      doc.rect(20, y, 170, 20, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(255, 77, 0);
+      doc.text("COURIER WAYBILL SYSTEM REGISTERED", 25, y + 7);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(15, 23, 42);
+      doc.text(`Shipper Courier Carrier Partner: ${order.courierName}  |  Docket Air Waybill No: ${order.trackingNumber}`, 25, y + 14);
+    }
+
+    // Footnote
+    y = 282;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(148, 163, 184);
+    doc.text("Thank you for choosing PrintBazaar commercial offset division. For invoice queries, support@printbazaar.com.", 20, y);
+
+    doc.save(`PrintBazaar_Invoice_${order.id}.pdf`);
+  };
+
+  const initBalancePayment = (order: Order) => {
+    const outstanding = order.totalAmount - order.payments.reduce((sum, p) => sum + p.amount, 0);
+    setBalanceAmountToPay(outstanding > 0 ? outstanding : Math.round(order.totalAmount / 2));
+    setPayingOrderId(order.id);
+  };
+
+  const handleBalancePaymentSuccess = (payment: PaymentDetails) => {
+    if (payingOrderId) {
+      onPayBalanceSuccess(payingOrderId, payment);
+      setPayingOrderId(null);
+    }
+  };
+
+  // Helper defining production stages
+  const STAGES: { status: OrderStatus; label: string; desc: string }[] = [
+    {
+      status: 'Order Received',
+      label: 'Order Placed & Received',
+      desc: '100% Upfront payment verified. Automated pre-flight checks initialized on design assets.'
+    },
+    {
+      status: 'Design Check',
+      label: 'Design & Pre-fight Check',
+      desc: 'Print press admin is auditing dimension safety, image resolutions, and bleed margins.'
+    },
+    {
+      status: 'Printing In Progress',
+      label: 'Printing & Lamination',
+      desc: 'Design assets sent to heavy-duty production presses. Media stocks are being printed.'
+    },
+    {
+      status: 'Ready for Dispatch',
+      label: 'Ready for Dispatch',
+      desc: 'Bulk batch production successfully completed! Awaiting final courier collection.'
+    },
+    {
+      status: 'Dispatched',
+      label: 'Shipped with Courier',
+      desc: 'Goods handed over to delivery couriers with real-time waybill tracking registered.'
+    },
+    {
+      status: 'Delivered',
+      label: 'Delivered Safely',
+      desc: 'Consignment marked delivered safely.'
+    }
+  ];
+
+  const getStageIndex = (status: OrderStatus): number => {
+    return STAGES.findIndex((st) => st.status === status);
+  };
+
+  const getStatusColor = (status: OrderStatus) => {
+    switch (status) {
+      case 'Order Received':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'Design Check':
+        return 'bg-amber-100 text-amber-800 border-amber-200';
+      case 'Printing In Progress':
+        return 'bg-purple-100 text-purple-800 border-purple-200';
+      case 'Ready for Dispatch':
+        return 'bg-indigo-100 text-indigo-800 border-indigo-200';
+      case 'Dispatched':
+        return 'bg-sky-100 text-sky-800 border-sky-200';
+      case 'Delivered':
+        return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+      default:
+        return 'bg-zinc-100 text-zinc-800 border-zinc-200';
+    }
+  };
+
+  if (orders.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center p-12 text-center bg-white rounded-[40px] border border-gray-200/60 max-w-lg mx-auto my-10 shadow-sm">
+        <div className="w-20 h-20 rounded-[28px] bg-zinc-100 flex items-center justify-center mb-6 border border-zinc-200">
+          <Calendar className="w-8 h-8 text-zinc-400" />
+        </div>
+        <h3 className="font-heavy text-2xl uppercase tracking-tight text-[#0F172A]">No Past Print Runs</h3>
+        <p className="text-gray-500 text-xs mt-3 leading-relaxed max-w-xs font-normal">
+          YOU HAVE NOT PLACED ANY PRINTING ORDERS YET. BROWSE OUR SELECTION TO EXPERIENCE THE 50:50 COURIER SERVICE FLOW!
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-4xl mx-auto py-2 px-1">
+      <div className="flex items-center gap-4 mb-8 text-zinc-900 bg-white p-6 rounded-[28px] border border-gray-150">
+        <div className="w-14 h-14 rounded-[18px] bg-[#0F172A] text-[#FF4D00] flex items-center justify-center font-heavy text-lg tracking-tighter shrink-0">
+          PB
+        </div>
+        <div>
+          <h2 className="font-heavy text-xl uppercase leading-none tracking-tight">MY PRINTING ACCOUNTS</h2>
+          <p className="text-xs text-zinc-500 font-bold uppercase tracking-wider mt-1.5 font-mono">Track production stages, verify file clearances, and finalize balance dues.</p>
+        </div>
+      </div>
+
+      {/* Spending Trend Analytics Section */}
+      <div className="mb-8">
+        <CustomerSpendingChart orders={orders} />
+      </div>
+
+      <div className="space-y-4">
+        {orders.map((order) => {
+          const isExpanded = expandedOrderId === order.id;
+          const currentStageIdx = getStageIndex(order.status);
+          const completionPercentage = (currentStageIdx / (STAGES.length - 1)) * 100;
+          const needsPayment = order.status === 'Ready for Dispatch' && !order.balancePaid;
+          const paymentsPaid = order.payments.reduce((sum, p) => sum + p.amount, 0);
+
+          return (
+            <div
+              key={order.id}
+              className="bg-white rounded-[32px] border border-gray-150 hover:border-black overflow-hidden transition duration-200"
+            >
+              {/* Header block preview summary */}
+              <div
+                onClick={() => toggleExpand(order.id)}
+                className="p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 cursor-pointer hover:bg-neutral-50/50 transition select-none"
+              >
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <span className="font-mono font-heavy text-xs text-white px-3.5 py-1 rounded-xl bg-black">
+                      {order.id}
+                    </span>
+                    <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider border ${getStatusColor(order.status)}`}>
+                      {order.status}
+                    </span>
+                    {(() => {
+                      try {
+                        const updated = new Date(order.updatedAt).getTime();
+                        const now = Date.now();
+                        const isRecent = (now - updated) < (24 * 60 * 60 * 1000);
+                        if (isRecent) {
+                          return (
+                            <span className="flex items-center gap-1.5 px-3 py-1 bg-amber-500/10 border border-amber-500/30 text-amber-600 rounded-full text-[9px] font-bold uppercase tracking-wider animate-pulse shrink-0">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping shrink-0" />
+                              <span>UPDATED RECENTLY</span>
+                            </span>
+                          );
+                        }
+                      } catch (e) {
+                        return null;
+                      }
+                    })()}
+                  </div>
+                  
+                  <div className="flex items-center gap-1.5 text-xs text-zinc-500 mt-1.5 font-bold uppercase tracking-widest font-mono">
+                    <Calendar className="w-3.5 h-3.5" />
+                    <span>Placed on {new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between sm:justify-end gap-6">
+                  <div className="text-left sm:text-right">
+                    <p className="font-micro text-gray-400 block">Invoice Valuation</p>
+                    <p className="text-xl font-heavy text-slate-900">₹{order.totalAmount.toLocaleString('en-IN')}</p>
+                  </div>
+
+                  <div className="text-zinc-500 p-2 bg-zinc-50 border border-gray-200 rounded-xl">
+                    {isExpanded ? <ChevronUp className="w-4 h-4 text-zinc-900" /> : <ChevronDown className="w-4 h-4 text-zinc-900" />}
+                  </div>
+                </div>
+              </div>
+
+              {/* Collapsed view expansion info */}
+              {isExpanded && (
+                <div className="border-t border-zinc-100 p-6 md:p-8 bg-zinc-50/40 space-y-8">
+
+                  {/* QUICK SUMMARY CARD OF ITEMS */}
+                  <div className="bg-slate-900 border border-slate-800 rounded-[28px] p-6 text-white shadow-md relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6">
+                    <div className="absolute top-0 right-0 transform translate-x-12 -translate-y-12 w-48 h-48 bg-slate-800/40 rounded-full blur-2xl pointer-events-none" />
+                    
+                    <div className="space-y-3 relative z-10 w-full md:w-auto">
+                      <span className="text-[9px] bg-[#FF4D00]/10 text-[#FF4D00] font-mono font-black tracking-widest uppercase px-2.5 py-1 rounded-md border border-[#FF4D00]/25">
+                        ORDER ITEM SUMMARY
+                      </span>
+                      <h4 className="text-lg font-heavy uppercase tracking-tight leading-none mt-1">
+                        {order.items.length === 1 ? '1 Specialized Print Item' : `${order.items.length} Specialized Print Items`}
+                      </h4>
+                      <p className="text-xs text-slate-400 font-normal leading-relaxed max-w-md">
+                        This order contains premium {order.items.map(item => item.productCategory).filter((val, i, arr) => arr.indexOf(val) === i).join(', ')} batches prepared on custom material substrates.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto shrink-0 relative z-10">
+                      {order.items.map((item, idx) => {
+                        const activeImg = item.productImage || 'https://images.unsplash.com/photo-1541807084-5c52b6b3adef?auto=format&fit=crop&w=300&q=80';
+                        return (
+                          <div key={item.id || idx} className="flex items-center gap-3 bg-slate-800/80 p-3 rounded-[20px] border border-slate-700/60 w-full sm:w-auto">
+                            <img 
+                              src={activeImg} 
+                              alt={item.productName} 
+                              className="w-10 h-10 object-cover rounded-lg border border-slate-600/50" 
+                              referrerPolicy="no-referrer"
+                              onError={(e) => {
+                                e.currentTarget.src = 'https://images.unsplash.com/photo-1541807084-5c52b6b3adef?auto=format&fit=crop&w=300&q=80';
+                              }}
+                            />
+                            <div>
+                              <p className="text-xs font-bold uppercase tracking-tight text-white line-clamp-1">{item.productName}</p>
+                              <p className="text-[9px] font-mono text-slate-400 uppercase tracking-widest">{item.selectedQuantity} PCS • {item.selectedSize.name}</p>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Action Rail & Quick Options */}
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4.5 rounded-[24px] border border-gray-150 shadow-2xs">
+                    <div className="flex items-center gap-2">
+                       <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse mt-0.5 shrink-0" />
+                       <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider font-mono">
+                         SECURE PRINT ORDER PORTAL • INTENT SUMMARY ACTIVE
+                       </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onReorder) {
+                            onReorder(order);
+                          }
+                        }}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-zinc-900 hover:bg-black text-white text-[11px] font-black uppercase tracking-wider rounded-xl transition duration-155 shadow-xs cursor-pointer select-none"
+                      >
+                        <RefreshCcw className="w-3.5 h-3.5" />
+                        <span>Buy Again</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadPDFInvoice(order)}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#FF4D00] hover:bg-[#d93d00] text-white text-[11px] font-black uppercase tracking-wider rounded-xl transition duration-155 shadow-xs cursor-pointer select-none"
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                        <span>Download PDF Invoice</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadReceipt(order)}
+                        className="inline-flex items-center gap-2 px-3.5 py-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-[11px] font-bold uppercase tracking-wider rounded-xl transition duration-155 border border-zinc-200/60 cursor-pointer select-none"
+                      >
+                        <Download className="w-3.5 h-3.5 text-zinc-500" />
+                        <span>TXT Receipt</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 48hr SLA Countdown Timer Widget */}
+                  <SlaCountdownTimer createdAt={order.createdAt} status={order.status} />
+
+                  {/* Visual Progress Timeline representing order stage */}
+                  <motion.div
+                    key={`timeline-${order.id}-${order.status}`}
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ type: "spring", stiffness: 220, damping: 25 }}
+                    className="bg-white rounded-[28px] border border-gray-150 p-6 md:p-8 space-y-6 shadow-2xs"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-4">
+                      <div>
+                        <h4 className="text-xs font-black uppercase tracking-tight text-slate-850">Live Production Status Pipeline</h4>
+                        <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider font-mono mt-1">Real-time status tracking inside offset print press division</p>
+                      </div>
+                      <div className="self-start sm:self-center">
+                        <span className={`text-[10px] font-black px-3.5 py-1.5 rounded-xl uppercase tracking-wider border font-mono ${getStatusColor(order.status)}`}>
+                          CURRENT STATUS: {order.status}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Progress Line Tracks */}
+                    <div className="relative pt-4 pb-2">
+                      {/* Background Gray Line */}
+                      <div className="absolute top-9 left-6 right-6 h-1 w-[calc(100%-48px)] bg-zinc-150 -translate-y-1/2 rounded-full hidden md:block" />
+                      
+                      {/* Active High-contrast Progress Line */}
+                      <div 
+                        className="absolute top-9 left-6 h-1 bg-[#FF4D00] -translate-y-1/2 rounded-full transition-all duration-500 hidden md:block"
+                        style={{ width: `calc(${completionPercentage}% - 24px)` }}
+                      />
+
+                      {/* Six Milestones Grid */}
+                      <div className="grid grid-cols-1 md:grid-cols-6 gap-6 md:gap-4 relative select-none">
+                        {STAGES.map((step, idx) => {
+                          const isCompleted = idx <= currentStageIdx;
+                          const isCurrent = idx === currentStageIdx;
+                          
+                          // Match specific icons for phases
+                          let StepIcon = Clock;
+                          if (idx === 0) StepIcon = Package;
+                          if (idx === 1) StepIcon = FileSpreadsheet;
+                          if (idx === 2) StepIcon = Loader2; // Running loader representing Printing
+                          if (idx === 3) StepIcon = CheckCircle;
+                          if (idx === 4) StepIcon = Truck;
+                          if (idx === 5) StepIcon = CheckCircle;
+
+                          return (
+                            <motion.div
+                              key={`${step.status}-${isCurrent}`}
+                              initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                              animate={{ opacity: 1, y: 0, scale: 1 }}
+                              transition={{ duration: 0.3, delay: idx * 0.04 }}
+                              className="flex md:flex-col items-center md:items-center gap-4 md:gap-3 text-left md:text-center relative"
+                            >
+                              {/* Connector for mobile vertical mode (hidden on md) */}
+                              {idx > 0 && (
+                                <div className={`absolute left-5 top-[-24px] h-[24px] w-[2px] md:hidden ${
+                                  idx <= currentStageIdx ? 'bg-[#FF4D00]' : 'bg-zinc-200'
+                                }`} />
+                              )}
+
+                              {/* Circle Node with Icon */}
+                              <div className={`w-10 h-10 rounded-full shrink-0 flex items-center justify-center border-2 transition-all duration-300 z-10 ${
+                                isCompleted
+                                  ? isCurrent
+                                    ? 'bg-[#FF4D00] text-white border-[#FF4D00] ring-4 ring-[#fff5f0] scale-110 font-black shadow-lg shadow-[#FF4D00]/15'
+                                    : 'bg-[#0F172A] text-white border-[#0F172A]'
+                                  : 'bg-white text-zinc-400 border-zinc-200'
+                              }`}>
+                                {isCompleted && !isCurrent ? (
+                                  <span className="text-xs font-black">✓</span>
+                                ) : idx === 2 && isCurrent ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <StepIcon className="w-4 h-4" />
+                                )}
+                              </div>
+
+                              {/* Labels */}
+                              <div className="space-y-0.5">
+                                <p className={`text-xs font-black uppercase tracking-tight leading-tight ${
+                                  isCurrent 
+                                    ? 'text-[#FF4D00]' 
+                                    : isCompleted 
+                                      ? 'text-zinc-950' 
+                                      : 'text-zinc-400'
+                                }`}>
+                                  {step.status === 'Printing In Progress' ? 'Printing' : step.status}
+                                </p>
+                                <p className={`text-[9px] leading-tight font-bold uppercase tracking-wider font-mono ${
+                                  isCurrent ? 'text-zinc-500' : 'text-zinc-400'
+                                }`}>
+                                  {idx === 0 && 'Precheck Done'}
+                                  {idx === 1 && 'Audit Check'}
+                                  {idx === 2 && 'Stock Running'}
+                                  {idx === 3 && 'Press Complete'}
+                                  {idx === 4 && 'Waybill Active'}
+                                  {idx === 5 && 'Delivered Safely'}
+                                </p>
+                              </div>
+                            </motion.div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </motion.div>
+
+                  {/* Item customization specifications summary */}
+                  <div className="space-y-3">
+                    <h4 className="font-micro text-gray-450 block">Custom Print Specifications</h4>
+                    <div className="space-y-2">
+                      {order.items.map((item) => (
+                        <div key={item.id} className="bg-white rounded-[24px] p-5 border border-zinc-200/60 shadow-xs flex items-start justify-between gap-4">
+                          <div className="flex items-start gap-4">
+                            {/* Product photograph thumbnail */}
+                            <div className="w-14 h-14 rounded-xl overflow-hidden bg-zinc-100 border border-zinc-200 shrink-0 relative shadow-2xs">
+                              {item.productImage ? (
+                                <img
+                                  src={item.productImage}
+                                  alt={item.productName}
+                                  className="w-full h-full object-cover"
+                                  referrerPolicy="no-referrer"
+                                />
+                              ) : (
+                                <span className="text-[9px] font-bold text-zinc-400 font-mono flex items-center justify-center h-full">N/A</span>
+                              )}
+                            </div>
+                            
+                            <div className="space-y-1">
+                              <p className="text-sm font-heavy text-slate-950 uppercase tracking-tight">{item.productName}</p>
+                              <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wide leading-tight">
+                                Size: {item.selectedSize.name} • Finish: {item.selectedMaterial.name} • Qty: {item.selectedQuantity} Pcs
+                              </p>
+                              <div className="inline-flex items-center gap-1.5 bg-[#fff5f0] text-[#FF4D00] text-[9px] font-bold uppercase px-3 py-1 rounded-md border border-[#FF4D00]/10 mt-1.5 font-mono">
+                                <span>Asset Vector: {item.designFile.name} ({(item.designFile.size / (1024 * 1024)).toFixed(2)} MB)</span>
+                              </div>
+                            </div>
+                          </div>
+                          <span className="text-sm font-bold text-slate-900 font-mono whitespace-nowrap">₹{item.itemTotal.toLocaleString('en-IN')}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 100% payment clearance widget */}
+                  <div className="bg-white rounded-[32px] p-6 border border-zinc-200/80 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-6">
+                    <div className="space-y-1.5">
+                      <p className="font-micro text-gray-400 block">PAYMENT SETTLEMENT</p>
+                      <div className="flex items-center gap-2 text-emerald-600 font-heavy text-base uppercase">
+                        <CheckCircle className="w-5 h-5 text-emerald-500 font-bold" />
+                        <span>₹{order.totalAmount.toLocaleString('en-IN')} Secured (100% Paid Upfront)</span>
+                      </div>
+                      <p className="text-[10px] text-zinc-500 font-mono font-bold uppercase">
+                        Transaction ID: {order.payments[0]?.txId || 'TXN_SYSTEM_AUTO'} • Stamp: {order.payments[0] ? new Date(order.payments[0].timestamp).toLocaleString('en-IN') : 'AUTO'}
+                      </p>
+                    </div>
+                    
+                    <div className="inline-flex items-center gap-2 bg-emerald-50 text-emerald-800 border border-emerald-250 text-xs font-black uppercase px-4 py-2.5 rounded-2xl select-none">
+                      <span>✓ Invoice fully settled</span>
+                    </div>
+                  </div>
+
+                  {/* Courier Tracking Section */}
+                  {order.trackingNumber && (
+                    <div className="bg-[#fff5f0] text-zinc-800 p-6 rounded-[24px] border border-[#FF4D00]/20 flex items-start gap-4">
+                      <Truck className="w-6 h-6 mt-0.5 shrink-0 text-[#FF4D00]" />
+                      <div className="space-y-1">
+                        <h5 className="text-xs font-black uppercase tracking-wider text-[#FF4D00]">DISPATCHED - COURIER INITIATED</h5>
+                        <p className="text-xs text-[#0F172A] font-bold uppercase mt-1">
+                          Consignment dispatched via <strong className="font-extrabold text-[#0F172A]">{order.courierName}</strong>. 
+                        </p>
+                        <div className="mt-3 flex items-center gap-2">
+                          <span className="text-xs bg-white text-zinc-900 px-3.5 py-1 rounded-xl border border-[#FF4D00]/20 font-mono font-bold uppercase">
+                            Waybill No: {order.trackingNumber}
+                          </span>
+                          <span className="text-[9px] bg-[#FF4D00] text-white font-black px-2.5 py-1 rounded-full uppercase">
+                            IN TRANSIT
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Pay balance modal */}
+      {payingOrderId && (
+        <CashfreeGateway
+          amount={balanceAmountToPay}
+          paymentTypeLabel="50% Outstanding Balance payment"
+          onSuccess={handleBalancePaymentSuccess}
+          onCancel={() => setPayingOrderId(null)}
+        />
+      )}
+
+    </div>
+  );
+}

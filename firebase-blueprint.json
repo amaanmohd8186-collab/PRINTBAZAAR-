@@ -1,0 +1,58 @@
+{
+  "entities": {
+    "Seller": {
+      "title": "Seller",
+      "description": "Represents a merchant in the system with full KYC data.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "mobile": { "type": "string" },
+        "dob": { "type": "string", "format": "date" },
+        "status": {
+          "type": "string",
+          "enum": ["Draft", "Submitted", "Under Review", "Additional Info Required", "Approved", "Rejected", "Verified", "Suspended"]
+        },
+        "level": {
+          "type": "string",
+          "enum": ["Candidate", "Verified", "Premium Seller", "Trusted Seller", "Gold Seller", "Enterprise Seller"]
+        },
+        "verificationStep": { "type": "integer" },
+        "documents": {
+          "type": "object",
+          "properties": {
+            "selfie": { "type": "string" },
+            "governmentIdType": { "type": "string" },
+            "governmentIdNumber": { "type": "string" },
+            "governmentIdFile": { "type": "string" },
+            "businessGst": { "type": "string" },
+            "businessPan": { "type": "string" },
+            "addressLine": { "type": "string" },
+            "pincode": { "type": "string" },
+            "city": { "type": "string" },
+            "state": { "type": "string" },
+            "bankAccountNumber": { "type": "string" },
+            "bankIfscCode": { "type": "string" },
+            "bankName": { "type": "string" },
+            "mobileOtpVerified": { "type": "boolean" },
+            "emailOtpVerified": { "type": "boolean" }
+          }
+        },
+        "aiRiskScore": { "type": "integer" },
+        "trustScore": { "type": "integer" },
+        "aiFraudFlags": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "required": ["id", "name", "email", "mobile", "status"]
+    }
+  },
+  "firestore": {
+    "/sellers/{sellerId}": {
+      "schema": "Seller",
+      "description": "Collection of seller profiles including KYC documents."
+    }
+  }
+}

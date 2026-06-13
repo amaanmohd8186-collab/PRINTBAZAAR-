@@ -1,0 +1,91 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && 
+             (request.auth.token.get('email', '') == "amaanmohd8186@gmail.com" || 
+              request.auth.token.get('email', '') == "amaanmohd81865@gmail.com" ||
+              request.auth.token.get('email', '') == "gazisiddiqui01@gmail.com");
+    }
+
+    match /products/{productId} {
+      allow read: if true; 
+      allow write: if isAdmin();
+    }
+
+    match /designs/{designId} {
+      allow read: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid || resource.data.userId == 'anonymous');
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
+    }
+
+    match /user_stats/{userId} {
+      allow read, write: if isSignedIn() && (isAdmin() || request.auth.uid == userId);
+    }
+
+    match /transactions/{txId} {
+      allow read: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn();
+    }
+
+    match /bulk_quotes/{quoteId} {
+      allow read: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn();
+    }
+
+    match /dev_verification_codes/{id} {
+      allow read, write: if isAdmin();
+    }
+
+    match /verification_audits/{id} {
+      allow read, write: if isAdmin();
+    }
+
+    match /orders/{orderId} {
+      allow read: if isSignedIn() && (
+        isAdmin() || 
+        (resource != null && resource.data.customerEmail == request.auth.token.get('email', ''))
+      );
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (
+        isAdmin() || 
+        (resource != null && resource.data.customerEmail == request.auth.token.get('email', ''))
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /subscribers/{subscriberId} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
+    }
+
+    match /sellers/{sellerId} {
+      allow read: if isSignedIn() && (isAdmin() || request.auth.uid == sellerId);
+      allow create: if isSignedIn() && request.auth.uid == sellerId;
+      allow update: if isSignedIn() && (isAdmin() || request.auth.uid == sellerId);
+      allow list: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /cashfree_orders/{id} {
+      allow read, write: if isAdmin();
+    }
+
+    match /cashfree_audit_logs/{id} {
+      allow read, write: if isAdmin();
+    }
+
+    match /_diagnostics/{id} {
+      allow read, write: if isAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
