@@ -2,90 +2,88 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // --- HELPER FUNCTIONS ---
     function isSignedIn() {
       return request.auth != null;
     }
 
     function isAdmin() {
       return isSignedIn() && 
-             (request.auth.token.get('email', '') == "amaanmohd8186@gmail.com" || 
-              request.auth.token.get('email', '') == "amaanmohd81865@gmail.com" ||
-              request.auth.token.get('email', '') == "gazisiddiqui01@gmail.com");
+             (request.auth.token.email == "musagraphics75@gmail.com" || 
+              request.auth.token.email == "gazisiddiqui01@gmail.com");
     }
 
+    // --- COLLECTION RULES ---
+
+    // 1. User Profiles
+    match /users/{userId} {
+      allow read: if (isSignedIn() && request.auth.uid == userId) || isAdmin();
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update: if (isSignedIn() && request.auth.uid == userId) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // 2. Sellers & Onboarding
+    match /sellers/{sellerId} {
+      allow read: if (isSignedIn() && request.auth.uid == sellerId) || isAdmin();
+      allow create: if isSignedIn() && request.auth.uid == sellerId;
+      allow update: if (isSignedIn() && request.auth.uid == sellerId) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // 3. Products (Public Read, Admin Write)
     match /products/{productId} {
-      allow read: if true; 
+      allow read: if true;
       allow write: if isAdmin();
     }
 
-    match /designs/{designId} {
-      allow read: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid || resource.data.userId == 'anonymous');
+    // 4. Designs (Owner + Admin)
+    match /generated_designs/{designId} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
       allow create: if isSignedIn();
-      allow update, delete: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow update, delete: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
     }
 
-    match /user_stats/{userId} {
-      allow read, write: if isSignedIn() && (isAdmin() || request.auth.uid == userId);
-    }
-
-    match /transactions/{txId} {
-      allow read: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
-      allow create: if isSignedIn();
-    }
-
-    match /bulk_quotes/{quoteId} {
-      allow read: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
-      allow create: if isSignedIn();
-    }
-
-    match /dev_verification_codes/{id} {
-      allow read, write: if isAdmin();
-    }
-
-    match /verification_audits/{id} {
-      allow read, write: if isAdmin();
-    }
-
+    // 5. Orders (Owner + Admin)
     match /orders/{orderId} {
-      allow read: if isSignedIn() && (
-        isAdmin() || 
-        (resource != null && resource.data.customerEmail == request.auth.token.get('email', ''))
-      );
+      allow read: if isAdmin() || (isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.customerEmail == request.auth.token.email));
       allow create: if isSignedIn();
-      allow update: if isSignedIn() && (
-        isAdmin() || 
-        (resource != null && resource.data.customerEmail == request.auth.token.get('email', ''))
-      );
+      allow update: if isAdmin() || (isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.customerEmail == request.auth.token.email));
       allow delete: if isAdmin();
     }
 
-    match /subscribers/{subscriberId} {
-      allow create: if true;
-      allow read, update, delete: if isAdmin();
+    // 6. Payments (Admin Only - Client should not touch directly)
+    match /payments/{paymentId} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow write: if isAdmin();
     }
 
-    match /sellers/{sellerId} {
-      allow read: if isSignedIn() && (isAdmin() || request.auth.uid == sellerId);
-      allow create: if isSignedIn() && request.auth.uid == sellerId;
-      allow update: if isSignedIn() && (isAdmin() || request.auth.uid == sellerId);
-      allow list: if isAdmin();
-      allow delete: if isAdmin();
+    // 7. Quotes (Owner + Admin)
+    match /quotes/{quoteId} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn();
+      allow update: if isAdmin();
     }
 
-    match /cashfree_orders/{id} {
-      allow read, write: if isAdmin();
+    // 9. Audit Logs (Backend Only - No client access)
+    match /audit_logs/{id} {
+      allow read, write: if false;
     }
 
-    match /cashfree_audit_logs/{id} {
-      allow read, write: if isAdmin();
+    // 10. Wallet Transactions (Owner Read - Admin Write)
+    match /wallet_transactions/{txId} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow write: if isAdmin();
     }
 
+    // 11. Diagnostics & Internal (Admin Only)
     match /_diagnostics/{id} {
       allow read, write: if isAdmin();
     }
 
+    // --- FALLBACK ---
     match /{document=**} {
-      allow read, write: if false;
+      allow read, write: if isAdmin();
     }
   }
 }

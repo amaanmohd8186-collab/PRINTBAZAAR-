@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { 
   Loader2, 
   FileText, 
@@ -37,23 +37,19 @@ export default function PaymentHistory({ userId, onBack }: PaymentHistoryProps) 
   useEffect(() => {
     if (!userId) return;
 
-    const txCol = collection(db, 'transactions');
     const q = query(
-      txCol, 
-      where('userId', '==', userId), 
-      orderBy('timestamp', 'desc'),
+      collection(db, 'wallet_transactions'),
+      where('userId', '==', userId),
+      orderBy('createdAt', 'desc'),
       limit(50)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const txList: WalletTransaction[] = [];
-      snapshot.forEach((docSnap) => {
-        txList.push({ id: docSnap.id, ...docSnap.data() } as WalletTransaction);
-      });
+      const txList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as unknown as WalletTransaction[];
       setTransactions(txList);
       setLoading(false);
     }, (error) => {
-      console.error("Error fetching transactions:", error);
+      console.error("Wallet transactions fetch failed:", error);
       setLoading(false);
     });
 

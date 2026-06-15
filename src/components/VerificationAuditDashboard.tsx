@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { VerificationAudit } from '../types';
+import { getAuthHeaders } from '../firebase';
 
 interface VerificationAuditDashboardProps {
   onBack: () => void;
@@ -31,7 +32,8 @@ export const VerificationAuditDashboard: React.FC<VerificationAuditDashboardProp
 
   const fetchAudits = async () => {
     try {
-      const res = await fetch('/api/verification/audits');
+      const headers = await getAuthHeaders();
+      const res = await fetch('/api/verification/audits', { headers });
       const data = await res.json();
       if (data.success) setAudits(data.audits);
     } catch (err) {

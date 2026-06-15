@@ -3,7 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { ShoppingBag, Trash2, FileCode, Landmark, ShieldCheck, ArrowRight, Wallet, CheckCircle2 } from 'lucide-react';
 import { CartItem, PaymentDetails, Order } from '../types';
 import CashfreeGateway from './CashfreeGateway';
@@ -39,63 +40,9 @@ export default function CartView({
   const [phone, setPhone] = useState('');
   const [isConfirmed, setIsConfirmed] = useState(false);
 
-  // OTP Verification State
-  const [isPhoneVerified, setIsPhoneVerified] = useState(false);
-  const [isEmailVerified, setIsEmailVerified] = useState(false);
-  
-  const [showPhoneOtp, setShowPhoneOtp] = useState(false);
-  const [phoneOtp, setPhoneOtp] = useState('');
-  const [phoneVerifyLoading, setPhoneVerifyLoading] = useState(false);
-
-  const [showEmailOtp, setShowEmailOtp] = useState(false);
-  const [emailOtp, setEmailOtp] = useState('');
-  const [emailVerifyLoading, setEmailVerifyLoading] = useState(false);
-  
   const [shippingError, setShippingError] = useState('');
 
   const cartSubtotal = cartItems.reduce((acc, item) => acc + item.itemTotal, 0);
-
-  const requestOtp = async (type: 'mobile' | 'email', value: string) => {
-    try {
-      const res = await fetch('/api/seller/send-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, mobile: type === 'mobile' ? value : undefined, email: type === 'email' ? value : undefined })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to send OTP');
-      
-      if (type === 'mobile') setShowPhoneOtp(true);
-      else setShowEmailOtp(true);
-      
-      setShippingError(''); // Clear error
-    } catch (err: any) {
-      setShippingError(err.message);
-    }
-  };
-
-  const verifyOtp = async (type: 'mobile' | 'email', value: string, otp: string) => {
-    try {
-      const res = await fetch('/api/seller/verify-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, mobile: type === 'mobile' ? value : undefined, email: type === 'email' ? value : undefined, otp })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Invalid OTP');
-      
-      if (type === 'mobile') {
-        setIsPhoneVerified(true);
-        setShowPhoneOtp(false);
-      } else {
-        setIsEmailVerified(true);
-        setShowEmailOtp(false);
-      }
-      setShippingError('');
-    } catch (err: any) {
-      setShippingError(err.message);
-    }
-  };
 
   const validateCheckout = (): string | null => {
     // 1. Name Validation
@@ -107,11 +54,11 @@ export default function CartView({
     // 2. Mobile Validation
     if (!/^[6-9]\d{9}$/.test(phone)) return 'Please enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9.';
     if (/^(\d)\1{9}$/.test(phone) || phone === '1234567890') return 'Invalid mobile number format.';
-    if (!isPhoneVerified) return 'Mobile number must be verified with OTP before checkout.';
+    // Mobile verification no longer required:
+    // if (!isPhoneVerified) return 'Mobile number must be verified before checkout.';
 
     // 3. Email Validation
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(checkoutEmail)) return 'Please enter a valid email address.';
-    if (!isEmailVerified) return 'Email address must be verified with OTP before checkout.';
 
     // 4. Address Validation
     const fullAddress = `${addressLine1} ${addressLine2} ${city} ${state}`.trim();
@@ -203,63 +150,69 @@ export default function CartView({
             </span>
           </div>
 
-          <div className="space-y-4">
-            {cartItems.map((item) => (
-              <div
-                key={item.id}
-                className="bg-white rounded-[32px] p-5 border border-gray-200/60 shadow-sm hover:shadow-md transition-all flex items-start gap-4"
-              >
-                {/* Visual product photograph thumbnail preview */}
-                <div className="w-16 h-16 rounded-[20px] overflow-hidden bg-zinc-100 border border-zinc-200 flex items-center justify-center shrink-0 relative shadow-2xs">
-                  {item.productImage ? (
-                    <img
-                      src={item.productImage}
-                      alt={item.productName}
-                      className="w-full h-full object-cover"
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <FileCode className="w-6 h-6 text-zinc-400" />
-                  )}
-                </div>
-
-                <div className="flex-1 min-w-0 space-y-1.5">
-                  <div className="flex justify-between items-start gap-2">
-                    <h4 className="text-sm font-heavy text-slate-900 truncate uppercase tracking-tight">{item.productName}</h4>
-                    <span className="text-sm font-mono font-heavy text-slate-900">₹{item.itemTotal.toLocaleString('en-IN')}</span>
-                  </div>
-                  
-                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-zinc-500 font-bold uppercase tracking-wider">
-                    <span>Size: <strong className="text-zinc-950 font-heavy">{item.selectedSize.name}</strong></span>
-                    <span>•</span>
-                    <span>Finish: <strong className="text-zinc-950 font-heavy">{item.selectedMaterial.name}</strong></span>
-                    <span>•</span>
-                    <span>Qty: <strong className="text-[#FF4D00] font-mono">{item.selectedQuantity} PCS</strong></span>
-                  </div>
-
-                  <div className="bg-zinc-50 p-2.5 rounded-xl border border-zinc-150 flex items-center justify-between gap-2 mt-2">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <div className="w-2 h-2 rounded-full bg-[#FF4D00] shrink-0" />
-                      <p className="text-[10px] text-zinc-500 truncate font-mono">FILE: {item.designFile.name}</p>
-                    </div>
-                    <span className="text-[9px] text-zinc-400 shrink-0 uppercase font-black font-mono">
-                      {(item.designFile.size / (1024 * 1024)).toFixed(2)} MB
-                    </span>
-                  </div>
-                </div>
-
-                {/* Remove button */}
-                <button
-                  type="button"
-                  onClick={() => onRemoveItem(item.id)}
-                  className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition shrink-0 self-start"
-                  title="Remove from checkout"
+          <motion.div layout className="space-y-4">
+            <AnimatePresence mode="popLayout" initial={false}>
+              {cartItems.map((item) => (
+                <motion.div
+                  key={item.id}
+                  layout
+                  initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
+                  className="bg-white rounded-[32px] p-5 border border-gray-200/60 shadow-sm hover:shadow-md transition-all flex items-start gap-4"
                 >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
-          </div>
+                  {/* Visual product photograph thumbnail preview */}
+                  <div className="w-16 h-16 rounded-[20px] overflow-hidden bg-zinc-100 border border-zinc-200 flex items-center justify-center shrink-0 relative shadow-2xs">
+                    {item.productImage ? (
+                      <img
+                        src={item.productImage}
+                        alt={item.productName}
+                        className="w-full h-full object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <FileCode className="w-6 h-6 text-zinc-400" />
+                    )}
+                  </div>
+
+                  <div className="flex-1 min-w-0 space-y-1.5">
+                    <div className="flex justify-between items-start gap-2">
+                      <h4 className="text-sm font-heavy text-slate-900 truncate uppercase tracking-tight">{item.productName}</h4>
+                      <span className="text-sm font-mono font-heavy text-slate-900">₹{item.itemTotal.toLocaleString('en-IN')}</span>
+                    </div>
+                    
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-zinc-500 font-bold uppercase tracking-wider">
+                      <span>Size: <strong className="text-zinc-950 font-heavy">{item.selectedSize.name}</strong></span>
+                      <span>•</span>
+                      <span>Finish: <strong className="text-zinc-950 font-heavy">{item.selectedMaterial.name}</strong></span>
+                      <span>•</span>
+                      <span>Qty: <strong className="text-[#FF4D00] font-mono">{item.selectedQuantity} PCS</strong></span>
+                    </div>
+
+                    <div className="bg-zinc-50 p-2.5 rounded-xl border border-zinc-150 flex items-center justify-between gap-2 mt-2">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <div className="w-2 h-2 rounded-full bg-[#FF4D00] shrink-0" />
+                        <p className="text-[10px] text-zinc-500 truncate font-mono">FILE: {item.designFile.name}</p>
+                      </div>
+                      <span className="text-[9px] text-zinc-400 shrink-0 uppercase font-black font-mono">
+                        {(item.designFile.size / (1024 * 1024)).toFixed(2)} MB
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Remove button */}
+                  <button
+                    type="button"
+                    onClick={() => onRemoveItem(item.id)}
+                    className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition shrink-0 self-start"
+                    title="Remove from checkout"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </motion.div>
         </div>
 
         {/* Checkout Summary panel */}
@@ -332,42 +285,14 @@ export default function CartView({
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#FF4D00] focus:border-transparent font-mono"
                 />
                 
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="email"
-                      placeholder="Email Address *"
-                      value={checkoutEmail}
-                      onChange={(e) => { setCheckoutEmail(e.target.value); setIsEmailVerified(false); }}
-                      disabled={isEmailVerified}
-                      className={`w-full ${isEmailVerified ? 'bg-white/2 opacity-60' : 'bg-white/5'} border border-white/10 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#FF4D00] focus:border-transparent font-mono`}
-                    />
-                    {!isEmailVerified && checkoutEmail.includes('@') && (
-                      <button type="button" onClick={() => requestOtp('email', checkoutEmail)} className="px-3 py-3 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white text-[10px] font-bold uppercase whitespace-nowrap transition-colors shadow-sm">
-                        Verify
-                      </button>
-                    )}
-                    {isEmailVerified && (
-                      <div className="px-3 py-3 rounded-xl bg-green-500/10 border border-green-500/20 text-green-400 text-[10px] font-bold uppercase whitespace-nowrap shadow-sm flex items-center gap-1.5">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        Verified
-                      </div>
-                    )}
-                  </div>
-                  {showEmailOtp && (
-                    <div className="flex items-center gap-2 pl-2 border-l-2 border-[#FF4D00]">
-                      <input
-                        type="text"
-                        placeholder="6-digit Email OTP"
-                        value={emailOtp}
-                        onChange={(e) => setEmailOtp(e.target.value)}
-                        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 max-w-[150px] font-mono"
-                      />
-                      <button type="button" onClick={() => verifyOtp('email', checkoutEmail, emailOtp)} className="px-3 py-2 bg-[#FF4D00] hover:bg-[#E64500] text-white text-[10px] rounded-lg font-bold uppercase">
-                        Confirm
-                      </button>
-                    </div>
-                  )}
+                <div>
+                  <input
+                    type="email"
+                    placeholder="Email Address *"
+                    value={checkoutEmail}
+                    onChange={(e) => setCheckoutEmail(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#FF4D00] focus:border-transparent font-mono"
+                  />
                 </div>
               </div>
             </div>
@@ -423,39 +348,12 @@ export default function CartView({
                       type="tel"
                       placeholder="Mobile No *"
                       value={phone}
-                      onChange={(e) => { setPhone(e.target.value.replace(/\D/g, '')); setIsPhoneVerified(false); }}
+                      onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
                       maxLength={10}
-                      disabled={isPhoneVerified}
-                      className={`w-full ${isPhoneVerified ? 'bg-white/2 opacity-60' : 'bg-white/5'} border border-white/10 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#FF4D00] focus:border-transparent font-mono`}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#FF4D00] focus:border-transparent font-mono"
                     />
                   </div>
-                  
-                  {!isPhoneVerified && phone.length === 10 && (
-                    <button type="button" onClick={() => requestOtp('mobile', phone)} className="w-full py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white text-[10px] font-bold uppercase whitespace-nowrap transition-colors shadow-sm mt-1">
-                      Verify Mobile Number
-                    </button>
-                  )}
-                  {isPhoneVerified && (
-                    <div className="w-full py-2.5 rounded-xl bg-green-500/10 border border-green-500/20 text-green-400 text-[10px] font-bold uppercase whitespace-nowrap shadow-sm flex items-center justify-center gap-1.5 mt-1">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      Mobile Verified
-                    </div>
-                  )}
-
-                  {showPhoneOtp && (
-                    <div className="flex items-center gap-2 pl-2 border-l-2 border-[#FF4D00] mt-1">
-                      <input
-                        type="text"
-                        placeholder="6-digit Mobile OTP"
-                        value={phoneOtp}
-                        onChange={(e) => setPhoneOtp(e.target.value)}
-                        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 font-mono"
-                      />
-                      <button type="button" onClick={() => verifyOtp('mobile', phone, phoneOtp)} className="px-4 py-2 bg-[#FF4D00] hover:bg-[#E64500] text-white text-[10px] rounded-lg font-bold uppercase whitespace-nowrap">
-                        Confirm
-                      </button>
-                    </div>
-                  )}
+                  {/* SMS OTP verification removed - Phone number is captured purely for delivery updates */}
                 </div>
                 
                 {shippingError && (

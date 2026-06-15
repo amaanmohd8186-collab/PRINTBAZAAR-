@@ -40,8 +40,19 @@ export default function CashfreeGateway({
     async function checkConfig() {
       try {
         const response = await fetch('/api/cashfree/config');
-        const data = await response.json();
-        if (data.success) {
+        const text = await response.text();
+        let data: any = {};
+        
+        if (text) {
+          try {
+            data = JSON.parse(text);
+          } catch (parseErr) {
+            console.error("Non-JSON response from /api/cashfree/config:", text);
+            // Non-blocking for config check
+          }
+        }
+        
+        if (response.ok && data.success) {
           setHasKeys(data.hasKeys);
           setCashfreeEnv(data.env);
         }
@@ -87,24 +98,78 @@ export default function CashfreeGateway({
           customerEmail
         })
       });
-      const data = await res.json();
       
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to initialize Cashfree order session');
+      const text = await res.text();
+      let data: any = {};
+      
+      if (text) {
+        try {
+          data = JSON.parse(text);
+        } catch (parseErr) {
+          console.error("Non-JSON response from /api/cashfree/create-order:", text);
+          throw new Error(`Order creation failed: Server returned non-JSON response (${res.status})`);
+        }
+      }
+      
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || `Failed to initialize Cashfree order session (${res.status})`);
+      }
+
+      if (!data.payment_session_id) {
+        console.error("========== CASHFREE INITIALIZATION ERROR ==========");
+        console.error("Root cause: payment_session_id is missing");
+        console.error("Line failed: 'cf.checkout' cannot be called");
+        console.error("Variable undefined: data.payment_session_id");
+        console.error("API returned valid data? False:", data);
+        console.error("==================================================");
+        throw new Error("Backend did not return a valid payment_session_id. Initialization failed.");
       }
 
       setStep('Mounting Cashfree V3 Checkout...');
       const loaded = await loadCashfreeScript();
       if (!loaded) throw new Error('Cashfree SDK failed to load. Check internet connectivity.');
 
-      const cf = new Cashfree({ mode: cashfreeEnv.toLowerCase() === 'production' ? 'production' : 'sandbox' });
+      const resolvedEnv = data.environment || cashfreeEnv;
+      console.log(`[CASHFREE] Verified Environment matching: Backend=${data.environment}, Frontend=${resolvedEnv}`);
       
+      console.log("Checkout Payload:", {
+        paymentSessionId: data.payment_session_id,
+        redirectTarget: "_self"
+      });
+
+      console.log("paymentSessionId typeof:", typeof data.payment_session_id);
+      console.log("paymentSessionId value:", data.payment_session_id);
+
+      if (!data.payment_session_id || typeof data.payment_session_id !== 'string' || !data.payment_session_id.startsWith('session_')) {
+        throw new Error(`Invalid payment_session_id format: ${data.payment_session_id}`);
+      }
+
+      // Ensure window.Cashfree exists
+      if (!(window as any).Cashfree) {
+        throw new Error('window.Cashfree is undefined after script load.');
+      }
+      
+      console.log("[CASHFREE] window.Cashfree:", (window as any).Cashfree);
+      if ((window as any).Cashfree.version) {
+        console.log("[CASHFREE] SDK Version:", (window as any).Cashfree.version);
+      }
+
+      const cfInstance = (window as any).Cashfree({ mode: resolvedEnv.toLowerCase() === 'production' ? 'production' : 'sandbox' });
+      
+      console.log("[CASHFREE] Initialized Instance:", cfInstance);
+
       setStep('Launching secure payment overlay...');
       
-      cf.checkout({
+      const payload = {
         paymentSessionId: data.payment_session_id,
-        redirectTarget: "_self", 
-      }).then(async (result: any) => {
+        redirectTarget: "_self"
+      };
+
+      console.log("========== CASHFREE CHECKOUT PAYLOAD ==========");
+      console.log(payload);
+      console.log("===============================================");
+
+      cfInstance.checkout(payload).then(async (result: any) => {
         if (result.error) {
           setErrorMsg(result.error.message);
           setProcessing(false);
@@ -118,9 +183,20 @@ export default function CashfreeGateway({
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ order_id: data.order_id })
           });
-          const verifyData = await verifyRes.json();
           
-          if (verifyData.success && verifyData.verified) {
+          const verifyText = await verifyRes.text();
+          let verifyData: any = {};
+          
+          if (verifyText) {
+            try {
+              verifyData = JSON.parse(verifyText);
+            } catch (e) {
+              console.error("Non-JSON response from /api/cashfree/verify-payment:", verifyText);
+              throw new Error(`Payment verification failed: Server returned non-JSON response (${verifyRes.status})`);
+            }
+          }
+          
+          if (verifyRes.ok && verifyData.success && verifyData.verified) {
             const paymentResult: PaymentDetails = {
               method: 'Card',
               txId: verifyData.payment?.cf_payment_id || data.order_id,

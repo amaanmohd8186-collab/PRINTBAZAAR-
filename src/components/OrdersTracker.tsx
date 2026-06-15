@@ -10,6 +10,7 @@ import { jsPDF } from 'jspdf';
 import { Order, OrderStatus, PaymentDetails } from '../types';
 import CashfreeGateway from './CashfreeGateway';
 import CustomerSpendingChart from './CustomerSpendingChart';
+import { DesignApprovalWorkflow } from './DesignApprovalWorkflow';
 
 function SlaCountdownTimer({ createdAt, status }: { createdAt: string; status: OrderStatus }) {
   const [timeLeftStr, setTimeLeftStr] = useState('');
@@ -104,12 +105,16 @@ interface OrdersTrackerProps {
   orders: Order[];
   onPayBalanceSuccess: (orderId: string, payment: PaymentDetails) => void;
   onReorder?: (order: Order) => void;
+  userRole?: 'customer' | 'seller' | 'admin';
+  userEmail?: string;
 }
 
 export default function OrdersTracker({
   orders,
   onPayBalanceSuccess,
-  onReorder
+  onReorder,
+  userRole = 'customer',
+  userEmail = 'amaanmohd8681@gmail.com'
 }: OrdersTrackerProps) {
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [payingOrderId, setPayingOrderId] = useState<string | null>(null);
@@ -664,9 +669,11 @@ ${separator}
                       <div className="absolute top-9 left-6 right-6 h-1 w-[calc(100%-48px)] bg-zinc-150 -translate-y-1/2 rounded-full hidden md:block" />
                       
                       {/* Active High-contrast Progress Line */}
-                      <div 
-                        className="absolute top-9 left-6 h-1 bg-[#FF4D00] -translate-y-1/2 rounded-full transition-all duration-500 hidden md:block"
-                        style={{ width: `calc(${completionPercentage}% - 24px)` }}
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `calc(${completionPercentage}% - 24px)` }}
+                        transition={{ type: "spring", stiffness: 100, damping: 18 }}
+                        className="absolute top-9 left-6 h-1 bg-[#FF4D00] -translate-y-1/2 rounded-full hidden md:block"
                       />
 
                       {/* Six Milestones Grid */}
@@ -687,46 +694,67 @@ ${separator}
                           return (
                             <motion.div
                               key={`${step.status}-${isCurrent}`}
-                              initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                              animate={{ opacity: 1, y: 0, scale: 1 }}
+                              initial={{ opacity: 0, scale: 0.95 }}
+                              animate={{ opacity: 1, scale: 1 }}
                               transition={{ duration: 0.3, delay: idx * 0.04 }}
                               className="flex md:flex-col items-center md:items-center gap-4 md:gap-3 text-left md:text-center relative"
                             >
                               {/* Connector for mobile vertical mode (hidden on md) */}
                               {idx > 0 && (
-                                <div className={`absolute left-5 top-[-24px] h-[24px] w-[2px] md:hidden ${
-                                  idx <= currentStageIdx ? 'bg-[#FF4D00]' : 'bg-zinc-200'
-                                }`} />
+                                <motion.div 
+                                  animate={{ 
+                                    backgroundColor: idx <= currentStageIdx ? '#FF4D00' : '#E4E4E5'
+                                  }}
+                                  transition={{ duration: 0.4 }}
+                                  className="absolute left-5 top-[-24px] h-[24px] w-[2px] md:hidden"
+                                />
                               )}
 
                               {/* Circle Node with Icon */}
-                              <div className={`w-10 h-10 rounded-full shrink-0 flex items-center justify-center border-2 transition-all duration-300 z-10 ${
-                                isCompleted
-                                  ? isCurrent
-                                    ? 'bg-[#FF4D00] text-white border-[#FF4D00] ring-4 ring-[#fff5f0] scale-110 font-black shadow-lg shadow-[#FF4D00]/15'
-                                    : 'bg-[#0F172A] text-white border-[#0F172A]'
-                                  : 'bg-white text-zinc-400 border-zinc-200'
-                              }`}>
+                              <motion.div 
+                                animate={{
+                                  scale: isCurrent ? 1.15 : 1,
+                                  backgroundColor: isCurrent ? '#FF4D00' : isCompleted ? '#0F172A' : '#FFFFFF',
+                                  borderColor: isCurrent ? '#FF4D00' : isCompleted ? '#0F172A' : '#E4E4E7',
+                                }}
+                                transition={{ type: "spring", stiffness: 260, damping: 20 }}
+                                className={`w-10 h-10 rounded-full shrink-0 flex items-center justify-center border-2 z-10 transition-shadow ${
+                                  isCurrent ? 'ring-4 ring-[#fff5f0] shadow-lg shadow-[#FF4D00]/20' : ''
+                                }`}
+                              >
                                 {isCompleted && !isCurrent ? (
-                                  <span className="text-xs font-black">✓</span>
+                                  <motion.span 
+                                    initial={{ scale: 0, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 1 }}
+                                    transition={{ type: "spring", stiffness: 300, damping: 15 }}
+                                    className="text-xs font-black text-white"
+                                  >
+                                    ✓
+                                  </motion.span>
                                 ) : idx === 2 && isCurrent ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                  <Loader2 className="w-4 h-4 text-white animate-spin" />
                                 ) : (
-                                  <StepIcon className="w-4 h-4" />
+                                  <motion.div
+                                    animate={{ 
+                                      color: isCurrent ? '#FFFFFF' : isCompleted ? '#FFFFFF' : '#A1A1AA' 
+                                    }}
+                                    transition={{ duration: 0.3 }}
+                                  >
+                                    <StepIcon className="w-4 h-4" />
+                                  </motion.div>
                                 )}
-                              </div>
+                              </motion.div>
 
                               {/* Labels */}
                               <div className="space-y-0.5">
-                                <p className={`text-xs font-black uppercase tracking-tight leading-tight ${
-                                  isCurrent 
-                                    ? 'text-[#FF4D00]' 
-                                    : isCompleted 
-                                      ? 'text-zinc-950' 
-                                      : 'text-zinc-400'
-                                }`}>
+                                <motion.p 
+                                  animate={{
+                                    color: isCurrent ? '#FF4D00' : isCompleted ? '#0F172A' : '#A1A1AA'
+                                  }}
+                                  className="text-xs font-black uppercase tracking-tight leading-tight"
+                                >
                                   {step.status === 'Printing In Progress' ? 'Printing' : step.status}
-                                </p>
+                                </motion.p>
                                 <p className={`text-[9px] leading-tight font-bold uppercase tracking-wider font-mono ${
                                   isCurrent ? 'text-zinc-500' : 'text-zinc-400'
                                 }`}>
@@ -744,6 +772,17 @@ ${separator}
                       </div>
                     </div>
                   </motion.div>
+
+                  {/* Smart Client-Seller Design Annotation & Consultation Arena */}
+                  <DesignApprovalWorkflow
+                    order={order}
+                    userRole={userRole}
+                    userEmail={userEmail}
+                    onStatusUpdate={(orderId, newStatus) => {
+                      // Status sync hook
+                      order.status = newStatus;
+                    }}
+                  />
 
                   {/* Item customization specifications summary */}
                   <div className="space-y-3">

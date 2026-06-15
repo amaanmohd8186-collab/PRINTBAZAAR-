@@ -1,0 +1,35 @@
+{
+  "timestamp": "2026-06-15T12:25:11.143Z",
+  "env": {
+    "projectId_exists": true,
+    "projectId_val": "thugs-of-sultan-3cb83",
+    "clientEmail_exists": true,
+    "clientEmail_val": "amaanmohd8681@gmail.com",
+    "privateKey_exists": true,
+    "privateKey_len": 39,
+    "privateKey_prefix": "AIzaSyDPw1JScBo4K6YO2ptQAFBCwh",
+    "google_application_credentials": null,
+    "all_matching_env_keys": [
+      "GOOGLE_RUNTIME",
+      "FIREBASE_CLIENT_EMAIL",
+      "FIREBASE_PRIVATE_KEY",
+      "CASHFREE_CLIENT_SECRET",
+      "RAZORPAY_KEY_SECRET",
+      "FIREBASE_PROJECT_ID",
+      "CASHFREE_SECRET_KEY"
+    ]
+  },
+  "firebaseAdminChecked": false,
+  "checks": {},
+  "error": "Firebase Admin initialization was not checked or failed earlier.",
+  "client_config": {
+    "projectId": "thugs-of-sultan-3cb83",
+    "appId": "1:569804689508:web:a40e8f9c217caf8eeecf71",
+    "apiKey": "AIzaSyDPw1JScBo4K6YO2ptQAFBCwhm2H3S8VQk",
+    "authDomain": "thugs-of-sultan-3cb83.firebaseapp.com",
+    "firestoreDatabaseId": "ai-studio-cbdc0a21-76ec-4497-9c62-516031d0800d",
+    "storageBucket": "thugs-of-sultan-3cb83.firebasestorage.app",
+    "messagingSenderId": "569804689508",
+    "measurementId": "G-H3JNC2MVDF"
+  }
+}

@@ -47,12 +47,95 @@
         }
       },
       "required": ["id", "name", "email", "mobile", "status"]
+    },
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "User profile with credits, wallet, and loyalty data.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "seller", "admin"] },
+        "walletBalance": { "type": "number" },
+        "aiCredits": { "type": "integer" },
+        "loyaltyPoints": { "type": "integer" },
+        "ordersCount": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "email"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Represents a customer order.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "items": { "type": "array", "items": { "type": "object" } },
+        "total": { "type": "number" },
+        "status": { "type": "string" },
+        "paymentId": { "type": "string" },
+        "shippingAddress": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "items", "total", "status"]
+    },
+    "Payment": {
+      "title": "Payment",
+      "description": "Records of financial transactions.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orderId": { "type": "string" },
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "currency": { "type": "string" },
+        "status": { "type": "string" },
+        "gateway": { "type": "string" },
+        "gatewayTransactionId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "amount", "status"]
+    },
+    "AuditLog": {
+      "title": "Audit Log",
+      "description": "System audit logs for tracking actions.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "action": { "type": "string" },
+        "entityType": { "type": "string" },
+        "entityId": { "type": "string" },
+        "details": { "type": "object" },
+        "ip": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "action", "createdAt"]
     }
   },
   "firestore": {
     "/sellers/{sellerId}": {
       "schema": "Seller",
       "description": "Collection of seller profiles including KYC documents."
+    },
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profiles and account settings."
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Consumer orders."
+    },
+    "/payments/{paymentId}": {
+      "schema": "Payment",
+      "description": "Payment transaction records."
+    },
+    "/audit_logs/{logId}": {
+      "schema": "AuditLog",
+      "description": "Security and activity audit trails."
     }
   }
 }

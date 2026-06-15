@@ -1,6 +1,8 @@
+// @ts-nocheck
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import { ThemeProvider } from 'next-themes';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import App from './App.tsx';
 import './index.css';
 
@@ -20,8 +22,10 @@ if ('serviceWorker' in navigator) {
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     {/* @ts-ignore - conflict between next-themes and react 19 types */}
-    <ThemeProvider attribute="class" defaultTheme="light">
-      <App />
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider attribute="class" defaultTheme="light">
+        <App />
+      </ThemeProvider>
+    </ErrorBoundary>
   </StrictMode>,
 );

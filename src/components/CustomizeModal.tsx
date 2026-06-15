@@ -73,7 +73,23 @@ export default function CustomizeModal({
           }
         })
       });
-      const data = await response.json();
+      
+      const text = await response.text();
+      let data: any = {};
+      
+      if (text) {
+        try {
+          data = JSON.parse(text);
+        } catch (parseErr) {
+          console.error("Non-JSON response from Gemini advice:", text);
+          throw new Error(`Server returned non-JSON response (${response.status})`);
+        }
+      }
+      
+      if (!response.ok) {
+        throw new Error(data.error || data.message || `Advisory service error (${response.status})`);
+      }
+      
       if (data.success && data.text) {
         setAiResponse(data.text);
       } else {
@@ -81,7 +97,7 @@ export default function CustomizeModal({
       }
     } catch (err: any) {
       console.error("Gemini advice request error:", err);
-      setAiResponse('Network Error: Unable to reach Gemini print advisory desk.');
+      setAiResponse(`Advisory Error: ${err.message || 'Unable to reach Gemini print advisory desk.'}`);
     } finally {
       setIsGeneratingAi(false);
     }
@@ -159,6 +175,15 @@ export default function CustomizeModal({
   }, [product.id, selectedSize, selectedMaterial, quantity, designFile, aiPrompt, aiResponse]);
 
   // Calculate dynamic pricing parameters
+  const getDynamicQtyStep = () => {
+    if (product.quantitySlabs.length >= 2) {
+      return product.quantitySlabs[1].quantity - product.quantitySlabs[0].quantity;
+    }
+    return product.quantitySlabs[0]?.quantity || 50;
+  };
+  const qtyStep = getDynamicQtyStep();
+  const minQty = product.quantitySlabs[0]?.quantity || 100;
+
   const finalPrice = calculateItemPrice(product, selectedSize, selectedMaterial, quantity);
   const halfAdvance = finalPrice;
   const halfBalance = 0;
@@ -338,6 +363,11 @@ export default function CustomizeModal({
   };
 
   const submitToCart = () => {
+    if (quantity < minQty) {
+      setFileError(`⚠️ Minimum order quantity for ${product.name} is ${minQty} Pcs.`);
+      return;
+    }
+
     if (!designFile) {
       setFileError('⚠️ Design file is mandatory to request production print runs.');
       return;
@@ -627,21 +657,21 @@ export default function CustomizeModal({
               <div className="flex items-center gap-3 bg-zinc-50 border border-zinc-200 rounded-xl p-1.5 w-max">
                 <button 
                   type="button"
-                  onClick={() => handleQtyChange(Math.max(1, quantity - 1).toString())}
+                  onClick={() => handleQtyChange(Math.max(minQty, quantity - qtyStep).toString())}
                   className="w-8 h-8 flex items-center justify-center bg-white border border-zinc-200 rounded-lg text-zinc-500 hover:text-black hover:border-black transition cursor-pointer font-bold"
                 >
                   -
                 </button>
                 <input
                   type="number"
-                  min="1"
+                  min={minQty}
                   value={customQtyInput}
                   onChange={(e) => handleQtyChange(e.target.value)}
                   className="w-16 text-center py-1 bg-transparent text-xs font-mono font-black focus:outline-hidden"
                 />
                 <button 
                   type="button"
-                  onClick={() => handleQtyChange((quantity + 1).toString())}
+                  onClick={() => handleQtyChange((quantity + qtyStep).toString())}
                   className="w-8 h-8 flex items-center justify-center bg-white border border-zinc-200 rounded-lg text-zinc-500 hover:text-black hover:border-black transition cursor-pointer font-bold"
                 >
                   +

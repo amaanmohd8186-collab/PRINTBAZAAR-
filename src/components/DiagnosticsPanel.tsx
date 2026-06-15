@@ -17,6 +17,7 @@ import {
   RefreshCw,
   Search
 } from 'lucide-react';
+import { getAuthHeaders } from '../firebase';
 
 interface DiagnosticResult {
   firebase: { status: string; details: string };
@@ -36,7 +37,8 @@ export default function DiagnosticsPanel() {
   const fetchDiagnostics = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/diagnostics');
+      const headers = await getAuthHeaders();
+      const res = await fetch('/api/admin/diagnostics', { headers });
       const json = await res.json();
       setData(json);
       setError(null);

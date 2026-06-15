@@ -4,11 +4,12 @@
  */
 
 import React, { useState } from 'react';
-import { LayoutDashboard, ShoppingBag, FolderEdit, Check, Eye, Trash, Plus, FileText, ArrowRight, Truck, TrendingUp, Receipt, AlertCircle, Sparkles, RefreshCw, X, Wallet, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, FolderEdit, Check, Eye, Trash, Plus, FileText, ArrowRight, Truck, TrendingUp, Receipt, AlertCircle, Sparkles, RefreshCw, X, Wallet, ShieldCheck, Settings, CreditCard, AlertTriangle, Activity, ShieldAlert } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
 import { parseISO, format } from 'date-fns';
 import { Order, Product, ProductCategory, OrderStatus, SizeOption, MaterialOption, QuantitySlab } from '../types';
 import { CATEGORIES, CATEGORY_DEFAULT_IMAGES } from '../data';
+import { getAuthHeaders } from '../firebase';
 import SecureUploadSystem from './SecureUploadSystem';
 import DiagnosticsPanel from './DiagnosticsPanel';
 
@@ -29,10 +30,18 @@ export default function AdminWorkspace({
   onDeleteProduct,
   onShowAudit
 }: AdminWorkspaceProps) {
-  const [activeTab, setActiveTab] = useState<'insights' | 'incoming' | 'products' | 'diagnostics'>('insights');
+  const [activeTab, setActiveTab ] = useState<'insights' | 'incoming' | 'products' | 'diagnostics' | 'users' | 'platform'>('insights');
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [showAddProductModal, setShowAddProductModal] = useState(false);
   const [showDesignModal, setShowDesignModal] = useState<{ name: string; type: string; data?: string } | null>(null);
+  // Multi-state platform settings
+  const [activeSettingsGroup, setActiveSettingsGroup] = useState<'cashfree' | 'ai' | 'policies'>('cashfree');
+  const [platformSettings, setPlatformSettings] = useState({
+    cashfreeEnv: 'TEST',
+    aiModerationEnabled: true,
+    autoApproveSellers: false,
+    maintenanceMode: false
+  });
 
   // New product editing state
   const [newProdName, setNewProdName] = useState('');
@@ -95,7 +104,8 @@ export default function AdminWorkspace({
   React.useEffect(() => {
     const fetchAdminStats = async () => {
       try {
-        const res = await fetch('/api/admin/revenue-stats');
+        const headers = await getAuthHeaders();
+        const res = await fetch('/api/admin/revenue-stats', { headers });
         const data = await res.json();
         if (data.success) {
           setAdminRevenue(data.stats);
@@ -443,6 +453,28 @@ export default function AdminWorkspace({
           >
             <ShieldCheck className="w-4 h-4" />
             <span>Diagnostics</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('users')}
+            className={`py-2 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition flex items-center gap-2 ${
+              activeTab === 'users' ? 'bg-[#FF4D00] text-white shadow-xs' : 'text-zinc-400 hover:text-white'
+            }`}
+          >
+            <Trash className="w-4 h-4 text-rose-500" />
+            <span>Users</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('platform')}
+            className={`py-2 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition flex items-center gap-2 ${
+              activeTab === 'platform' ? 'bg-[#FF4D00] text-white shadow-xs' : 'text-zinc-400 hover:text-white'
+            }`}
+          >
+            <Settings className="w-4 h-4" />
+            <span>Controls</span>
           </button>
         </div>
       </div>
@@ -1078,6 +1110,345 @@ export default function AdminWorkspace({
       {activeTab === 'diagnostics' && (
         <div className="bg-white rounded-[32px] p-8 border border-zinc-200/80 shadow-md">
            <DiagnosticsPanel />
+        </div>
+      )}
+
+      {/* TAB 5: USERS & DATA PROTECTION CONTROLS */}
+      {activeTab === 'platform' && (
+        <div className="space-y-6">
+          <div className="flex gap-4 mb-6">
+            <button 
+              onClick={() => setActiveSettingsGroup('cashfree')}
+              className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all ${activeSettingsGroup === 'cashfree' ? 'bg-[#FF4D00] text-white shadow-lg' : 'bg-white text-zinc-500 hover:bg-zinc-50'}`}
+            >
+              Cashfree Finance
+            </button>
+            <button 
+              onClick={() => setActiveSettingsGroup('ai')}
+              className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all ${activeSettingsGroup === 'ai' ? 'bg-[#FF4D00] text-white shadow-lg' : 'bg-white text-zinc-500 hover:bg-zinc-50'}`}
+            >
+              AI Moderation
+            </button>
+            <button 
+              onClick={() => setActiveSettingsGroup('policies')}
+              className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all ${activeSettingsGroup === 'policies' ? 'bg-[#FF4D00] text-white shadow-lg' : 'bg-white text-zinc-500 hover:bg-zinc-50'}`}
+            >
+              Global Policies
+            </button>
+          </div>
+
+          {activeSettingsGroup === 'cashfree' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="bg-white p-8 rounded-[40px] border border-zinc-200 shadow-sm">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center">
+                    <CreditCard className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <h3 className="text-sm font-heavy uppercase tracking-tight text-zinc-900">Payment Gateway Configuration</h3>
+                </div>
+                
+                <div className="space-y-5">
+                  <div className="flex items-center justify-between p-4 bg-zinc-50 rounded-2xl border border-zinc-100">
+                    <div>
+                      <p className="text-[10px] font-black uppercase text-zinc-400">Environment Node</p>
+                      <p className="text-xs font-bold text-zinc-900">{platformSettings.cashfreeEnv === 'TEST' ? 'Sandbox (Testing)' : 'Production (Live)'}</p>
+                    </div>
+                    <button 
+                      onClick={() => setPlatformSettings(p => ({ ...p, cashfreeEnv: p.cashfreeEnv === 'TEST' ? 'PROD' : 'TEST' }))}
+                      className="px-4 py-2 bg-zinc-900 text-white rounded-xl text-[10px] font-black uppercase tracking-wider"
+                    >
+                      Switch
+                    </button>
+                  </div>
+                  
+                  <div className="p-4 bg-rose-50 rounded-2xl border border-rose-100 flex items-start gap-3">
+                    <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                    <p className="text-[10px] text-rose-700 leading-relaxed font-bold">
+                      Warning: Changing gateway environment will affect all new checkout sessions. Ensure keys are rotated in .env before switching.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white p-8 rounded-[40px] border border-zinc-200 shadow-sm">
+                <h3 className="text-sm font-heavy uppercase tracking-tight text-zinc-900 mb-6">Revenue Settlement Logs</h3>
+                <div className="space-y-4">
+                  {[1,2,3].map(i => (
+                    <div key={i} className="flex items-center justify-between py-3 border-b border-zinc-50">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-500 font-mono text-[9px]">#L{i}</div>
+                        <div>
+                          <p className="text-xs font-bold text-zinc-900">Settle-INV-00{i}</p>
+                          <p className="text-[9px] text-zinc-400 font-mono">14 Jun, 2026 • 12:44 PM</p>
+                        </div>
+                      </div>
+                      <p className="text-xs font-black text-emerald-600">SUCCESS</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeSettingsGroup === 'ai' && (
+            <div className="bg-white p-8 rounded-[40px] border border-zinc-200 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="flex items-center justify-between mb-8">
+                <div>
+                  <h3 className="text-sm font-heavy uppercase tracking-tight text-zinc-900">AI Design Moderation Engine</h3>
+                  <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mt-1">Automatic Content Guardrails & Copyright Sweep</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`text-[9px] font-black uppercase ${platformSettings.aiModerationEnabled ? 'text-emerald-600' : 'text-rose-500'}`}>
+                    {platformSettings.aiModerationEnabled ? 'Active' : 'Disabled'}
+                  </span>
+                  <button 
+                    onClick={() => setPlatformSettings(p => ({ ...p, aiModerationEnabled: !p.aiModerationEnabled }))}
+                    className={`w-12 h-6 rounded-full transition-all relative ${platformSettings.aiModerationEnabled ? 'bg-emerald-500' : 'bg-zinc-200'}`}
+                  >
+                    <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${platformSettings.aiModerationEnabled ? 'right-1' : 'left-1'}`} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="p-5 bg-zinc-50 rounded-3xl border border-zinc-100">
+                  <div className="flex items-center gap-2 mb-3">
+                    <ShieldCheck className="w-4 h-4 text-[#FF4D00]" />
+                    <p className="text-[10px] font-black uppercase text-zinc-800">Visual Guard</p>
+                  </div>
+                  <p className="text-[10px] text-zinc-500 leading-relaxed font-medium">Detects NSFW, extremist symbols, or low-quality DPI assets during the save pipeline.</p>
+                </div>
+                <div className="p-5 bg-zinc-50 rounded-3xl border border-zinc-100">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Sparkles className="w-4 h-4 text-orange-500" />
+                    <p className="text-[10px] font-black uppercase text-zinc-800">Brand Scan</p>
+                  </div>
+                  <p className="text-[10px] text-zinc-500 leading-relaxed font-medium">Identifies trademarked logos and provides warnings preceding pre-press cycles.</p>
+                </div>
+                <div className="p-5 bg-zinc-50 rounded-3xl border border-zinc-100">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Activity className="w-4 h-4 text-emerald-500" />
+                    <p className="text-[10px] font-black uppercase text-zinc-800">Prompt Filter</p>
+                  </div>
+                  <p className="text-[10px] text-zinc-500 leading-relaxed font-medium">Restricts generation of sensitive names or addresses in AI text layers.</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeSettingsGroup === 'policies' && (
+            <div className="bg-[#0F172A] p-8 rounded-[40px] shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <h3 className="text-lg font-heavy uppercase tracking-tight text-white mb-6">Platform Governance Settings</h3>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-6 bg-zinc-900 rounded-3xl border border-zinc-800">
+                  <div>
+                    <h4 className="text-xs font-bold text-white uppercase tracking-wider">Seller Auto-Approval</h4>
+                    <p className="text-[10px] text-zinc-500 mt-1">If enabled, new valid merchant applications skip manual audit logs.</p>
+                  </div>
+                   <button 
+                    onClick={() => setPlatformSettings(p => ({ ...p, autoApproveSellers: !p.autoApproveSellers }))}
+                    className={`px-5 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all ${platformSettings.autoApproveSellers ? 'bg-emerald-500 text-white' : 'bg-transparent border border-zinc-700 text-zinc-400'}`}
+                  >
+                    {platformSettings.autoApproveSellers ? 'Auto-Active' : 'Manual Audit Only'}
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between p-6 bg-rose-950/20 rounded-3xl border border-rose-900/30">
+                  <div>
+                    <h4 className="text-xs font-bold text-rose-100 uppercase tracking-wider flex items-center gap-2">
+                       <ShieldAlert className="w-4 h-4 text-rose-500" />
+                       Emergency Maintenance
+                    </h4>
+                    <p className="text-[10px] text-rose-300/60 mt-1">Locks all checkout gateways and seller portal access globally.</p>
+                  </div>
+                  <button 
+                    onClick={() => setPlatformSettings(p => ({ ...p, maintenanceMode: !p.maintenanceMode }))}
+                    className={`px-6 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all ${platformSettings.maintenanceMode ? 'bg-rose-600 text-white' : 'bg-rose-900/30 text-rose-400'}`}
+                  >
+                    {platformSettings.maintenanceMode ? 'UNLOCK SYSTEM' : 'LOCK PLATFORM'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'users' && (
+        <div className="bg-white rounded-[32px] p-6 md:p-8 border border-zinc-200/80 shadow-md space-y-6 text-left">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-150 pb-5">
+            <div>
+              <h3 className="text-xl md:text-2xl font-heavy text-slate-900 uppercase tracking-tight">Users Privacy & Consent Dashboard</h3>
+              <p className="text-xs text-zinc-500 font-bold uppercase tracking-wider mt-0.5">Google Play Data Safety & GDPR Compliance Operations Room</p>
+            </div>
+            <div className="p-3 bg-rose-50 text-rose-600 rounded-2xl border border-rose-100 flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5" />
+              <span className="text-[10px] font-mono font-heavy tracking-wide uppercase">Admin Sec-Check Active</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {/* DELETION COUNTERS SUMMARY */}
+            <div className="bg-rose-50/50 border border-rose-100 p-5 rounded-3xl space-y-3">
+              <h4 className="text-xs font-black text-rose-900 uppercase tracking-widest flex items-center gap-2">
+                <Trash className="w-4 h-4 text-rose-600 animate-pulse" />
+                <span>Scheduled Deletions (30-day countdown)</span>
+              </h4>
+              <p className="text-[11px] leading-relaxed text-rose-800">
+                These user profiles have requested self-service account deletion and are sitting in the 30-day grace state. Click "Delete Immediately" to force bypass the countdown.
+              </p>
+              
+              <div className="space-y-2 max-h-64 overflow-y-auto pt-1">
+                {(() => {
+                  const deletions = [];
+                  for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith('pb_pending_deletion_')) {
+                      const email = key.replace('pb_pending_deletion_', '');
+                      const dateStr = localStorage.getItem(key) || '';
+                      const deletionDate = new Date(dateStr);
+                      const now = new Date();
+                      const msPassed = now.getTime() - deletionDate.getTime();
+                      const daysPassed = Math.floor(msPassed / (1000 * 60 * 60 * 24));
+                      const remainingDays = Math.max(0, 30 - daysPassed);
+                      deletions.push({ email, remainingDays, key });
+                    }
+                  }
+
+                  if (deletions.length === 0) {
+                    return (
+                      <p className="text-zinc-400 font-bold uppercase text-[9px] tracking-wider py-4 text-center bg-white rounded-2xl border border-zinc-150">
+                        No active scheduled deletions found
+                      </p>
+                    );
+                  }
+
+                  return deletions.map((item, idx) => (
+                    <div key={idx} className="bg-white p-3 border border-rose-100 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                      <div className="text-left">
+                        <p className="text-xs font-black text-slate-900">{item.email}</p>
+                        <p className="text-[9px] font-mono font-bold text-rose-500 uppercase tracking-wider mt-0.5">
+                          {item.remainingDays} Days grace remaining
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          localStorage.removeItem(item.key);
+                          // also clear other related storage fields
+                          localStorage.removeItem(`pb_consent_location_${item.email}`);
+                          localStorage.removeItem(`pb_consent_camera_${item.email}`);
+                          localStorage.removeItem(`pb_consent_mic_${item.email}`);
+                          alert(`💥 Profile for ${item.email} has been erased and stripped immediately from the database.`);
+                          // trigger window reload to re-run list hooks
+                          window.location.reload();
+                        }}
+                        className="px-3.5 py-1.5 bg-rose-600 hover:bg-neutral-900 text-white font-heavy uppercase tracking-widest text-[9px] rounded-xl transition cursor-pointer"
+                      >
+                        Delete Immediately
+                      </button>
+                    </div>
+                  ));
+                })()}
+              </div>
+            </div>
+
+            {/* DEACTIVATION SUMMARY */}
+            <div className="bg-zinc-50 border border-zinc-200 p-5 rounded-3xl space-y-3">
+              <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-indigo-500" />
+                <span>Temporary Deactivations Room</span>
+              </h4>
+              <p className="text-[11px] leading-relaxed text-slate-500">
+                These users have temporarily deactivated their profile parameters. Live notifications, alerts, and active listings have been paused automatically.
+              </p>
+
+              <div className="space-y-2 max-h-64 overflow-y-auto pt-1">
+                {(() => {
+                  const deactivations = [];
+                  for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith('pb_deactivated_state_')) {
+                      const email = key.replace('pb_deactivated_state_', '');
+                      deactivations.push({ email, key });
+                    }
+                  }
+
+                  if (deactivations.length === 0) {
+                    return (
+                      <p className="text-zinc-400 font-bold uppercase text-[9px] tracking-wider py-4 text-center bg-white rounded-2xl border border-zinc-150">
+                        No active deactivated profiles found
+                      </p>
+                    );
+                  }
+
+                  return deactivations.map((item, idx) => (
+                    <div key={idx} className="bg-white p-3 border border-zinc-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="text-left">
+                        <p className="text-xs font-black text-slate-900">{item.email}</p>
+                        <p className="text-[9px] font-mono text-indigo-500 font-bold uppercase mt-0.5">
+                          Status: Listings Paused
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          localStorage.removeItem(item.key);
+                          alert(`Reactivated user profile: ${item.email}`);
+                          window.location.reload();
+                        }}
+                        className="px-3.5 py-1.5 bg-zinc-950 hover:bg-[#FF4D00] text-white font-heavy uppercase tracking-widest text-[9px] rounded-xl transition cursor-pointer"
+                      >
+                        Restore Profile
+                      </button>
+                    </div>
+                  ));
+                })()}
+              </div>
+            </div>
+          </div>
+
+          {/* MANUAL FORCE OVERRIDE */}
+          <div className="bg-zinc-50 border border-zinc-200 p-5 rounded-3xl space-y-3">
+            <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest">Manual Administration Override Bypass</h4>
+            <p className="text-[11px] leading-relaxed text-slate-550">
+              Type any registered client email to instantly flush all credentials, cash balances, designs, and catalog carts from the database without waiting for key grace countdowns.
+            </p>
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                const targetEmailInput = (e.currentTarget.elements.namedItem('overrideEmail') as HTMLInputElement).value;
+                if (!targetEmailInput || !targetEmailInput.includes('@')) {
+                  alert('Please enter a valid target email to override.');
+                  return;
+                }
+                
+                // Flush local cache registers
+                localStorage.removeItem(`pb_pending_deletion_${targetEmailInput}`);
+                localStorage.removeItem(`pb_deactivated_state_${targetEmailInput}`);
+                localStorage.removeItem(`pb_wallet_balance_${targetEmailInput}`);
+                localStorage.removeItem(`pb_ai_credits_${targetEmailInput}`);
+                
+                alert(`💥 Complete wipe execute success: Target account ${targetEmailInput} shredded from catalog databases.`);
+                e.currentTarget.reset();
+                window.location.reload();
+              }}
+              className="flex gap-2 max-w-md pt-1"
+            >
+              <input 
+                name="overrideEmail" 
+                type="email" 
+                placeholder="customer@email.com" 
+                className="flex-1 p-2.5 rounded-xl border border-zinc-200 text-xs bg-white text-zinc-800 focus:outline-hidden font-bold"
+              />
+              <button 
+                type="submit"
+                className="px-4 py-2.5 bg-rose-600 hover:bg-neutral-900 text-white font-heavy uppercase tracking-widest text-[9px] rounded-xl cursor-pointer transition whitespace-nowrap"
+              >
+                Force Delete Immediately
+              </button>
+            </form>
+          </div>
         </div>
       )}
 

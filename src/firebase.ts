@@ -53,3 +53,55 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   console.error('Firestore Error: ', JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));
 }
+
+export async function getAuthHeaders() {
+  const user = auth.currentUser;
+  if (!user) return {};
+  const token = await user.getIdToken();
+  return {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  };
+}
+
+/**
+ * Enhanced fetch wrapper with robust JSON parsing, error handling, 
+ * and response validation as mandated by Production-Ready guidelines.
+ */
+export async function safeFetch<T = any>(url: string, options: RequestInit = {}): Promise<T> {
+  const headers = await getAuthHeaders();
+  const config = {
+    ...options,
+    headers: {
+      ...headers,
+      ...(options.headers || {})
+    }
+  };
+
+  try {
+    const response = await fetch(url, config);
+    const contentType = response.headers.get('content-type');
+    
+    // Check if the response is actually JSON before parsing
+    if (contentType && contentType.includes('application/json')) {
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || data.message || `API Error (${response.status})`);
+      }
+      
+      return data as T;
+    } else {
+      // Handle non-JSON or empty responses
+      const text = await response.text();
+      if (!response.ok) {
+        throw new Error(text || `API Non-JSON Error (${response.status})`);
+      }
+      // If OK but no JSON, return empty object or success indicator
+      return { success: response.ok, status: response.status } as unknown as T;
+    }
+  } catch (err: any) {
+    console.error(`[SafeFetch Failed] ${url}:`, err.message);
+    throw err;
+  }
+}

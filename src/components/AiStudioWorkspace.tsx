@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
-import { auth, db } from "../firebase";
-import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { db, auth } from "../firebase";
+import { onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
+import { doc, getDoc, onSnapshot } from "firebase/firestore";
 import {
   Upload,
   Wand2,
@@ -90,29 +90,40 @@ export default function AiStudioWorkspace() {
 
   // Real-time seller status synchronization hook
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (usr) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setCheckingAuth(true);
-      if (usr) {
+      if (firebaseUser) {
         try {
-          const docRef = doc(db, "sellers", usr.uid);
-          const snap = await getDoc(docRef);
-          if (snap.exists()) {
-            const data = snap.data();
-            setCurrentSellerStatus(data.status || "Draft");
-            setIsVerified(data.status === "Verified");
-          } else {
-            setCurrentSellerStatus("Unregistered");
+          const sellerRef = doc(db, 'sellers', firebaseUser.uid);
+          
+          // Setup real-time listener for seller status
+          const unsubSeller = onSnapshot(sellerRef, (docSnap) => {
+            if (docSnap.exists()) {
+              const sellerData = docSnap.data();
+              setCurrentSellerStatus(sellerData.status || "Draft");
+              setIsVerified(sellerData.status === "Verified");
+            } else {
+              setCurrentSellerStatus("Unregistered");
+              setIsVerified(false);
+            }
+            setCheckingAuth(false);
+          }, (err) => {
+            console.error("Failed to fetch seller record in Firestore:", err);
             setIsVerified(false);
-          }
+            setCheckingAuth(false);
+          });
+
+          return () => unsubSeller();
         } catch (err) {
-          console.error("Failed to fetch seller record in Firebase:", err);
+          console.error("Failed to setup seller listener:", err);
           setIsVerified(false);
+          setCheckingAuth(false);
         }
       } else {
         setCurrentSellerStatus("Anonymous");
         setIsVerified(false);
+        setCheckingAuth(false);
       }
-      setCheckingAuth(false);
     });
     return () => unsubscribe();
   }, []);
@@ -568,13 +579,20 @@ export default function AiStudioWorkspace() {
           })
         });
 
-        if (!response.ok) {
-          throw new Error(await response.text() || `Server error code ${response.status}`);
+        const text = await response.text();
+        let result: any = {};
+        
+        if (text) {
+          try {
+            result = JSON.parse(text);
+          } catch (parseErr) {
+            console.error("Non-JSON response from AI studio process:", text);
+            throw new Error(`AI transformation failed: Server returned non-JSON response (${response.status})`);
+          }
         }
 
-        const result = await response.json();
-        if (!result.success) {
-          throw new Error(result.error || "AI adjustment failed.");
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || `AI adjustment failed (${response.status})`);
         }
 
         const newImg = result.imageUrl;

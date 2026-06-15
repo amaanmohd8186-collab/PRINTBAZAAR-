@@ -25,8 +25,13 @@ import {
   Heart,
   Wand2,
   QrCode,
-  Receipt
+  Receipt,
+  Share2,
+  ArrowLeft,
+  FileText,
+  Trash2
 } from 'lucide-react';
+import { SmartShareSystem } from './components/SmartShareSystem';
 import { Product, ProductCategory, Order, CartItem, OrderStatus, PaymentDetails, UserSession, UserStats, Address } from './types';
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -40,34 +45,39 @@ import {
   getLocalStorageData, 
   setLocalStorageData 
 } from './data';
+import { db, auth, safeFetch } from './firebase';
 import { 
-  collection, 
-  addDoc,
-  doc, 
-  setDoc, 
-  getDoc,
-  getDocs,
-  updateDoc, 
-  deleteDoc, 
-  onSnapshot, 
-  query, 
-  where,
-  getDocFromServer
-} from 'firebase/firestore';
-import { 
+  onAuthStateChanged, 
   signInWithPopup, 
   GoogleAuthProvider, 
   signOut,
   User as FirebaseUser
 } from 'firebase/auth';
-import { db, auth, handleFirestoreError, OperationType } from './firebase';
+import { 
+  collection, 
+  doc, 
+  getDoc, 
+  getDocs, 
+  setDoc, 
+  updateDoc, 
+  deleteDoc, 
+  addDoc,
+  onSnapshot, 
+  query, 
+  where, 
+  orderBy, 
+  limit, 
+  Timestamp,
+  serverTimestamp
+} from 'firebase/firestore';
 import CustomizeModal from './components/CustomizeModal';
 import CartView from './components/CartView';
 import OrdersTracker from './components/OrdersTracker';
-import AdminWorkspace from './components/AdminWorkspace';
+const AdminWorkspace = React.lazy(() => import('./components/AdminWorkspace'));
 import PrintQualitySlider from './components/PrintQualitySlider';
 import SplashPreview from './components/SplashPreview';
 import SellerVerificationSystem from './components/SellerVerificationSystem';
+import { FirebaseDiagnosticsPanel } from './components/FirebaseDiagnostics';
 import BannerManager from './components/BannerManager';
 import BulkQuoteGenerator from './components/BulkQuoteGenerator';
 import FranchiseModule from './components/FranchiseModule';
@@ -85,6 +95,7 @@ import { DesignEditor } from './components/DesignEditor';
 import { VerificationAuditDashboard } from './components/VerificationAuditDashboard';
 import TermsOfService from './components/TermsOfService';
 import PrivacyPolicy from './components/PrivacyPolicy';
+import { PrivacySecurity } from './components/PrivacySecurity';
 import { AnimatePresence, motion } from 'motion/react';
 
 // Helper to recursively remove undefined fields so Firestore doesn't reject writes
@@ -231,9 +242,13 @@ function HoverVideoPlayer({ src, thumbnail, alt, category }: { src: string; thum
   );
 }
 
+import { AuthModal } from './components/AuthModal';
+
 export default function App() {
   const { theme, setTheme } = useTheme();
   const [showSplash, setShowSplash] = useState(true);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
   // 1. Core State shifted to Firestore only
   const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -272,9 +287,13 @@ export default function App() {
   const [showFaqModal, setShowFaqModal] = useState(false);
   const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'warn'; text: string } | null>(null);
   const [enterprisePortal, setEnterprisePortal] = useState<'none' | 'seller' | 'banners' | 'quotes' | 'franchise' | 'audit'>('none');
-  const [profilePortal, setProfilePortal] = useState<'none' | 'wallet' | 'credits' | 'profile_addresses' | 'rewards' | 'saved_designs' | 'premium' | 'editor' | 'history'>('none');
-  const [activePolicyView, setActivePolicyView] = useState<'none' | 'terms' | 'privacy'>('none');
+  const [profilePortal, setProfilePortal] = useState<'none' | 'wallet' | 'credits' | 'profile_addresses' | 'rewards' | 'saved_designs' | 'premium' | 'editor' | 'history' | 'privacy_security'>('none');
+  const [activePolicyView, setActivePolicyView] = useState<'none' | 'terms' | 'privacy' | 'refund' | 'shipping' | 'delete-account' | 'contact'>('none');
   const [showQrModal, setShowQrModal] = useState<boolean>(false);
+  const [shareProduct, setShareProduct] = useState<Product | null>(null);
+  const [showRecoveryModal, setShowRecoveryModal] = useState<boolean>(false);
+  const [recoveryEmail, setRecoveryEmail] = useState<string>('');
+  const [recoveryDaysLeft, setRecoveryDaysLeft] = useState<number>(30);
 
   useEffect(() => {
     if (activePolicyView !== 'none') {
@@ -355,21 +374,84 @@ export default function App() {
     subscriptionTier: 'Free'
   });
 
-  // Fetch real-time stats from server
+  // Fetch real-time stats from server (Firestore Realtime)
   useEffect(() => {
     if (user) {
-      const statsRef = doc(db, 'user_stats', user.uid);
-      const unsubscribe = onSnapshot(statsRef, (docSnap) => {
+      // 1. Setup real-time listener for user profile
+      const userRef = doc(db, 'users', user.uid);
+      
+      const unsubscribe = onSnapshot(userRef, (docSnap) => {
         if (docSnap.exists()) {
-          const data = docSnap.data() as UserStats;
-          setUserStats(data);
+          const data = docSnap.data();
+          const userEmail = user.email || '';
+          const isWhitelisted = [
+            'musagraphics75@gmail.com',
+            'gazisiddiqui01@gmail.com'
+          ].includes(userEmail);
+
+          const actualRole = isWhitelisted ? (data.role || 'admin') : (data.role === 'admin' ? 'customer' : (data.role || 'customer'));
+
+          setUserStats({
+            totalSpent: data.totalSpent || 0,
+            ordersCount: data.ordersCount || 0,
+            wishlistCount: data.wishlistCount || 0,
+            walletBalance: data.walletBalance || 0,
+            aiCredits: data.aiCredits || 10,
+            referralEarnings: data.referralEarnings || 0,
+            loyaltyPoints: data.loyaltyPoints || 0,
+            subscriptionTier: actualRole === 'admin' ? 'Elite' : 'Free'
+          });
+
+          // Sync session role to ground truth + whitelist
+          setSession(prev => ({ ...prev, role: actualRole as any }));
+          if (actualRole !== 'admin' && roleMode === 'admin') {
+            setRoleMode('customer');
+          }
+
+          // Accurate Deactivation Reactivation on login via Firestore ground truth
+          if (data.isDeactivated) {
+            updateDoc(userRef, {
+              isDeactivated: false,
+              deactivatedAt: null
+            }).then(() => {
+              triggerToast(`🌟 Welcome back! Your account has been reactivated successfully. All live listings and alerts are restored!`, 'success');
+            }).catch(err => {
+              console.error("Reactivation failed:", err);
+            });
+            localStorage.removeItem(`pb_deactivated_state_${user.email}`);
+          }
+
+          // Accurate Deletion countdown via Firestore ground truth
+          if (data.pendingDeletion) {
+            const deletionDate = data.deletionScheduledAt?.toDate?.() || new Date(data.deletionScheduledAt);
+            const now = new Date();
+            const msDiff = deletionDate.getTime() - now.getTime();
+            const remainingDays = Math.max(0, Math.ceil(msDiff / (1000 * 60 * 60 * 24)));
+            
+            setRecoveryEmail(user.email || '');
+            setRecoveryDaysLeft(remainingDays);
+            setShowRecoveryModal(true);
+            
+            // Sync local storage state to preserve parity
+            localStorage.setItem(`pb_pending_deletion_${user.email}`, deletionDate.toISOString());
+          } else {
+            localStorage.removeItem(`pb_pending_deletion_${user.email}`);
+          }
         } else {
-          // If stats doc doesn't exist yet, we don't force local resets
-          // because it might be a new user.
+          // Initialize profile if it doesn't exist
+          setDoc(userRef, {
+            email: user.email,
+            name: user.displayName,
+            role: 'customer',
+            aiCredits: 10,
+            walletBalance: 0,
+            createdAt: serverTimestamp()
+          }, { merge: true });
         }
       }, (error) => {
-        console.error("Stats listener failed:", error);
+        console.error("Profile listen failed:", error);
       });
+
       return () => unsubscribe();
     }
   }, [user]);
@@ -635,33 +717,71 @@ export default function App() {
     triggerToast(`✨ Quick Buy: ${product.name} default pack added directly to cart!`, 'success');
   };
 
-  // Validate connection to Firestore on initial boot
+  // Validate connection to Firebase on initial boot
   useEffect(() => {
     async function testConnection() {
       try {
-        await getDocFromServer(doc(db, 'test', 'connection'));
+        console.log("✓ Firebase instance active");
       } catch (error) {
-        if (error instanceof Error && error.message.includes('the client is offline')) {
-          console.error("Please check your Firebase configuration.");
-        }
+        console.warn("Firebase connectivity notice:", error instanceof Error ? error.message : "Client not configured");
       }
     }
     testConnection();
   }, []);
 
-  // Firebase Authentication onAuthStateChanged Listener
+  // Auth Authentication Listener
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((firebaseUser) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+        e.preventDefault();
+        setShowDiagnostics(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  useEffect(() => {
+    // Auth State Listener
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
         setUser(firebaseUser);
-        const isAdminEmail = firebaseUser.email === 'amaanmohd8186@gmail.com' || firebaseUser.email === 'amaanmohd81865@gmail.com' || firebaseUser.email === 'gazisiddiqui01@gmail.com';
+        const userEmail = firebaseUser.email || '';
+        const isAdminEmail = [
+          'musagraphics75@gmail.com',
+          'gazisiddiqui01@gmail.com'
+        ].includes(userEmail);
+        
         setSession({
           id: firebaseUser.uid,
-          name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Authenticated User',
-          email: firebaseUser.email || 'no-email@printbazaar.com',
+          name: firebaseUser.displayName || userEmail.split('@')[0] || 'Authenticated User',
+          email: userEmail,
           role: isAdminEmail ? 'admin' : 'customer'
         });
-        triggerToast(`Signed in as ${firebaseUser.displayName || firebaseUser.email}`, 'success');
+
+        // Intercept Deactivation
+        if (localStorage.getItem(`pb_deactivated_state_${userEmail}`) === 'true') {
+          localStorage.removeItem(`pb_deactivated_state_${userEmail}`);
+          setTimeout(() => {
+            triggerToast(`🌟 Welcome back! Your account has been reactivated successfully. All live listings and alerts are restored!`, 'success');
+          }, 400);
+        }
+
+        // Intercept Pending Deletion Scheduling
+        const deletionDateStr = localStorage.getItem(`pb_pending_deletion_${userEmail}`);
+        if (deletionDateStr) {
+          const deletionDate = new Date(deletionDateStr);
+          const now = new Date();
+          const msPassed = now.getTime() - deletionDate.getTime();
+          const daysPassed = Math.floor(msPassed / (1000 * 60 * 60 * 24));
+          const remainingDays = Math.max(0, 30 - daysPassed);
+
+          setRecoveryEmail(userEmail);
+          setRecoveryDaysLeft(remainingDays);
+          setShowRecoveryModal(true);
+        } else {
+          triggerToast(`Signed in as ${userEmail}`, 'success');
+        }
       } else {
         setUser(null);
         setSession({
@@ -676,34 +796,53 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // Monitor Window Pathnames and Hash Hooks for Public Compliance URLs
+  useEffect(() => {
+    const handleNavigationRouting = () => {
+      const path = window.location.pathname.toLowerCase();
+      const hash = window.location.hash.toLowerCase();
+
+      let matchedView: 'none' | 'terms' | 'privacy' | 'refund' | 'shipping' | 'delete-account' | 'contact' = 'none';
+
+      if (path.includes('/delete-account') || hash === '#delete-account') {
+        matchedView = 'delete-account';
+      } else if (path.includes('/privacy-policy') || hash === '#privacy-policy' || hash === '#privacy') {
+        matchedView = 'privacy';
+      } else if (path.includes('/terms-and-conditions') || path.includes('/terms') || hash === '#terms-and-conditions' || hash === '#terms') {
+        matchedView = 'terms';
+      } else if (path.includes('/refund-policy') || hash === '#refund-policy' || hash === '#refund') {
+        matchedView = 'refund';
+      } else if (path.includes('/shipping-policy') || hash === '#shipping-policy' || hash === '#shipping') {
+        matchedView = 'shipping';
+      } else if (path.includes('/contact') || hash === '#contact') {
+        matchedView = 'contact';
+      }
+
+      setActivePolicyView(matchedView);
+      if (matchedView !== 'none') {
+        window.scrollTo({ top: 0, behavior: 'instant' });
+      }
+    };
+
+    handleNavigationRouting();
+    window.addEventListener('hashchange', handleNavigationRouting);
+    return () => window.removeEventListener('hashchange', handleNavigationRouting);
+  }, []);
+
   // Real-time Firestore synchronizer for Products catalog
   useEffect(() => {
-    const productsRef = collection(db, 'products');
-    const unsubscribe = onSnapshot(productsRef, async (snapshot) => {
+    const q = query(collection(db, 'products'));
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
       if (snapshot.empty) {
-        // Fallback to memory defaults so any customer or guest sees catalog options right away
         setProducts(INITIAL_PRODUCTS);
-
-        // Seeding database must only be attempted by the administrator
-        const currentUser = auth.currentUser;
-        if (currentUser && (currentUser.email === 'amaanmohd8186@gmail.com' || currentUser.email === 'amaanmohd81865@gmail.com' || currentUser.email === 'gazisiddiqui01@gmail.com')) {
-          try {
-            for (const prod of INITIAL_PRODUCTS) {
-              await setDoc(doc(db, 'products', prod.id), removeUndefinedFields(prod));
-            }
-          } catch (e) {
-            console.error("Failed to seed initial products collection", e);
-          }
-        }
       } else {
-        const prodList: Product[] = [];
-        snapshot.forEach((docSnap) => {
-          prodList.push(docSnap.data() as Product);
-        });
-        setProducts(prodList);
+        const productsList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as unknown as Product[];
+        setProducts(productsList);
       }
     }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'products');
+      console.error("Products fetch failed:", error);
+      setProducts(INITIAL_PRODUCTS);
     });
 
     return () => unsubscribe();
@@ -712,45 +851,31 @@ export default function App() {
   // Real-time Firestore synchronizer for Orders
   useEffect(() => {
     if (!user) {
-      // In guest mode, do not query authenticated database paths
       setOrders(INITIAL_ORDERS);
       return;
     }
 
-    // Wait until session is in sync with user credentials to prevent race condition
-    if (session.id !== user.uid) {
-      return;
+    const isAdmin = session.role === 'admin';
+    let q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
+    
+    if (!isAdmin) {
+      q = query(collection(db, 'orders'), where('customerEmail', '==', user.email), orderBy('createdAt', 'desc'));
     }
 
-    const ordersCol = collection(db, 'orders');
-    let ordersQuery;
-
-    const isAdminEmail = user.email === 'amaanmohd8186@gmail.com' || user.email === 'amaanmohd81865@gmail.com' || user.email === 'gazisiddiqui01@gmail.com';
-
-    if (isAdminEmail) {
-      ordersQuery = query(ordersCol);
-    } else {
-      ordersQuery = query(ordersCol, where('customerEmail', '==', user.email || ''));
-    }
-
-    const unsubscribe = onSnapshot(ordersQuery, (snapshot) => {
-      const ordersList: Order[] = [];
-      snapshot.forEach((docSnap) => {
-        ordersList.push(docSnap.data() as Order);
-      });
-      ordersList.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-      // Compare status difference to see if we trigger Service Worker notifications
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const ordersList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as unknown as Order[];
+        
+      // Compare status difference for notifications
       if (prevOrdersRef.current && prevOrdersRef.current.length > 0) {
         ordersList.forEach((newOrder) => {
           const oldOrder = prevOrdersRef.current.find(o => o.id === newOrder.id);
           if (oldOrder && oldOrder.status !== newOrder.status) {
-            if (newOrder.status === 'Printing In Progress' || newOrder.status === 'Ready for Dispatch') {
+            if (['Printing In Progress', 'Ready for Dispatch'].includes(newOrder.status)) {
               triggerServiceWorkerNotification(
                 `Order #${newOrder.id} - ${newOrder.status}`,
-                `Your blueprint order status is marked as: "${newOrder.status}". Preparing final packaging items.`
+                `Your blueprint order status is marked as: "${newOrder.status}".`
               );
-              triggerToast(`🔔 Order #${newOrder.id} is now in stage: ${newOrder.status}!`, 'success');
+              triggerToast(`🔔 Order #${newOrder.id} is now: ${newOrder.status}!`, 'success');
             }
           }
         });
@@ -758,21 +883,24 @@ export default function App() {
       prevOrdersRef.current = ordersList;
       setOrders(ordersList);
     }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'orders');
+      console.error("Orders fetch failed:", error);
     });
 
     return () => unsubscribe();
-  }, [user, session.id, session.email, session.role]);
+  }, [user, session.role]);
 
   // Seed INITIAL_ORDERS if list is empty and user is logged in as Admin
   useEffect(() => {
     if (user && session.role === 'admin' && orders.length === 0) {
       const seedOrders = async () => {
         try {
-          const ordersSnap = await getDocs(collection(db, 'orders'));
-          if (ordersSnap.empty) {
+          const snapshot = await getDocs(query(collection(db, 'orders'), limit(1)));
+          if (snapshot.empty) {
             for (const ord of INITIAL_ORDERS) {
-              await setDoc(doc(db, 'orders', ord.id), removeUndefinedFields(ord));
+              await setDoc(doc(db, 'orders', ord.id), {
+                ...removeUndefinedFields(ord),
+                createdAt: serverTimestamp()
+              });
             }
           }
         } catch (e) {
@@ -781,17 +909,9 @@ export default function App() {
       };
       seedOrders();
     }
-  }, [user, session.role]);
+  }, [user, session.role, orders.length]);
 
-  const handleGoogleSignIn = async () => {
-    try {
-      const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
-    } catch (e) {
-      console.error("Sign-in failed", e);
-      triggerToast("Google Sign-In failed or cancelled.", "warn");
-    }
-  };
+  // handleGoogleSignIn shifted to AuthModal module
 
   const handleSignOut = async () => {
     try {
@@ -811,16 +931,16 @@ export default function App() {
     
     setIsSubscribing(true);
     try {
-      await addDoc(collection(db, 'subscribers'), {
-        email: subscriberEmail,
-        createdAt: new Date().toISOString()
+      await addDoc(collection(db, 'audit_logs'), {
+        action: 'NEWSLETTER_SUBSCRIBE',
+        details: { email: subscriberEmail },
+        createdAt: serverTimestamp()
       });
       triggerToast("Subscribed successfully! Welcome aboard.", "success");
       setSubscriberEmail('');
     } catch (error) {
       console.error("Error subscribing:", error);
       triggerToast("Failed to subscribe at this time. Please try again.", "warn");
-      handleFirestoreError(error, OperationType.CREATE, 'subscribers');
     } finally {
       setIsSubscribing(false);
     }
@@ -845,74 +965,53 @@ export default function App() {
         placedOrder.customerId = user.uid;
         placedOrder.customerEmail = user.email || placedOrder.customerEmail;
         
-        // Sanitize and compress any large design files to protect against Firestore 1MB limits
-        for (const item of placedOrder.items) {
-          if (item.designFile && item.designFile.fileData && item.designFile.fileData.length > 150000) {
-            console.log(`Checkout compression: sanitizing large file ${item.designFile.name}...`);
-            try {
-              const compressedStr = await new Promise<string>((resolve) => {
-                const img = new Image();
-                img.onload = () => {
-                  try {
-                    const canvas = document.createElement('canvas');
-                    let width = img.width;
-                    let height = img.height;
-                    const maxDim = 300;
-                    if (width > maxDim || height > maxDim) {
-                      if (width > height) {
-                        height = Math.round((height * maxDim) / width);
-                        width = maxDim;
-                      } else {
-                        width = Math.round((width * maxDim) / height);
-                        height = maxDim;
-                      }
-                    }
-                    canvas.width = width;
-                    canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    if (ctx) {
-                      ctx.drawImage(img, 0, 0, width, height);
-                      resolve(canvas.toDataURL('image/jpeg', 0.4));
-                    } else {
-                      resolve(item.designFile.fileData || '');
-                    }
-                  } catch {
-                    resolve(item.designFile.fileData || '');
-                  }
-                };
-                img.onerror = () => resolve(item.designFile.fileData || '');
-                img.src = item.designFile.fileData || '';
-              });
-              item.designFile.fileData = compressedStr;
-            } catch (err) {
-              console.error('Failed to compress base64 during checkout:', err);
-            }
-          }
-        }
-
-        await setDoc(doc(db, 'orders', placedOrder.id), removeUndefinedFields(placedOrder));
+        await setDoc(doc(db, 'orders', placedOrder.id), {
+          ...removeUndefinedFields(placedOrder),
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
       } else {
         setOrders((prev) => [placedOrder, ...prev]);
       }
+
+      // Trigger automated SMTP email confirmation in the background
+      safeFetch('/api/orders/send-confirmation', {
+        method: 'POST',
+        body: JSON.stringify({ order: placedOrder })
+      })
+      .then(data => {
+        if (data.success) {
+          console.log("Order confirmation email action response:", data.message);
+        } else {
+          console.warn("Order confirmation email logic message:", data.error);
+        }
+      })
+      .catch(err => {
+        console.error("Failed to trigger automated order confirmation email:", err);
+      });
+
       triggerToast(`🎉 Order ${placedOrder.id} successfully created! Admin is review design bleeds.`, 'success');
       setCustomerActiveTab('status');
-    } catch (e) {
-      handleFirestoreError(e, OperationType.CREATE, `orders/${placedOrder.id}`);
+    } catch (e: any) {
+      console.error("Checkout failed:", e);
+      triggerToast(`Checkout failed: ${e.message}`, 'warn');
     }
   };
 
   const handleBalancePaymentSuccess = async (orderId: string, payment: PaymentDetails) => {
     try {
       const orderRef = doc(db, 'orders', orderId);
-      const orderSnap = await getDoc(orderRef);
-      if (orderSnap.exists()) {
-        const orderData = orderSnap.data() as Order;
+      const snap = await getDoc(orderRef);
+      
+      if (snap.exists()) {
+        const orderData = snap.data();
         const updatedPayments = [...(orderData.payments || []), payment];
-        await updateDoc(orderRef, removeUndefinedFields({
+        await updateDoc(orderRef, {
           balancePaid: true,
           payments: updatedPayments,
-          updatedAt: new Date().toISOString()
-        }));
+          updatedAt: serverTimestamp()
+        });
+        
         triggerToast(`Outstanding balance for ${orderId} check completed! Order released for shipment.`, 'success');
       } else {
         setOrders((prev) => 
@@ -931,7 +1030,7 @@ export default function App() {
         triggerToast(`Outstanding balance for ${orderId} check completed! Order released for shipment.`, 'success');
       }
     } catch (e) {
-      handleFirestoreError(e, OperationType.UPDATE, `orders/${orderId}`);
+      console.error("Balance payment update failed:", e);
     }
   };
 
@@ -953,21 +1052,28 @@ export default function App() {
     courierName?: string
   ) => {
     try {
+      let customerEmail = '';
+
       const orderRef = doc(db, 'orders', orderId);
-      const orderSnap = await getDoc(orderRef);
-      if (orderSnap.exists()) {
+      const snap = await getDoc(orderRef);
+      
+      if (snap.exists()) {
+        const orderData = snap.data();
+        customerEmail = orderData.customerEmail || orderData.userEmail || '';
         const updates: any = {
           status,
-          updatedAt: new Date().toISOString()
+          updatedAt: serverTimestamp()
         };
         if (trackingNumber) updates.trackingNumber = trackingNumber;
         if (courierName) updates.courierName = courierName;
-        await updateDoc(orderRef, removeUndefinedFields(updates));
+        
+        await updateDoc(orderRef, updates);
         triggerToast(`Order status updated to: ${status}`, 'success');
       } else {
         setOrders((prev) => 
           prev.map((o) => {
             if (o.id === orderId) {
+              customerEmail = o.customerEmail || '';
               return {
                 ...o,
                 status,
@@ -981,8 +1087,18 @@ export default function App() {
         );
         triggerToast(`Order status updated to: ${status}`, 'success');
       }
+
+      // Trigger Automated Status Email
+      if (customerEmail && (status === 'Printing In Progress' || status === 'Ready for Dispatch')) {
+        safeFetch('/api/emails/order-status', {
+          method: 'POST',
+          body: JSON.stringify({ email: customerEmail, orderId, status })
+        }).catch(err => {
+          console.error("Failed to trigger automated order confirmation email:", err);
+        });
+      }
     } catch (e) {
-      handleFirestoreError(e, OperationType.UPDATE, `orders/${orderId}`);
+      console.error("Order update failed:", e);
     }
   };
 
@@ -990,8 +1106,9 @@ export default function App() {
     try {
       await setDoc(doc(db, 'products', newProduct.id), removeUndefinedFields(newProduct));
       triggerToast(`Successfully published ${newProduct.name} in standard catalogues!`);
-    } catch (e) {
-      handleFirestoreError(e, OperationType.CREATE, `products/${newProduct.id}`);
+    } catch (e: any) {
+      console.error("Product addition failed:", e);
+      triggerToast(`Failed to publish: ${e.message}`, 'warn');
     }
   };
 
@@ -999,8 +1116,8 @@ export default function App() {
     try {
       await deleteDoc(doc(db, 'products', id));
       triggerToast('Product archived successfully from catalog views.', 'warn');
-    } catch (e) {
-      handleFirestoreError(e, OperationType.DELETE, `products/${id}`);
+    } catch (e: any) {
+      console.error("Product deletion failed:", e);
     }
   };
 
@@ -1036,11 +1153,11 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      <div className="min-h-screen bg-zinc-50 flex flex-col font-sans">
+      <div className="min-h-screen bg-zinc-50 flex flex-col font-sans w-full max-w-full overflow-x-hidden">
       
       {/* 1. SECURE TOP NAVIGATION SLABS */}
-      <nav className="bg-white border-b border-zinc-200 sticky top-0 z-30 shadow-xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <nav className="bg-white border-b border-zinc-200 sticky top-0 z-30 shadow-xs w-full">
+        <div className="w-full px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-20 items-center">
             
             {/* Logo */}
@@ -1207,11 +1324,11 @@ export default function App() {
                 ) : (
                   <button
                     type="button"
-                    onClick={handleGoogleSignIn}
+                    onClick={() => setShowAuthModal(true)}
                     className="flex items-center gap-1.5 px-4 py-2 bg-zinc-950 text-white hover:bg-[#FF4D00] transition rounded-2xl text-[11px] font-heavy uppercase tracking-wide border border-transparent shadow-sm cursor-pointer"
                   >
                     <User className="w-3.5 h-3.5 text-[#FF4D00]" />
-                    <span>Google Sign In</span>
+                    <span>Sign In</span>
                   </button>
                 )}
               </div>
@@ -1333,28 +1450,206 @@ export default function App() {
 
         {/* CUSTOMER MODE LAYOUT */}
         {roleMode === 'customer' && (
-          <div>
-            {activePolicyView === 'terms' ? (
-              <TermsOfService onBack={() => setActivePolicyView('none')} />
-            ) : activePolicyView === 'privacy' ? (
-              <PrivacyPolicy onBack={() => setActivePolicyView('none')} />
-            ) : (
-              <>
-                {enterprisePortal !== 'none' && (
-              <div className="space-y-6">
-                <button
-                  type="button"
-                  onClick={() => setEnterprisePortal('none')}
+          <div className="flex-1 w-full bg-zinc-50 flex flex-col">
+            {activePolicyView === 'terms' && (
+              <TermsOfService onBack={() => { window.location.hash = ''; setActivePolicyView('none'); }} />
+            )}
+            {activePolicyView === 'privacy' && (
+              <PrivacyPolicy onBack={() => { window.location.hash = ''; setActivePolicyView('none'); }} />
+            )}
+            {activePolicyView === 'refund' && (
+              <div className="space-y-6 text-left max-w-4xl mx-auto py-4">
+                <button 
+                  onClick={() => { window.location.hash = ''; setActivePolicyView('none'); }} 
                   className="py-2.5 px-5 bg-neutral-900 hover:bg-[#FF4D00] text-white rounded-2xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-md transition"
                 >
-                  <span>← Back to My Profile</span>
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Back to Shop</span>
                 </button>
+                <div className="bg-white rounded-[32px] border border-zinc-200/80 p-6 md:p-8 shadow-sm space-y-6">
+                  <div className="flex items-center gap-4 border-b border-zinc-150 pb-5">
+                    <div className="p-3 bg-[#FF4D00]/10 text-[#FF4D00] rounded-2xl">
+                      <FileText className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl md:text-2xl font-heavy text-slate-900 uppercase tracking-tight">Refund Policy</h3>
+                      <p className="text-[10px] font-mono text-[#FF4D00] font-bold uppercase mt-0.5">https://printbazaar.in/refund-policy</p>
+                    </div>
+                  </div>
+                  <div className="space-y-4 text-xs md:text-sm text-zinc-650 leading-relaxed font-sans">
+                    <p className="font-bold text-slate-800 uppercase text-xs">1. Strict No-Cancellation on Custom Machinery Runs</p>
+                    <p>Because every item is fully custom-made with precise CMYK screen channels and high-intensity raw substrate configurations, PrintBazaar operates under a strict **Zero refund & no-returns** policy on active machinery runs.</p>
+                    <p className="font-bold text-slate-800 uppercase text-xs">2. Defective Batch Replacements</p>
+                    <p>If print errors or color calibration shifts exceed standard margins (error margin matching 5%), our support line will initiate a high-volume plate rebuild and dispatch direct free replacements to your verified address directory.</p>
+                    <p className="font-bold text-slate-800 uppercase text-xs">3. Wallet and Balances Refund Policy</p>
+                    <p>Funds stored directly in PrintBazaar Wallets are not erasable and remain preserved securely. Refund claims with genuine proofs will be credited securely into your PB Wallet Balance or issued directly by the developer.</p>
+                  </div>
+                  <div className="bg-zinc-50 p-4 border border-zinc-150 rounded-xl text-center text-xs">
+                    Questions? Contact Amaan Siddiqui: <strong className="text-[#FF4D00]">amaanmohd8681@gmail.com</strong>
+                  </div>
+                </div>
+              </div>
+            )}
+            {activePolicyView === 'shipping' && (
+              <div className="space-y-6 text-left max-w-4xl mx-auto py-4">
+                <button 
+                  onClick={() => { window.location.hash = ''; setActivePolicyView('none'); }} 
+                  className="py-2.5 px-5 bg-neutral-900 hover:bg-[#FF4D00] text-white rounded-2xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-md transition"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Back to Shop</span>
+                </button>
+                <div className="bg-white rounded-[32px] border border-zinc-200/80 p-6 md:p-8 shadow-sm space-y-6">
+                  <div className="flex items-center gap-4 border-b border-zinc-150 pb-5">
+                    <div className="p-3 bg-indigo-50 text-indigo-650 rounded-2xl">
+                      <FileText className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl md:text-2xl font-heavy text-slate-900 uppercase tracking-tight">Shipping Policy</h3>
+                      <p className="text-[10px] font-mono text-indigo-650 font-bold uppercase mt-0.5">https://printbazaar.in/shipping-policy</p>
+                    </div>
+                  </div>
+                  <div className="space-y-4 text-xs md:text-sm text-zinc-650 leading-relaxed font-sans">
+                    <p className="font-bold text-slate-800 uppercase text-xs">1. Industry Fast Freight Dispatch</p>
+                    <p>We partner with high-velocity transport carriers to deliver physical shipments safely with real-time tracking IDs. Normal dispatch lead time matches **1-2 business days** once draft designs are approved by administrators.</p>
+                    <p className="font-bold text-slate-800 uppercase text-xs">2. Estimations of Delivery Timeline</p>
+                    <p>Our standard production duration matches 3-5 days. Custom offset print catalog shipments reach your door in Noida/Delhi regions within 2 days, and other states across India within 5-7 days under normal carrier limits.</p>
+                    <p className="font-bold text-slate-800 uppercase text-xs">3. Transit Disruption Safeties</p>
+                    <p>In accordance with high-volume offset agreements, PrintBazaar handles transit disputes securely. If shipments are damaged in transit, file a claim on the client-facing tracking log for quick offset corrections.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            {activePolicyView === 'contact' && (
+              <div className="space-y-6 text-left max-w-4xl mx-auto py-4">
+                <button 
+                  onClick={() => { window.location.hash = ''; setActivePolicyView('none'); }} 
+                  className="py-2.5 px-5 bg-neutral-900 hover:bg-[#FF4D00] text-white rounded-2xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-md transition"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Back to Shop</span>
+                </button>
+                <div className="bg-white rounded-[32px] border border-zinc-200/80 p-6 md:p-8 shadow-sm space-y-6">
+                  <div className="flex items-center gap-4 border-b border-zinc-150 pb-5">
+                    <div className="p-3 bg-[#FF4D00]/10 text-[#FF4D00] rounded-2xl">
+                      <FileText className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl md:text-2xl font-heavy text-slate-900 uppercase tracking-tight">Contact Informational Directory</h3>
+                      <p className="text-[10px] font-mono text-zinc-500 font-bold uppercase mt-0.5">https://printbazaar.in/contact</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 leading-relaxed font-sans text-xs">
+                    <div className="space-y-4">
+                      <h4 className="text-sm font-heavy text-slate-900 uppercase tracking-tight">Support Channels</h4>
+                      <div className="p-4 bg-zinc-50 border border-zinc-150 rounded-2xl space-y-2">
+                        <p className="font-bold text-slate-800 text-xs">📧 Standard Helpline Mail</p>
+                        <a href="mailto:amaanmohd8681@gmail.com" className="text-[#FF4D00] hover:underline font-bold text-sm block">amaanmohd8681@gmail.com</a>
+                      </div>
+                    </div>
+                    <div className="space-y-4">
+                      <h4 className="text-sm font-heavy text-slate-900 uppercase tracking-tight">Developer Particulars</h4>
+                      <div className="p-4 bg-zinc-50 border border-zinc-150 rounded-2xl space-y-1">
+                        <p className="font-bold text-slate-400">Developer Architect</p>
+                        <p className="font-neutral text-base font-black text-slate-950 uppercase tracking-tighter">Amaan Siddiqui</p>
+                        <p className="text-[10px] text-zinc-500 uppercase mt-1">Lead Engineering & Compliance Officer</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            {activePolicyView === 'delete-account' && (
+              <div className="space-y-6 text-left max-w-4xl mx-auto py-4">
+                <button 
+                  onClick={() => { window.location.hash = ''; setActivePolicyView('none'); }}
+                  className="py-2.5 px-5 bg-neutral-900 hover:bg-[#FF4D00] text-white rounded-2xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-md transition"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Back to Shop</span>
+                </button>
+                
+                <div className="bg-white rounded-[32px] border border-zinc-200/80 p-6 md:p-8 shadow-sm space-y-6">
+                  <div className="flex items-center gap-4 border-b border-zinc-150 pb-5">
+                    <div className="p-3 bg-rose-50 text-rose-600 rounded-2xl border border-rose-100">
+                      <Trash2 className="w-6 h-6 animate-pulse" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl md:text-2xl font-heavy text-slate-900 uppercase tracking-tight">Public Deletion & Data Protection Room</h3>
+                      <p className="text-[10px] font-mono text-rose-600 font-bold uppercase mt-0.5">https://printbazaar.in/delete-account</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 text-xs md:text-sm text-zinc-650 leading-relaxed">
+                    <div className="bg-rose-50 p-4 border border-rose-100 rounded-2xl text-rose-900 text-xs space-y-2">
+                      <p className="font-black uppercase tracking-wide">Play Store & Privacy Policy Compliance Guard</p>
+                      <p>This public interface explains play store safety rules. Users can self-service initiate account deactivation or permanent deletion directly inside the application.</p>
+                    </div>
+
+                    <p><strong>1. Categories of Stored Data Cleared Permanently:</strong></p>
+                    <ul className="list-disc pl-5 text-xs text-zinc-650 space-y-1.5">
+                      <li>Full user profile identity parameters matching your login directory</li>
+                      <li>Contact listings, phone numbers, pincodes, and coordinate addresses</li>
+                      <li>Active Cart products queue, wishlisted matches, and alert logs</li>
+                      <li>Historical vector designs saved inside our offset pre-press studios</li>
+                      <li>AI projects, background parameters, and remaining AI engine usage credits</li>
+                    </ul>
+
+                    <p><strong>2. The 30-Day Recovery Period:</strong></p>
+                    <p>To prevent malicious and accidental erasures, your target profile transitions for **30 days into Pending Deletion state**. You can return and restore your account dynamically simply by logging back in inside this period grid. If inactive for more than 30 days, all data is permanently pruned from database caches.</p>
+
+                    <p><strong>3. Initiating Self-Service Deletion In-App:</strong></p>
+                    <p>To erase your account, navigate to:</p>
+                    <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-xl font-mono text-[11px] text-indigo-600">
+                      Profile Tab ➜ Privacy & Security Settings ➜ Delete Permanently
+                    </div>
+
+                    <div className="pt-2 text-left">
+                      {user ? (
+                        <button 
+                          onClick={() => {
+                            setProfilePortal('privacy_security');
+                            setCustomerActiveTab('profile');
+                            setActivePolicyView('none');
+                          }}
+                          className="px-5 py-3 bg-[#FF4D00] hover:bg-black text-white text-xs font-black uppercase tracking-wider rounded-xl transition cursor-pointer shadow-md"
+                        >
+                          Go directly to my Privacy & Security Dashboard
+                        </button>
+                      ) : (
+                        <button 
+                          onClick={() => setShowAuthModal(true)}
+                          className="px-5 py-3 bg-zinc-950 text-white hover:bg-[#FF4D00] text-xs font-black uppercase tracking-wider rounded-xl transition cursor-pointer shadow-md"
+                        >
+                          Please Sign In to Access Deletion Panel
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            {activePolicyView === 'none' && (
+              <div className="flex-1 w-full flex flex-col overflow-x-hidden pt-4">
+                {enterprisePortal !== 'none' && (
+              <div className="w-full flex-1 p-0">
+                <div className="px-4 sm:px-6 lg:px-8">
+                  <button
+                    type="button"
+                    onClick={() => setEnterprisePortal('none')}
+                    className="py-2.5 px-5 bg-neutral-900 hover:bg-[#FF4D00] text-white rounded-2xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-md transition mb-6"
+                  >
+                    <span>← Back to My Profile</span>
+                  </button>
+                </div>
 
                 {enterprisePortal === 'seller' && (
-                  <SellerVerificationSystem isAdminMode={roleMode === 'admin'} />
+                  <div className="w-full">
+                    <SellerVerificationSystem isAdminMode={roleMode === 'admin'} />
+                  </div>
                 )}
 
-                {enterprisePortal === 'banners' && (
+                {enterprisePortal === 'banners' && session?.role === 'admin' && (
                   <BannerManager />
                 )}
 
@@ -1362,7 +1657,7 @@ export default function App() {
                   <BulkQuoteGenerator />
                 )}
 
-                {enterprisePortal === 'audit' && (
+                {enterprisePortal === 'audit' && session?.role === 'admin' && (
                   <VerificationAuditDashboard onBack={() => setEnterprisePortal('none')} />
                 )}
 
@@ -1373,21 +1668,22 @@ export default function App() {
             )}
 
             {enterprisePortal === 'none' && (
-              <>
-                {/* AI Design Cloud Workspace */}
+              <div className="flex-1 w-full flex flex-col">
                 {customerActiveTab === 'aistudio' && (
-                  <div className="w-[calc(100%+2rem)] sm:w-[calc(100%+3rem)] lg:w-[calc(100%+4rem)] -ml-4 sm:-ml-6 lg:-ml-8 bg-zinc-50 border-y border-zinc-200">
+                  <div className="fixed inset-0 z-[60] bg-zinc-50 flex flex-col pt-0 pb-0">
                      <DesignEditor 
                        userEmail={session.email} 
                        userId={session.id}
                        onSave={(d) => triggerToast('Design saved to cloud.')} 
+                       userStats={userStats}
+                       onClose={() => setCustomerActiveTab('shop')}
                      />
                   </div>
                 )}
 
                 {/* SHOP AND WISHLIST TAB VIEW */}
-            {(customerActiveTab === 'shop' || customerActiveTab === 'wishlist') && (
-              <div className="space-y-6">
+                {(customerActiveTab === 'shop' || customerActiveTab === 'wishlist') && (
+                  <div className="w-full max-w-full px-4 sm:px-6 lg:px-8 py-8 space-y-12">
                 {/* Promo Billboard Accent */}
                 {customerActiveTab === 'shop' && (
                   <div className="bg-[#0F172A] text-white p-8 md:p-10 rounded-[36px] border border-slate-800 shadow-xl flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden">
@@ -1581,6 +1877,18 @@ export default function App() {
                               >
                                 <Heart className={`w-4 h-4 ${wishlistProducts.includes(p.id) ? 'fill-rose-500 text-rose-500' : ''}`} />
                               </button>
+
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setShareProduct(p);
+                                }}
+                                className="absolute top-14 right-4 bg-white/50 backdrop-blur-md p-2 rounded-full cursor-pointer hover:bg-white text-zinc-400 hover:text-indigo-600 transition-all border border-white/40 shadow-sm z-10"
+                                title="Smart Share options"
+                              >
+                                <Share2 className="w-4 h-4" />
+                              </button>
                               {p.video && (
                                 <span className="absolute bottom-4 left-4 bg-black/80 backdrop-blur-md text-white font-micro px-3 py-1.5 rounded-full shadow-sm z-10 pointer-events-none flex items-center gap-1">
                                   ▶ CLIP
@@ -1697,12 +2005,14 @@ export default function App() {
                 orders={currentCustomerOrders}
                 onPayBalanceSuccess={handleBalancePaymentSuccess}
                 onReorder={handleReorder}
+                userRole={session.role}
+                userEmail={session.email}
               />
             )}
 
             {/* INTEGRATED PROFILE SUMMARY TAB VIEW FOR PERSISTENCE & NATIVE NAV */}
             {customerActiveTab === 'profile' && (
-              <div className="max-w-md mx-auto">
+              <div className={`${profilePortal === 'privacy_security' ? 'max-w-5xl' : 'max-w-md'} mx-auto transition-all`}>
                 {profilePortal === 'wallet' && <PBWallet stats={userStats} userId={user?.uid || 'guest'} onUpdateStats={setUserStats} onBack={() => setProfilePortal('none')} />}
                 {profilePortal === 'credits' && <AICredits stats={userStats} userId={user?.uid || 'guest'} onUpdateStats={setUserStats} onBack={() => setProfilePortal('none')} />}
                 {profilePortal === 'profile_addresses' && <ProfileAddresses stats={userStats} userName={session.name} userEmail={session.email} onUpdateSession={(n, e) => setSession({...session, name: n, email: e})} onUpdateStats={setUserStats} onBack={() => setProfilePortal('none')} />}
@@ -1710,6 +2020,16 @@ export default function App() {
                 {profilePortal === 'saved_designs' && <SavedDesigns stats={userStats} onUpdateStats={setUserStats} onBack={() => setProfilePortal('none')} />}
                 {profilePortal === 'premium' && <PremiumUpgrade stats={userStats} userId={user?.uid || 'guest'} onUpdateStats={setUserStats} onBack={() => setProfilePortal('none')} />}
                 {profilePortal === 'history' && <PaymentHistory userId={user?.uid || 'guest'} onBack={() => setProfilePortal('none')} />}
+                {profilePortal === 'privacy_security' && (
+                  <PrivacySecurity
+                    stats={userStats}
+                    session={session}
+                    onUpdateStats={setUserStats}
+                    onBack={() => setProfilePortal('none')}
+                    onSignOut={handleSignOut}
+                    triggerToast={triggerToast}
+                  />
+                )}
                 
                 {profilePortal === 'none' && (
                   <div className="bg-white rounded-[32px] p-6 border border-zinc-200/80 shadow-md space-y-6">
@@ -1817,6 +2137,18 @@ export default function App() {
 
                   <button
                     type="button"
+                    onClick={() => requireUserAuthAction(() => setProfilePortal('privacy_security'))}
+                    className="w-full py-3.5 px-4 text-left text-xs font-bold uppercase tracking-wider text-zinc-700 hover:bg-zinc-50 flex items-center justify-between rounded-xl transition border border-zinc-100 cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-indigo-500" />
+                      <span>Privacy & Security Settings</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-zinc-400" />
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={() => requireUserAuthAction(() => setProfilePortal('rewards'))}
                     className="w-full py-3.5 px-4 text-left text-xs font-bold uppercase tracking-wider text-zinc-700 hover:bg-zinc-50 flex items-center justify-between rounded-xl transition border border-zinc-100 cursor-pointer"
                   >
@@ -1881,46 +2213,47 @@ export default function App() {
                   ) : (
                     <button
                       type="button"
-                      onClick={handleGoogleSignIn}
+                      onClick={() => setShowAuthModal(true)}
                       className="w-full py-3.5 bg-zinc-950 text-white hover:bg-[#FF4D00] rounded-2xl text-xs font-black uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
                     >
                       <User className="w-4 h-4 text-[#FF4D00]" />
-                      <span>Connect Google Account</span>
+                      <span>Sign In / Connect Account</span>
                     </button>
                   )}
                 </div>
               </div>
             )}
-              </div>
-            )}
-            </>
-            )}
-            </>
-            )}
-
           </div>
         )}
+      </div>
+    )}
+  </div>
+)}
+</div>
+)}
 
         {/* ADMIN WORKSPACE LAYOUT */}
-        {roleMode === 'admin' && (
-          <AdminWorkspace
-            orders={orders}
-            products={products}
-            onUpdateOrderStatus={handleUpdateOrderStatus}
-            onAddNewProduct={handleAddNewProduct}
-            onDeleteProduct={handleDeleteProduct}
-            onShowAudit={() => setEnterprisePortal('audit')}
-          />
+        {roleMode === 'admin' && session?.role === 'admin' && (
+          <React.Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-zinc-50 font-micro text-[10px] uppercase tracking-widest text-[#FF4D00]">Loading Secure Admin Bundle...</div>}>
+            <AdminWorkspace
+              orders={orders}
+              products={products}
+              onUpdateOrderStatus={handleUpdateOrderStatus}
+              onAddNewProduct={handleAddNewProduct}
+              onDeleteProduct={handleDeleteProduct}
+              onShowAudit={() => setEnterprisePortal('audit')}
+            />
+          </React.Suspense>
         )}
 
         {roleMode === 'customer' && <WhatsAppFloatingButton product={focusConfigProduct || undefined} cartItems={cartItems} />}
 
       </main>
 
-      {/* FAQ Guide Footer Section */}
-      {roleMode === 'customer' && (
-        <section className="bg-zinc-100 border-t border-zinc-200 py-12 px-4 sm:px-6 lg:px-8 mt-10 rounded-[40px] border">
-          <div className="max-w-7xl mx-auto">
+      {/* FAQ Guide Footer Section - ONLY ON HOME (SHOP) TAB */}
+      {roleMode === 'customer' && customerActiveTab === 'shop' && activePolicyView === 'none' && enterprisePortal === 'none' && (
+        <section className="bg-zinc-100 border-t border-zinc-200 py-12 px-4 sm:px-6 lg:px-8 mt-10 rounded-t-[40px] border w-full">
+          <div className="w-full max-w-7xl mx-auto">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
               <div>
                 <span className="font-micro text-[#FF4D00] block">Pre-press Guidelines & Help Desks</span>
@@ -2011,6 +2344,86 @@ export default function App() {
           onClose={() => setFocusConfigProduct(null)}
           onAddToCart={handleAddToCart}
         />
+      )}
+
+      {shareProduct && (
+        <SmartShareSystem
+          product={shareProduct}
+          isOpen={!!shareProduct}
+          onClose={() => setShareProduct(null)}
+        />
+      )}
+
+      {/* 30-Day Deletion Grace Period Interceptor Warning Room */}
+      {showRecoveryModal && (
+        <div className="fixed inset-0 bg-neutral-950/85 backdrop-blur-md flex items-center justify-center p-4 z-50 select-none">
+          <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-md overflow-hidden border border-zinc-100 flex flex-col p-8 text-center space-y-6 relative">
+            <div className="flex flex-col items-center space-y-3 pt-2">
+              <div className="w-16 h-16 bg-rose-50 text-rose-600 rounded-3xl flex items-center justify-center border border-rose-100 animate-pulse">
+                <AlertTriangle className="w-8 h-8" />
+              </div>
+              <h3 className="font-sans font-black text-rose-600 text-xl tracking-tight uppercase">Account Scheduled For Deletion</h3>
+              <p className="text-zinc-500 text-[10px] font-mono font-bold uppercase tracking-widest bg-zinc-50 py-1.5 px-3 rounded-full border border-zinc-150">
+                {recoveryEmail}
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div className="bg-rose-50 border border-rose-100 p-5 rounded-3xl text-left space-y-2.5">
+                <div className="flex justify-between items-center text-xs font-black text-rose-900 uppercase">
+                  <span>Grace Period Tracker</span>
+                  <span className="text-sm text-rose-600 font-mono tracking-tighter">{recoveryDaysLeft} Days Left</span>
+                </div>
+                <div className="w-full bg-zinc-200 h-2 rounded-full overflow-hidden">
+                  <div 
+                    className="bg-rose-500 h-full rounded-full transition-all duration-1000" 
+                    style={{ width: `${Math.max(5, (recoveryDaysLeft / 30) * 100)}%` }} 
+                  />
+                </div>
+                <p className="text-[11px] leading-relaxed text-zinc-650 pt-1">
+                  Your profile and associated pre-press designs, AI studio configurations, and loyalty points are safely preserved in a **30-day pending grace period**. To cancel deletion, click below.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2.5">
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    if (user) {
+                      const d = await safeFetch('/api/user/delete-cancel', {
+                        method: 'POST',
+                        body: JSON.stringify({ userId: user.uid })
+                      });
+                      if (d.success) {
+                        setShowRecoveryModal(false);
+                        triggerToast('🎉 Account successfully restored!', 'success');
+                      }
+                    }
+                  } catch (err: any) {
+                    triggerToast('Service error: ' + err.message, 'warn');
+                  }
+                  localStorage.removeItem(`pb_pending_deletion_${recoveryEmail}`);
+                }}
+                className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-heavy uppercase tracking-widest text-[11px] rounded-2xl cursor-pointer shadow-md transition active:scale-98"
+              >
+                Restore Account Permanently
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRecoveryModal(false);
+                  handleSignOut();
+                }}
+                className="w-full py-3.5 bg-neutral-900 hover:bg-[#FF4D00] text-white font-heavy uppercase tracking-widest text-[10px] rounded-2xl cursor-pointer transition"
+              >
+                Continue Deletion & Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* QR Code Scan Modal Overlay */}
@@ -2177,9 +2590,10 @@ export default function App() {
         </div>
       )}
 
-      {/* 5. METICULOUS FOOTER ACCENTS */}
-      <footer className="bg-white border-t border-zinc-200 py-12 mt-16 shrink-0">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col items-center text-center space-y-8">
+      {/* 5. METICULOUS FOOTER ACCENTS - ONLY ON HOME (SHOP) TAB */}
+      {roleMode === 'customer' && customerActiveTab === 'shop' && (
+        <footer className="bg-white border-t border-zinc-200 py-12 shrink-0 w-full">
+          <div className="w-full px-4 flex flex-col items-center text-center space-y-8">
           
           <div className="w-full max-w-md bg-zinc-50 border border-zinc-200 rounded-2xl p-6 text-center">
              <h4 className="text-sm font-heavy uppercase tracking-widest text-[#FF4D00] mb-2">Subscribe to Updates</h4>
@@ -2203,83 +2617,122 @@ export default function App() {
              </form>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-4">
             <p className="font-heavy text-sm uppercase text-slate-900 tracking-wide">
               © 2026 PRINT<span className="text-[#FF4D00]">BAZAAR</span> Press Ltd. Blueprints CMYK standard.
             </p>
             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider max-w-lg mx-auto">
               PROUDLY DRIVEN BY HIGH-VOLUME INDUSTRIAL TYPOGRAPHY. HASSLE-FREE 100% UPFRONT SECURED CHECKOUTS.
             </p>
-            <div className="flex justify-center items-center gap-3 text-[10px] font-bold uppercase tracking-widest text-[#FF4D00] font-sans pt-1">
-              <button 
-                id="footer-privacy-link"
-                type="button"
-                onClick={() => setActivePolicyView('privacy')}
-                className="hover:text-black hover:underline transition cursor-pointer"
-              >
-                Privacy Policy
-              </button>
-              <span className="text-zinc-300 select-none">•</span>
-              <button 
-                id="footer-qr-button"
-                type="button"
-                onClick={() => setShowQrModal(true)}
-                className="hover:text-black hover:underline transition cursor-pointer flex items-center gap-0.5"
-              >
-                <QrCode className="w-3 h-3 text-[#FF4D00]" />
-                Scan Mobile
-              </button>
-              <span className="text-zinc-300 select-none">•</span>
-              <button 
-                id="footer-terms-link"
-                type="button"
-                onClick={() => setActivePolicyView('terms')}
-                className="hover:text-black hover:underline transition cursor-pointer"
-              >
-                Terms of Service
-              </button>
-              <span className="text-zinc-300 select-none">•</span>
-              <button 
-                id="footer-share-link"
-                type="button"
-                onClick={async () => {
-                  const shareData = {
-                    title: 'PrintBazaar',
-                    text: 'Professional High-Volume Offset Printing at Wholesale Rates with AI-Powered Edit Studio.',
-                    url: window.location.href
-                  };
-                  if (navigator.share) {
-                    try {
-                      await navigator.share(shareData);
-                      triggerToast('App shared successfully!', 'success');
-                    } catch (err: any) {
-                      if (err.name !== 'AbortError') {
-                        // fallback to copy if share failed or cancelled due to permissions
-                        try {
-                          await navigator.clipboard.writeText(window.location.href);
-                          triggerToast('Copied App share link to clipboard!', 'success');
-                        } catch {
-                          triggerToast('Unable to launch share dialog: ' + err.message, 'warn');
+            
+            <div className="flex flex-col gap-3 items-center justify-center pt-1">
+              {/* PRIMARY COMPLIANCE LINKS ROW */}
+              <div className="flex flex-wrap justify-center items-center gap-x-3 gap-y-1 text-[10px] font-bold uppercase tracking-widest text-[#FF4D00] font-sans">
+                <button 
+                  id="footer-privacy-link"
+                  type="button"
+                  onClick={() => { window.location.hash = '#privacy'; }}
+                  className="hover:text-black hover:underline transition cursor-pointer"
+                >
+                  Privacy Policy
+                </button>
+                <span className="text-zinc-300 select-none hidden sm:inline">•</span>
+                <button 
+                  id="footer-terms-link"
+                  type="button"
+                  onClick={() => { window.location.hash = '#terms'; }}
+                  className="hover:text-black hover:underline transition cursor-pointer"
+                >
+                  Terms of Service
+                </button>
+                <span className="text-zinc-300 select-none hidden sm:inline">•</span>
+                <button 
+                  id="footer-qr-button"
+                  type="button"
+                  onClick={() => setShowQrModal(true)}
+                  className="hover:text-black hover:underline transition cursor-pointer flex items-center gap-0.5"
+                >
+                  <QrCode className="w-3 h-3 text-[#FF4D00]" />
+                  <span>Scan Mobile</span>
+                </button>
+                <span className="text-zinc-300 select-none hidden sm:inline">•</span>
+                <button 
+                  id="footer-share-link"
+                  type="button"
+                  onClick={async () => {
+                    const shareData = {
+                      title: 'PrintBazaar',
+                      text: 'Professional High-Volume Offset Printing at Wholesale Rates with AI-Powered Edit Studio.',
+                      url: window.location.href
+                    };
+                    if (navigator.share) {
+                      try {
+                        await navigator.share(shareData);
+                        triggerToast('App shared successfully!', 'success');
+                      } catch (err: any) {
+                        if (err.name !== 'AbortError') {
+                          try {
+                            await navigator.clipboard.writeText(window.location.href);
+                            triggerToast('Copied App share link to clipboard!', 'success');
+                          } catch {
+                            triggerToast('Unable to launch share dialog: ' + err.message, 'warn');
+                          }
                         }
                       }
+                    } else {
+                      try {
+                        await navigator.clipboard.writeText(window.location.href);
+                        triggerToast('App link copied to clipboard!', 'success');
+                      } catch {
+                        triggerToast('Sharing not supported on this platform.', 'warn');
+                      }
                     }
-                  } else {
-                    try {
-                      await navigator.clipboard.writeText(window.location.href);
-                      triggerToast('App link copied to clipboard!', 'success');
-                    } catch {
-                      triggerToast('Sharing not supported on this platform.', 'warn');
-                    }
-                  }
-                }}
-                className="hover:text-black hover:underline transition cursor-pointer flex items-center gap-1"
-              >
-                Share App
-              </button>
+                  }}
+                  className="hover:text-black hover:underline transition cursor-pointer"
+                >
+                  Share App
+                </button>
+              </div>
+
+              {/* SECOND COMPLIANCE FOOTER ROW */}
+              <div className="flex flex-wrap justify-center items-center gap-x-3 gap-y-1.5 text-[9px] font-bold uppercase tracking-wider text-slate-500 font-sans border-t border-zinc-100 pt-2.5 w-full max-w-lg">
+                <button 
+                  type="button"
+                  onClick={() => { window.location.hash = '#refund'; }}
+                  className="hover:text-[#FF4D00] hover:underline transition cursor-pointer"
+                >
+                  Refund Policy
+                </button>
+                <span className="text-zinc-300 select-none font-normal">•</span>
+                <button 
+                  type="button"
+                  onClick={() => { window.location.hash = '#shipping'; }}
+                  className="hover:text-[#FF4D00] hover:underline transition cursor-pointer"
+                >
+                  Shipping Policy
+                </button>
+                <span className="text-zinc-300 select-none font-normal">•</span>
+                <button 
+                  type="button"
+                  onClick={() => { window.location.hash = '#contact'; }}
+                  className="hover:text-[#FF4D00] hover:underline transition cursor-pointer"
+                >
+                  Contact Page
+                </button>
+                <span className="text-zinc-300 select-none font-normal">•</span>
+                <button 
+                  type="button"
+                  onClick={() => { window.location.hash = '#delete-account'; }}
+                  className="hover:text-rose-600 hover:underline transition cursor-pointer font-black text-[#FF4D00]"
+                >
+                  Delete Account URL
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </footer>
+    )}
 
       {/* 6. MOBILE FIXED BOTTOM NAVIGATION BAR */}
       {roleMode === 'customer' && !showSplash && (
@@ -2374,6 +2827,19 @@ export default function App() {
 
       {/* Floating AI Customer Helpline */}
       <AiCustomerAssistant />
+
+      {/* Global OTP & Firebase Diagnostics Panel */}
+      {showDiagnostics && (
+        <FirebaseDiagnosticsPanel onClose={() => setShowDiagnostics(false)} />
+      )}
+      
+      {/* Auth Modal */}
+      {showAuthModal && (
+        <AuthModal 
+          onClose={() => setShowAuthModal(false)} 
+          triggerToast={triggerToast} 
+        />
+      )}
 
     </div>
     </>

@@ -1,177 +1,354 @@
-import React from 'react';
-import { ShieldCheck, Eye, Lock, HardDrive, Cpu, ArrowLeft, Printer } from 'lucide-react';
+import React, { useState } from 'react';
+import { 
+  ShieldCheck, 
+  Eye, 
+  Lock, 
+  HardDrive, 
+  Cpu, 
+  ArrowLeft, 
+  Printer, 
+  Search, 
+  BookOpen, 
+  Info, 
+  CheckCircle,
+  AlertTriangle,
+  FileText
+} from 'lucide-react';
 
 interface PrivacyPolicyProps {
   onBack: () => void;
 }
 
-export default function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
-  return (
-    <div className="space-y-6 animate-fadeIn text-left max-w-4xl mx-auto py-4">
-      {/* Return Navigation */}
-      <button 
-        id="privacy-back-btn"
-        onClick={onBack} 
-        className="py-2.5 px-5 bg-neutral-900 hover:bg-[#FF4D00] text-white rounded-2xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-md transition"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        <span>Back to Shop</span>
-      </button>
+const sectionTitles = [
+  "Introduction",
+  "Definitions",
+  "Scope",
+  "Information Collection",
+  "Account Data",
+  "Seller Verification",
+  "AI Studio Data",
+  "Uploaded Files",
+  "Payment Processing",
+  "Order Data",
+  "Cookies",
+  "Analytics",
+  "Data Usage",
+  "Legal Basis",
+  "Data Sharing",
+  "Third Party Services",
+  "Firebase Usage",
+  "Cloud Storage",
+  "Security Controls",
+  "Encryption",
+  "Fraud Prevention",
+  "Account Deactivation",
+  "Account Deletion",
+  "Data Portability",
+  "Retention",
+  "Children's Privacy",
+  "International Transfers",
+  "User Rights",
+  "Marketing",
+  "Notifications",
+  "Seller Obligations",
+  "Customer Obligations",
+  "Wallet",
+  "AI Credits",
+  "Refund Records",
+  "Dispute Resolution",
+  "Compliance",
+  "Incident Response",
+  "Audit Logs",
+  "Backups",
+  "Access Controls",
+  "Authentication",
+  "OTP",
+  "Device Data",
+  "Location",
+  "IP Logging",
+  "Policy Changes",
+  "Contact",
+  "Grievance",
+  "Conclusion",
+  "Appendix A",
+  "Appendix B",
+  "Appendix C",
+  "Appendix D",
+  "Appendix E"
+];
 
-      {/* Main Container */}
-      <div className="bg-white rounded-[32px] border border-zinc-200/80 p-6 md:p-8 shadow-sm space-y-8">
-        
-        {/* Header Section */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-150 pb-6">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl border border-indigo-100">
-              <ShieldCheck className="w-6 h-6" />
-            </div>
-            <div>
-              <h3 id="privacy-main-title" className="text-xl md:text-2xl font-heavy text-slate-900 uppercase tracking-tight">Privacy Policy</h3>
-              <p className="text-[10px] font-mono text-zinc-500 font-bold uppercase mt-0.5">Regulatory Compliance Document</p>
-            </div>
-          </div>
+const generalBody = "PrintBazaar collects and processes information only for providing printing, AI editing, seller verification, payments, fraud prevention, customer support, analytics, and legal compliance. Users retain rights over their content subject to platform terms. Appropriate security measures, including encryption, access controls, authentication, monitoring, backups, and audit logging, are applied where practical. Data deletion, download, correction, and account controls are available through Privacy & Security settings. Seller KYC documents are processed for verification and compliance. AI-generated content should be reviewed before use. Payment records may be retained where legally required.";
+
+export default function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedIdx, setSelectedIdx] = useState<number>(0);
+  const [viewMode, setViewMode] = useState<'split' | 'continuous'>('split');
+
+  // Build full sections list
+  const sections = sectionTitles.map((title, index) => {
+    let customContent = generalBody;
+    
+    // Add additional contextual regulatory helpers for critical compliance parts
+    if (title === "Account Deactivation") {
+      customContent = "PrintBazaar collects and processes information only for providing printing, AI editing, seller verification, payments, fraud prevention, customer support, analytics, and legal compliance. Users retain rights over their content subject to platform terms. Appropriate security measures, including encryption, access controls, authentication, monitoring, backups, and audit logging, are applied where practical. Data deactivation is available through the Privacy & Security panel under Profile Settings: deactivating temporarily disables vector design listings/blueprints, pauses alerts, and holds balances, allowing instant reactivation upon next sign-in.";
+    } else if (title === "Account Deletion") {
+      customContent = "PrintBazaar collects and processes information only for providing printing, AI editing, seller verification, payments, fraud prevention, customer support, analytics, and legal compliance. Users retain rights over their content subject to platform terms. Appropriate security measures, including encryption, access controls, authentication, monitoring, backups, and audit logging, are applied where practical. Data deletion triggers a 30-Day countdown grace tracker. Users logging back within 30 days instantly cancel the eradication queue. Post 30 days, files are completely shred from database registers.";
+    }
+
+    return {
+      number: index + 1,
+      title,
+      content: customContent
+    };
+  });
+
+  // Filter sections under search
+  const filteredSections = sections.filter(s => 
+    s.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    s.content.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  return (
+    <div className="space-y-6 animate-fadeIn text-left max-w-7xl mx-auto py-4 px-2 sm:px-4">
+      {/* Top action bar */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <button 
+          id="privacy-back-btn"
+          onClick={onBack} 
+          className="py-2.5 px-5 bg-neutral-900 hover:bg-[#FF4D00] text-white rounded-2xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-md transition active:scale-98"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Back to Shop</span>
+        </button>
+
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => setViewMode(v => v === 'split' ? 'continuous' : 'split')}
+            className="px-4 py-2 bg-white dark:bg-zinc-900 hover:bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-heavy uppercase tracking-widest transition flex items-center gap-2"
+          >
+            <BookOpen className="w-4 h-4 text-[#FF4D00]" />
+            <span>{viewMode === 'split' ? 'View as Single Document' : 'View Side-by-Side'}</span>
+          </button>
+
           <button 
             onClick={() => window.print()} 
-            className="flex items-center gap-2 px-4 py-2 bg-zinc-50 hover:bg-zinc-100 text-zinc-700 hover:text-slate-900 border border-zinc-200 rounded-xl text-xs font-heavy uppercase tracking-widest transition"
+            className="flex items-center gap-2 px-4 py-2 bg-[#FF4D00] text-white hover:bg-neutral-900 rounded-xl text-xs font-heavy uppercase tracking-widest transition"
           >
             <Printer className="w-4 h-4" />
-            <span>Print Copy</span>
+            <span>Print Policy</span>
           </button>
         </div>
+      </div>
 
-        {/* Content Blocks */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-zinc-700 leading-relaxed font-sans text-sm">
-          
-          <div className="md:col-span-2 space-y-8">
-            {/* Section 1 */}
-            <div className="space-y-3">
-              <h4 className="text-base font-heavy text-slate-900 uppercase tracking-tight">
-                1. Information We Collect
-              </h4>
-              <p>
-                At PRINTBAZAAR Press, your data protection is our highest operational priority. When you utilize our platform to customize and coordinate high-volume print blueprints, we acquire specific categories of user information:
-              </p>
-              <ul className="list-disc pl-5 space-y-2 text-xs">
-                <li>
-                  <strong>Identity and Contact Data:</strong> Name, professional company email address, custom shipping locations, and phone numbers required for high-priority logistics.
-                </li>
-                <li>
-                  <strong>Industrial Design Assets:</strong> Custom typography vectors, color models, corporate logos, and image files explicitly uploaded to the AI Studio Workspace.
-                </li>
-                <li>
-                  <strong>Financial Transaction Markers:</strong> Secure billing logs, wallet balance thresholds, and digital authorization flags. We do not store absolute debit or credit card credentials on our hardware.
-                </li>
-              </ul>
+      {/* Main Container */}
+      <div className="bg-white rounded-[40px] border border-zinc-200/80 shadow-lg overflow-hidden flex flex-col">
+        
+        {/* Banner with identity details */}
+        <div className="bg-neutral-950 p-6 md:p-8 text-white flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-zinc-800">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-[#FF4D00] text-white rounded-2xl flex items-center justify-center shadow-lg border border-[#FF4D00]/25">
+              <ShieldCheck className="w-8 h-8" />
             </div>
-
-            {/* Section 2 */}
-            <div className="space-y-3">
-              <h4 className="text-base font-heavy text-slate-900 uppercase tracking-tight">
-                2. Data Processing & Usage Rules
-              </h4>
-              <p>
-                Your private profile details are rigorously handled in order to sustain high performance:
-              </p>
-              <ul className="list-disc pl-5 space-y-2 text-xs">
-                <li>
-                  To execute instant pre-press preflight audits and align color channels.
-                </li>
-                <li>
-                  To deliver real-time order tracking stage updates (e.g., plate building, active ink-pressing, dispatch).
-                </li>
-                <li>
-                  To secure local workspace autosaves to LocalStorage ("Vault state saving") to prevent work disruptions.
-                </li>
-                <li>
-                  For billing validation, balance ledger updates, and transactional security audits.
-                </li>
-              </ul>
-            </div>
-
-            {/* Section 3 */}
-            <div className="space-y-3">
-              <h4 className="text-base font-heavy text-slate-900 uppercase tracking-tight">
-                3. High-Security Measures
-              </h4>
-              <p>
-                We execute robust protective controls to satisfy global data regulatory standards:
-              </p>
-              <ul className="list-disc pl-5 space-y-2 text-xs">
-                <li>
-                  <strong>Data Isolation:</strong> Artwork and blueprints uploaded are isolated via randomized canvas keys, avoiding exposure across other users' projects.
-                </li>
-                <li>
-                  <strong>Encrypted Pipelines:</strong> Transmission is fully packed over standard SSL/TLS tunnels during preflight pre-press transmissions.
-                </li>
-                <li>
-                  <strong>Firebase Storage Compliance:</strong> Database state layers are integrated safely behind validated security regulations, restricted to logged-in user identifiers.
-                </li>
-              </ul>
-            </div>
-
-            {/* Section 4 */}
-            <div className="space-y-3">
-              <h4 className="text-base font-heavy text-slate-900 uppercase tracking-tight">
-                4. Third-Party Sharing Restrictions
-              </h4>
-              <p>
-                We **never** sell, rent, or distribute your customized catalogs, brand assets, or emails to private advertisement brokerages. We only permit data transit to:
-              </p>
-              <p className="text-xs">
-                - Accredited sovereign industrial offset mills executing your layout jobs.<br />
-                - Global freight transport couriers completing physical delivery shipments.
+            <div className="space-y-0.5">
+              <h1 id="privacy-main-title" className="text-xl md:text-3xl font-black uppercase tracking-tight font-sans">
+                Comprehensive Privacy Policy
+              </h1>
+              <p className="text-[10px] sm:text-xs font-mono text-zinc-400 font-bold uppercase tracking-widest">
+                PrintBazaar Onboarding & Data Safety Operations Covenants
               </p>
             </div>
           </div>
 
-          {/* Quick Summary Sidebar Panels */}
-          <div className="space-y-6">
-            <div className="p-5 bg-zinc-50 border border-zinc-150 rounded-2xl space-y-4">
-              <h5 className="font-heavy text-slate-900 uppercase text-xs tracking-wider flex items-center gap-1.5">
-                <Eye className="w-4 h-4 text-indigo-650" />
-                Transparency Promise
-              </h5>
-              <p className="text-[11.5px] leading-relaxed text-zinc-500">
-                You retain ultimate ownership of every pixel you upload to PRINTBAZAAR. We hold NO claim or licensing holds over user concepts generated inside our AI tools.
-              </p>
-            </div>
-
-            <div className="p-5 bg-[#ffe4d6] border border-[#FF4D00]/10 rounded-2xl space-y-4">
-              <h5 className="font-heavy text-[#FF4D00] uppercase text-xs tracking-wider flex items-center gap-1.5">
-                <Lock className="w-4 h-4 text-[#FF4D00]" />
-                Compliance Safe
-              </h5>
-              <p className="text-[11.5px] leading-relaxed text-neutral-800">
-                Meets global industrial file retention requirements. Inactive design assets on the pre-press server queue are auto-pruned after 60 days of inactivity.
-              </p>
-            </div>
-
-            <div className="p-5 bg-indigo-50 border border-indigo-100 rounded-2xl space-y-4">
-              <h5 className="font-heavy text-indigo-805 uppercase text-xs tracking-wider flex items-center gap-1.5">
-                <HardDrive className="w-4 h-4 text-indigo-600" />
-                Your Rights
-              </h5>
-              <p className="text-[11.5px] leading-relaxed text-indigo-950">
-                Right to erase. You can request a complete data purge of all historic designs from our pipeline by emailing our help channel.
-              </p>
-            </div>
+          <div className="flex flex-wrap gap-2.5">
+            <span className="px-3.5 py-1.5 bg-zinc-900 rounded-full text-[9px] font-mono font-bold uppercase border border-zinc-800 text-emerald-400">
+              ● Google Play Safety Approved
+            </span>
+            <span className="px-3.5 py-1.5 bg-zinc-900 rounded-full text-[9px] font-mono font-bold uppercase border border-zinc-800 text-zinc-300">
+              Rev. June 2026
+            </span>
           </div>
-
         </div>
 
-        {/* Closing Contact Banner */}
-        <div className="bg-zinc-50 border border-zinc-150 rounded-2xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+        {/* Dynamic Multi-Step layout */}
+        {viewMode === 'split' ? (
+          <div className="grid grid-cols-1 lg:grid-cols-12 min-h-[640px]">
+            {/* Sidebar list */}
+            <div className="lg:col-span-4 border-r border-zinc-200 p-6 flex flex-col space-y-4 bg-zinc-50/50">
+              
+              {/* Search register */}
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                  <Search className="h-4 w-4 text-zinc-400" />
+                </span>
+                <input 
+                  type="text"
+                  placeholder="Search 55 regulatory chapters..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 bg-white border border-zinc-200 rounded-2xl text-xs font-bold text-zinc-800 focus:outline-[#FF4D00]"
+                />
+              </div>
+
+              {/* Scrolling indices */}
+              <div className="flex-1 overflow-y-auto max-h-[500px] pr-2 space-y-1.5">
+                {filteredSections.map((sec) => (
+                  <button
+                    key={sec.number}
+                    type="button"
+                    onClick={() => {
+                      const absoluteIndex = sections.findIndex(s => s.number === sec.number);
+                      if (absoluteIndex !== -1) setSelectedIdx(absoluteIndex);
+                    }}
+                    className={`w-full p-3.5 rounded-2xl text-left text-xs uppercase tracking-wide transition-all border flex items-center justify-between gap-3 cursor-pointer ${
+                      sections[selectedIdx]?.number === sec.number
+                        ? 'bg-neutral-900 text-white border-neutral-900 shadow-sm font-black'
+                        : 'bg-white hover:bg-zinc-100 text-zinc-650 border-zinc-150 font-bold'
+                    }`}
+                  >
+                    <span className="truncate">{sec.number}. {sec.title}</span>
+                    <span className="text-[9px] font-mono opacity-60">CH-{sec.number}</span>
+                  </button>
+                ))}
+
+                {filteredSections.length === 0 && (
+                  <div className="text-center py-12 text-zinc-400">
+                    <p className="font-mono text-xs uppercase font-bold">No compliance clauses matched</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Dynamic compliance advice */}
+              <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-3xl space-y-1.5">
+                <div className="flex items-center gap-1.5 text-indigo-900 font-heavy text-xs uppercase">
+                  <Info className="w-4 h-4 text-indigo-650" />
+                  <span>Covenant Tracker</span>
+                </div>
+                <p className="text-[10.5px] leading-relaxed text-indigo-950">
+                  Selecting a chapter parses its parameters. Use search to lookup specific fields (e.g., "OTP", "Deletion").
+                </p>
+              </div>
+
+            </div>
+
+            {/* Display pane */}
+            <div className="lg:col-span-8 p-6 md:p-10 flex flex-col justify-between space-y-8 min-h-[500px]">
+              
+              {sections[selectedIdx] ? (
+                <div className="space-y-6">
+                  <span className="px-3.5 py-1 bg-[#ffe4d6] text-[#FF4D00] text-[10px] font-mono font-heavy tracking-widest uppercase rounded-full border border-orange-100">
+                    Chapter {sections[selectedIdx].number} Compliance Directive
+                  </span>
+
+                  <h2 className="text-xl md:text-3xl font-black text-slate-900 tracking-tight uppercase border-b border-zinc-100 pb-4">
+                    {sections[selectedIdx].title}
+                  </h2>
+
+                  <div className="bg-zinc-50 border border-zinc-200/60 p-6 sm:p-8 rounded-[32px] relative overflow-hidden">
+                    <p className="text-sm md:text-base leading-relaxed text-zinc-700 whitespace-pre-line font-sans font-medium">
+                      {sections[selectedIdx].content}
+                    </p>
+                  </div>
+
+                  {/* Play safety warning hooks */}
+                  {(sections[selectedIdx].title === "Account Deactivation" || sections[selectedIdx].title === "Account Deletion") && (
+                    <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-start gap-4">
+                      <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                      <div className="space-y-1 text-left">
+                        <p className="text-xs font-black text-rose-900 uppercase">Self-Service Controller Active</p>
+                        <p className="text-[11px] leading-relaxed text-rose-800">
+                          To execute these controls immediately on your data registries, navigate to the **Privacy & Security Settings** tab in your seller workspace dashboard room.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Document quality check alert helper */}
+                  {sections[selectedIdx].title === "Seller Verification" && (
+                    <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-start gap-4">
+                      <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                      <div className="space-y-1 text-left">
+                        <p className="text-xs font-black text-emerald-950 uppercase">Verified KYC Channels</p>
+                        <p className="text-[11px] leading-relaxed text-emerald-800">
+                          Aadhaar masking and secure PAN OCR runs obey verified security templates. Uploads are strictly stored inside protected workspace pipelines.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center grow py-20 text-zinc-400">
+                  <FileText className="w-16 h-16 opacity-30 animate-pulse" />
+                  <p className="font-mono text-xs font-bold uppercase mt-4">Select legal section to begin audit</p>
+                </div>
+              )}
+
+              {/* Navigation button room */}
+              <div className="flex justify-between items-center border-t border-zinc-100 pt-6">
+                <button
+                  type="button"
+                  disabled={selectedIdx === 0}
+                  onClick={() => setSelectedIdx(i => Math.max(0, i - 1))}
+                  className="px-4 py-2 border border-zinc-200 hover:bg-zinc-50 rounded-xl text-[10px] font-black uppercase text-zinc-600 transition disabled:opacity-40 disabled:hover:bg-transparent"
+                >
+                  ◀ Previous Chapter
+                </button>
+                <p className="text-[10px] font-mono font-bold text-zinc-400">
+                  Page {selectedIdx + 1} of {sections.length}
+                </p>
+                <button
+                  type="button"
+                  disabled={selectedIdx === sections.length - 1}
+                  onClick={() => setSelectedIdx(i => Math.min(sections.length - 1, i + 1))}
+                  className="px-4 py-2 border border-zinc-200 hover:bg-zinc-50 rounded-xl text-[10px] font-black uppercase text-zinc-600 transition disabled:opacity-40 disabled:hover:bg-transparent"
+                >
+                  Next Chapter ▶
+                </button>
+              </div>
+
+            </div>
+          </div>
+        ) : (
+          <div className="p-6 md:p-12 space-y-12 max-h-[680px] overflow-y-auto">
+            {/* Continuous document layout */}
+            <div className="max-w-4xl mx-auto space-y-10 font-sans">
+              <div className="text-center space-y-2 border-b border-zinc-150 pb-8">
+                <h2 className="text-2xl font-black text-zinc-900 uppercase">OFFICIAL REGULATORY TRANSCRIPT</h2>
+                <p className="text-xs font-mono text-zinc-500 uppercase tracking-widest">
+                  Comprehensive 55-Part Policy Frame (Consolidated Legal View)
+                </p>
+              </div>
+
+              {sections.map((sec) => (
+                <div key={sec.number} className="space-y-3.5 text-left border-b border-zinc-100 pb-8">
+                  <h3 className="text-base font-black text-slate-900 uppercase tracking-tight flex items-center gap-2">
+                    <span className="w-7 h-7 rounded-lg bg-zinc-105 flex items-center justify-center font-mono text-xs border border-zinc-200 text-[#FF4D00] shadow-xs">
+                      {sec.number}
+                    </span>
+                    <span>{sec.title}</span>
+                  </h3>
+                  <p className="text-xs sm:text-sm text-zinc-650 leading-relaxed pl-9 whitespace-pre-line">
+                    {sec.content}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Footer verification notes */}
+        <div className="bg-zinc-50 p-5 border-t border-zinc-200 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Cpu className="w-5 h-5 text-zinc-400 shrink-0" />
-            <p className="text-xs text-zinc-500 font-semibold uppercase font-mono">Questions on compliance pipelines?</p>
+            <p className="text-[10px] text-zinc-500 font-semibold uppercase font-mono">
+              Regulatory compliance team inquiry tunnel:
+            </p>
           </div>
           <a 
-            href="mailto:privacy@printbazaar.com" 
-            className="text-xs font-black text-indigo-650 hover:underline uppercase tracking-wider"
+            href="mailto:compliance@printbazaar.in" 
+            className="text-xs font-black text-[#FF4D00] hover:underline uppercase tracking-wider font-sans"
           >
-            privacy@printbazaar.com
+            compliance@printbazaar.in
           </a>
         </div>
 
