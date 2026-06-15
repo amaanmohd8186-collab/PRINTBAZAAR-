@@ -1724,7 +1724,13 @@ Customer's custom requirements or idea prompt: "${prompt}"`;
       }
 
       const orderId = "order_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
-      const returnUrl = `${getCleanEnv("APP_URL") || process.env.APP_URL || 'https://www.printbazaar.app'}/order-status?order_id={order_id}`;
+      
+      // Override for strict production requirement
+      const appUrlForCashfree = process.env.NODE_ENV === 'production' || process.env.CASHFREE_ENVIRONMENT === 'PRODUCTION' 
+        ? 'https://printbazaar.vercel.app' 
+        : (getCleanEnv("APP_URL") || process.env.APP_URL || 'https://printbazaar.vercel.app');
+        
+      const returnUrl = `${appUrlForCashfree}/order-status?order_id={order_id}`;
 
       const request = {
         order_amount: amount,
@@ -1757,8 +1763,9 @@ Customer's custom requirements or idea prompt: "${prompt}"`;
         console.log("order_id:", response?.data?.order_id);
         console.log("order_status:", response?.data?.order_status);
         
-        console.log("CASHFREE_CLIENT_ID:", process.env.CASHFREE_CLIENT_ID ? "Loaded" : "Missing");
-        console.log("CASHFREE_CLIENT_SECRET:", process.env.CASHFREE_CLIENT_SECRET ? "Loaded" : "Missing");
+        const cClientId = process.env.CASHFREE_CLIENT_ID || "";
+        console.log("CASHFREE_CLIENT_ID:", cClientId ? `Loaded (${cClientId.substring(0, 4)}***)` : "Missing");
+        console.log("CASHFREE_CLIENT_SECRET:", process.env.CASHFREE_CLIENT_SECRET ? "Loaded (***)" : "Missing");
         console.log("CASHFREE_ENVIRONMENT:", process.env.CASHFREE_ENVIRONMENT);
 
         if (!response.data || !response.data.payment_session_id) {
