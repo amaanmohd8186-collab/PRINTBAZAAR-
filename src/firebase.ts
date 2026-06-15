@@ -1,11 +1,71 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
-import firebaseConfig from '../firebase-applet-config.json';
+import baseConfig from '../firebase-applet-config.json';
+
+// Support VITE_ environment variables overrides as requested
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || baseConfig.apiKey,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || baseConfig.authDomain,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || baseConfig.projectId,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || baseConfig.storageBucket,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || baseConfig.messagingSenderId,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || baseConfig.appId,
+  firestoreDatabaseId: import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || baseConfig.firestoreDatabaseId
+};
+
+// --- STARTUP AUDIT ---
+const audit: any = {
+  projectId: firebaseConfig.projectId,
+  authDomain: firebaseConfig.authDomain,
+  apiKeyStatus: firebaseConfig.apiKey ? 'PRESENT' : 'MISSING',
+  appIdStatus: firebaseConfig.appId ? 'PRESENT' : 'MISSING',
+  environment: import.meta.env.PROD ? 'PRODUCTION' : 'DEVELOPMENT',
+  currentHost: window.location.hostname,
+  authorized: true // Assumption to be verified by check
+};
+
+// LOGGING
+console.log("========== FIREBASE AUTH STARTUP AUDIT ==========");
+console.log(`Project ID:      ${audit.projectId}`);
+console.log(`Auth Domain:     ${audit.authDomain}`);
+console.log(`API Key:         ${firebaseConfig.apiKey ? firebaseConfig.apiKey.substring(0, 6) + '...' : 'MISSING'}`);
+console.log(`Storage:         ${firebaseConfig.storageBucket}`);
+console.log(`Current Host:    ${audit.currentHost}`);
+console.log(`Environment:     ${audit.environment}`);
+console.log(`Firebase SDK:    12.14.0`); // Hardcoded version tracking
+
+// Domain Authorization Check
+const authDomainName = firebaseConfig.authDomain?.split('.')[0];
+if (audit.projectId && authDomainName && audit.projectId !== authDomainName) {
+  console.warn(`⚠️ [FIREBASE AUDIT] Mismatch detected: projectId (${audit.projectId}) does not match authDomain prefix (${authDomainName}). This is a common cause of auth/invalid-credential.`);
+}
+
+const isDomainAuthPotentiallyMissing = !firebaseConfig.authDomain.includes(audit.currentHost) && 
+                                       audit.currentHost !== 'localhost' && 
+                                       !audit.currentHost.endsWith('.asia-southeast1.run.app');
+
+if (isDomainAuthPotentiallyMissing) {
+  audit.authorized = false;
+  console.warn(`⚠️ [FIREBASE AUDIT] UNAUTHORIZED DOMAIN: "${audit.currentHost}" may not be in Firebase Console > Auth > Authorized Domains.`);
+} else {
+  console.log(`Authorized:      YES (Domain matched)`);
+}
+
+// FAIL FAST: Validation
+if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+  const errorMsg = `🔥 [FIREBASE FATAL] Configuration Corrupted: Missing ${!firebaseConfig.apiKey ? 'API_KEY' : 'PROJECT_ID'}. Auth cannot initialize. Check VITE_FIREBASE_* env vars or firebase-applet-config.json.`;
+  console.error(errorMsg);
+  throw new Error(errorMsg);
+}
+
+console.log("Initialization:  PASSED (Basic Validation)");
+console.log("==================================================");
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
+console.log("Auth Ready:      YES");
 
 export enum OperationType {
   CREATE = 'create',

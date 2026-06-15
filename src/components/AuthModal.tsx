@@ -30,7 +30,22 @@ export const AuthModal = ({ onClose, triggerToast }: { onClose: () => void, trig
       triggerToast('Google Sign-In successful!', 'success');
       onClose();
     } catch (e: any) {
-      setErrorMsg(e.message || 'Google Auth Failed');
+      console.error("🚀 [FIREBASE GOOGLE AUTH FAILURE]", { 
+        code: e.code, 
+        message: e.message,
+        projectId: auth.app.options.projectId,
+        authDomain: auth.app.options.authDomain,
+        currentHost: window.location.hostname
+      });
+      if (e.code === 'auth/unauthorized-domain') {
+        setErrorMsg(`Google Auth Error: This domain (${window.location.hostname}) is not authorized in Firebase Console > Auth > Settings > Authorized Domains.`);
+      } else if (e.code === 'auth/popup-blocked') {
+        setErrorMsg("Auth Error: Popup was blocked by your browser. Please allow popups for this site.");
+      } else if (e.code === 'auth/operation-not-allowed') {
+        setErrorMsg("Auth Error: Google provider is not enabled in Firebase Console.");
+      } else {
+        setErrorMsg(e.message || 'Google Auth Failed');
+      }
     }
   };
 
@@ -84,7 +99,24 @@ export const AuthModal = ({ onClose, triggerToast }: { onClose: () => void, trig
         triggerToast("Registration successful! Please check your email inbox to verify your account.", "success");
         onClose();
       } catch (err: any) {
-        setErrorMsg(err.message || 'Authentication Failed');
+        console.error("🚀 [FIREBASE REGISTRATION FAILURE]", {
+          code: err.code,
+          message: err.message,
+          projectId: auth.app.options.projectId,
+          authDomain: auth.app.options.authDomain,
+          configKey: auth.app.options.apiKey?.substring(0, 6)
+        });
+        if (err.code === 'auth/email-already-in-use') {
+          setErrorMsg("Account already exists with this email.");
+        } else if (err.code === 'auth/invalid-email') {
+          setErrorMsg("The email address is improperly formatted.");
+        } else if (err.code === 'auth/operation-not-allowed') {
+          setErrorMsg("Registration Error: Email/Password provider is not enabled in Firebase Console > Auth > Sign-in method.");
+        } else if (err.code === 'auth/invalid-credential') {
+          setErrorMsg("Registration Failed: Invalid Credential. This often means the API Key does not match the Project ID or Identity Toolkit is not configured.");
+        } else {
+          setErrorMsg(err.message || 'Registration Failed');
+        }
       } finally {
         setLoading(false);
       }
@@ -105,7 +137,26 @@ export const AuthModal = ({ onClose, triggerToast }: { onClose: () => void, trig
         triggerToast("Login successful!", "success");
         onClose();
       } catch (err: any) {
-        setErrorMsg(err.message || 'Authentication Failed');
+        console.error("🚀 [FIREBASE LOGIN FAILURE]", {
+          code: err.code,
+          message: err.message,
+          projectId: auth.app.options.projectId,
+          authDomain: auth.app.options.authDomain,
+          activeDomain: window.location.hostname,
+          apiKey: auth.app.options.apiKey?.substring(0, 6)
+        });
+        
+        if (err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials') {
+          setErrorMsg("Login Failed: Invalid credentials. Required Checks: 1. Is Email/Password provider enabled? 2. Is this the right Firebase Project? 3. Is the API Key valid (check GCP restrictions)?");
+        } else if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+          setErrorMsg("Invalid email or password.");
+        } else if (err.code === 'auth/unauthorized-domain') {
+          setErrorMsg(`Auth Error: Domain ${window.location.hostname} is not authorized in Firebase Console > Auth > Authorized Domains.`);
+        } else if (err.code === 'auth/operation-not-allowed') {
+          setErrorMsg("Login Error: Email/Password provider is DISABLED in Firebase Console.");
+        } else {
+          setErrorMsg(err.message || 'Authentication Failed');
+        }
       } finally {
         setLoading(false);
       }
