@@ -388,9 +388,8 @@ async function verifyAdmin(req: any, res: any, next: any) {
   }
 }
 
-async function startServer() {
+export function createExpressApp() {
   const app = express();
-  const PORT = 3000;
 
   // Enable JSON request body parsing
   // Add raw body to requests for Cashfree webhook signature verification
@@ -2192,6 +2191,13 @@ Customer's custom requirements or idea prompt: "${prompt}"`;
     }
   });
 
+  return app;
+}
+
+async function startServer() {
+  const app = createExpressApp();
+  const PORT = 3000;
+
   // Serve static assets or mount Vite dev middleware
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
@@ -2222,4 +2228,6 @@ Customer's custom requirements or idea prompt: "${prompt}"`;
   });
 }
 
-startServer();
+if (!process.env.VERCEL) {
+  startServer();
+}

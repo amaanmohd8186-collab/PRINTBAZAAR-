@@ -47,7 +47,7 @@ export default function CashfreeGateway({
           try {
             data = JSON.parse(text);
           } catch (parseErr) {
-            console.error("Non-JSON response from /api/cashfree/config:", text);
+            console.error(`Non-JSON response from /api/cashfree/config (Status: ${response.status}):`, text.substring(0, 50));
             // Non-blocking for config check
           }
         }
@@ -107,6 +107,9 @@ export default function CashfreeGateway({
           data = JSON.parse(text);
         } catch (parseErr) {
           console.error("Non-JSON response from /api/cashfree/create-order:", text);
+          if (res.status === 404) {
+            throw new Error(`Backend API is entirely missing (404). This usually happens when the app is deployed on static hosting (like Vercel) without Serverless Functions configured for the Express backend.`);
+          }
           throw new Error(`Order creation failed: Server returned non-JSON response (${res.status})`);
         }
       }
