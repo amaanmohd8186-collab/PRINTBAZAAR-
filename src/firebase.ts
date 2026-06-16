@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
+import { getMessaging, getToken, isSupported } from 'firebase/messaging';
 import baseConfig from '../firebase-applet-config.json';
 
 // Support VITE_ environment variables overrides as requested
@@ -62,10 +63,23 @@ if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
 console.log("Initialization:  PASSED (Basic Validation)");
 console.log("==================================================");
 
-const app = initializeApp(firebaseConfig);
+export const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
 console.log("Auth Ready:      YES");
+
+export async function getMessagingService() {
+  try {
+    const supported = await isSupported();
+    if (supported) {
+      return getMessaging(app);
+    }
+  } catch (e) {
+    console.warn("FCM check failed/not supported in this context:", e);
+  }
+  return null;
+}
+export { getToken, isSupported };
 
 export enum OperationType {
   CREATE = 'create',

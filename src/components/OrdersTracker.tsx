@@ -191,9 +191,11 @@ ${itemsText}
 ${separator}
 BILLING & TRANSACT PAYMENTS LOG
 ${separator}
-Total Order Value : INR ${order.totalAmount.toLocaleString('en-IN')}
+Items Subtotal      : INR ${(order.totalAmount - (order.shippingCharge || 0)).toLocaleString('en-IN')}
+Shipping Charges    : ${order.shippingCharge && order.shippingCharge > 0 ? `INR ${order.shippingCharge.toLocaleString('en-IN')}` : 'FREE SHIPPING'}
+Total Order Value   : INR ${order.totalAmount.toLocaleString('en-IN')}
 Upfront Deposit (100%): INR ${order.totalAmount.toLocaleString('en-IN')} (PAID IN FULL)
-Outstanding Balance    : INR 0 (FULLY SETTLED)
+Outstanding Balance : INR 0 (FULLY SETTLED)
 
 Payment Details Log:
 ${paymentsText}
@@ -364,6 +366,21 @@ ${separator}
     doc.setLineWidth(0.5);
     doc.line(20, y, 190, y);
     y += 8;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(100, 116, 139);
+    doc.text("ITEMS SUBTOTAL PRICE:", 95, y);
+    doc.text(`INR ${(order.totalAmount - (order.shippingCharge || 0)).toLocaleString('en-IN')}`, 162, y);
+
+    y += 6;
+    doc.text("COURIER SHIPPING CHARGES:", 95, y);
+    doc.text(order.shippingCharge && order.shippingCharge > 0 ? `INR ${order.shippingCharge.toLocaleString('en-IN')}` : 'FREE SHIPPING', 162, y);
+
+    y += 8;
+    doc.setDrawColor(241, 245, 249);
+    doc.line(95, y, 190, y);
+    y += 5;
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
@@ -684,17 +701,33 @@ ${separator}
                        </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
+                      {(() => {
+                        let waMsg = `Hi PrintBazaar, I have a query regarding my Order ID: ${order.id}\n\n`;
+                        waMsg += `*Order Status*: ${order.status}\n`;
+                        waMsg += `*Items ordered*:\n`;
+                        order.items.forEach((item, idx) => {
+                          const itemImg = item.productImage.startsWith('http') ? item.productImage : `${window.location.origin}${item.productImage}`;
+                          waMsg += `• ${idx + 1}. ${item.productName} (${item.selectedQuantity} PCS, ${item.selectedSize.name})\n  Substrate: ${item.selectedMaterial.name}\n  Image: ${itemImg}\n`;
+                          if (item.designFile && item.designFile.name) {
+                            waMsg += `  Design Asset Attached: ${item.designFile.name}\n`;
+                          }
+                        });
+                        waMsg += `\nPlease guide me regarding this order. Thank you!`;
+                        const waUrl = `https://wa.me/917533939460?text=${encodeURIComponent(waMsg)}`;
+                        return (
+                          <a
+                            href={waUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#25D366] hover:bg-[#128C7E] text-white text-[11px] font-black uppercase tracking-wider rounded-xl transition duration-155 shadow-xs cursor-pointer select-none no-underline"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5 text-white" />
+                            <span>WhatsApp Support</span>
+                          </a>
+                        );
+                      })()}
                       <a
-                        href={`https://wa.me/919999999999?text=${encodeURIComponent(`Hi PrintBazaar, I have a query regarding my Order ID: ${order.id}`)}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#25D366] hover:bg-[#128C7E] text-white text-[11px] font-black uppercase tracking-wider rounded-xl transition duration-155 shadow-xs cursor-pointer select-none no-underline"
-                      >
-                        <MessageCircle className="w-3.5 h-3.5 text-white" />
-                        <span>WhatsApp Support</span>
-                      </a>
-                      <a
-                        href="tel:+919999999999"
+                        href="tel:+917533939460"
                         className="inline-flex items-center gap-2 px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-black uppercase tracking-wider rounded-xl transition duration-155 shadow-xs cursor-pointer select-none no-underline"
                       >
                         <Phone className="w-3.5 h-3.5 text-white" />
@@ -741,32 +774,55 @@ ${separator}
                     initial={{ opacity: 0, y: 15 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ type: "spring", stiffness: 220, damping: 25 }}
-                    className="bg-white rounded-[28px] border border-gray-150 p-6 md:p-8 space-y-6 shadow-2xs"
+                    className="bg-white rounded-[32px] border-[3px] border-black p-6 md:p-8 space-y-6 shadow-[8px_8px_0px_#000]"
                   >
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-4">
-                      <div>
-                        <h4 className="text-xs font-black uppercase tracking-tight text-slate-850">Live Production Status Pipeline</h4>
-                        <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider font-mono mt-1">Real-time status tracking inside offset print press division</p>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-5">
+                      <div className="space-y-1">
+                        <h4 className="text-sm font-black uppercase tracking-tight text-slate-900 flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full bg-[#FF4D00] animate-ping shrink-0" />
+                          Live Production Status Pipeline
+                        </h4>
+                        
+                        {/* Dynamic progression transition banner reflecting actual step moves */}
+                        <div className="flex items-center gap-2 flex-wrap text-[10px] font-mono font-bold text-zinc-500 uppercase tracking-widest bg-zinc-50 border border-zinc-200 rounded-lg px-2.5 py-1 mt-1.5 w-fit shadow-3xs">
+                          <span>{currentStageIdx > 0 ? STAGES[currentStageIdx - 1].status : 'Order Placed'}</span>
+                          <span className="text-[#FF4D00] animate-pulse">➔</span>
+                          <span className="text-[#FF4D00] underline decoration-wavy decoration-emerald-500 font-extrabold">{order.status}</span>
+                          {currentStageIdx < STAGES.length - 1 && (
+                            <>
+                              <span className="text-zinc-350">➔</span>
+                              <span className="text-zinc-400 font-normal">{STAGES[currentStageIdx + 1].status}</span>
+                            </>
+                          )}
+                        </div>
                       </div>
-                      <div className="self-start sm:self-center">
-                        <span className={`text-[10px] font-black px-3.5 py-1.5 rounded-xl uppercase tracking-wider border font-mono ${getStatusColor(order.status)}`}>
-                          CURRENT STATUS: {order.status}
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <div className="hidden sm:flex flex-col items-end text-right font-mono text-[9px] font-black tracking-widest text-zinc-400 leading-tight">
+                          <span>PIPELINE GAUGE</span>
+                          <span className="text-[#FF4D00] font-black text-xs">{Math.ceil(completionPercentage)}%</span>
+                        </div>
+                        <span className={`text-[10px] font-mono font-black px-4 py-2 rounded-xl uppercase tracking-widest border shadow-3xs ${getStatusColor(order.status)}`}>
+                          {order.status}
                         </span>
                       </div>
                     </div>
 
                     {/* Progress Line Tracks */}
-                    <div className="relative pt-4 pb-2">
-                      {/* Background Gray Line */}
-                      <div className="absolute top-9 left-6 right-6 h-1 w-[calc(100%-48px)] bg-zinc-150 -translate-y-1/2 rounded-full hidden md:block" />
+                    <div className="relative pt-6 pb-4">
+                      {/* Background Gray Line with inset shadow */}
+                      <div className="absolute top-11 left-6 right-6 h-2 w-[calc(100%-48px)] bg-zinc-100 border border-zinc-200/50 -translate-y-1/2 rounded-full hidden md:block shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]" />
                       
-                      {/* Active High-contrast Progress Line */}
-                      <motion.div 
-                        initial={{ width: 0 }}
-                        animate={{ width: `calc(${completionPercentage}% - 24px)` }}
-                        transition={{ type: "spring", stiffness: 100, damping: 18 }}
-                        className="absolute top-9 left-6 h-1 bg-[#FF4D00] -translate-y-1/2 rounded-full hidden md:block"
-                      />
+                      {/* Active High-contrast Progress Line with glowing gradient and running animation */}
+                      <div className="absolute top-11 left-6 right-6 h-2 w-[calc(100%-48px)] -translate-y-1/2 overflow-hidden rounded-full hidden md:block">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: `${completionPercentage}%` }}
+                          transition={{ type: "spring", stiffness: 80, damping: 15 }}
+                          className="h-full bg-gradient-to-r from-indigo-500 via-purple-600 to-[#FF4D00] rounded-full relative shadow-[0_0_8px_rgba(255,77,0,0.4)]"
+                        >
+                          <div className="absolute inset-0 bg-[linear-gradient(45deg,rgba(255,255,255,0.15)_25%,transparent_25%,transparent_50%,rgba(255,255,255,0.15)_50%,rgba(255,255,255,0.15)_75%,transparent_75%,transparent)] bg-[length:16px_16px] animate-[pulse_1.5s_infinite]" />
+                        </motion.div>
+                      </div>
 
                       {/* Six Milestones Grid */}
                       <div className="grid grid-cols-1 md:grid-cols-6 gap-6 md:gap-4 relative select-none">
@@ -864,6 +920,136 @@ ${separator}
                       </div>
                     </div>
                   </motion.div>
+
+                  {/* Laminated Transparency Status Logs representing precise milestone timings */}
+                  {(() => {
+                    const currentStageIdx = getStageIndex(order.status);
+                    
+                    let transitionLogs: { label: string; desc: string; timestamp: Date; isCritical?: boolean }[] = [];
+                    
+                    if (order.status === 'Cancelled') {
+                      transitionLogs = [
+                        {
+                          label: "Order Placed & Logged",
+                          desc: "Order record submitted and registered within the local Firestore backend.",
+                          timestamp: new Date(order.createdAt)
+                        },
+                        {
+                          label: "Order Cancelled & Halted",
+                          desc: "Production sequence aborted. Refund processing has been queued with our accounts division.",
+                          timestamp: new Date(order.updatedAt || order.createdAt),
+                          isCritical: true
+                        }
+                      ];
+                    } else if (order.status === 'Pending Payment') {
+                      transitionLogs = [
+                        {
+                          label: "Draft Checkout Created",
+                          desc: "Order invoice prepared. 100% upfront digital gateway credentials initialized.",
+                          timestamp: new Date(order.createdAt)
+                        }
+                      ];
+                    } else if (currentStageIdx >= 0) {
+                      const tStart = new Date(order.createdAt).getTime();
+                      const tEnd = new Date(order.updatedAt || order.createdAt).getTime();
+                      
+                      transitionLogs = STAGES.slice(0, currentStageIdx + 1).map((stage, idx, arr) => {
+                        let logTime: Date;
+                        if (idx === 0) {
+                          logTime = new Date(order.createdAt);
+                        } else if (idx === arr.length - 1) {
+                          logTime = new Date(order.updatedAt || order.createdAt);
+                        } else {
+                          // Linearly space the timing steps between start and end
+                          const fraction = idx / currentStageIdx;
+                          logTime = new Date(tStart + fraction * (tEnd - tStart));
+                        }
+                        return {
+                          label: stage.label,
+                          desc: stage.desc,
+                          timestamp: logTime
+                        };
+                      });
+                    }
+
+                    if (transitionLogs.length === 0) return null;
+
+                    return (
+                      <motion.div
+                        initial={{ opacity: 0, y: 15 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.1, duration: 0.3 }}
+                        className="bg-white rounded-[28px] border border-gray-150 p-6 md:p-8 space-y-5 shadow-2xs text-left"
+                      >
+                        <div className="border-b border-gray-100 pb-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                          <div>
+                            <h4 className="text-xs font-black uppercase tracking-tight text-slate-850">Laminated Transparency Status Timeline</h4>
+                            <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider font-mono mt-1">Chronological audit trail of production-floor transition timestamps</p>
+                          </div>
+                          <span className="self-start sm:self-center text-[9px] font-mono font-black uppercase text-[#FF4D00] bg-[#fff5f0] border border-[#FF4D00]/15 px-3 py-1 rounded-xl">
+                            Verified via Firestore Metadata
+                          </span>
+                        </div>
+
+                        <div className="relative pl-4 border-l-2 border-dashed border-zinc-200 py-1 space-y-5">
+                          {transitionLogs.map((log, logIdx) => {
+                            const isLatest = logIdx === transitionLogs.length - 1;
+                            return (
+                              <div key={log.label + '-' + logIdx} className="relative group text-left">
+                                {/* Bullet Node Indicator */}
+                                <div 
+                                  className={`absolute -left-[21px] top-1.5 w-2.5 h-2.5 rounded-full border transition-all ${
+                                    log.isCritical
+                                      ? 'bg-rose-500 border-rose-500 scale-125 ring-4 ring-rose-50'
+                                      : isLatest 
+                                      ? 'bg-[#FF4D00] scale-125 border-[#FF4D00] ring-4 ring-[#fff5f0]' 
+                                      : 'bg-zinc-850 border-zinc-900 bg-zinc-900'
+                                  }`}
+                                />
+                                
+                                <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-1.5">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className={`text-[11px] font-bold uppercase tracking-tight ${
+                                      log.isCritical 
+                                        ? 'text-rose-600 font-black'
+                                        : isLatest 
+                                        ? 'text-[#FF4D00] font-black' 
+                                        : 'text-slate-850'
+                                    }`}>
+                                      {log.label}
+                                    </span>
+                                    {isLatest && (
+                                      <span className={`text-[8px] font-mono px-1.5 py-0.5 rounded-md font-black tracking-widest ${
+                                        log.isCritical 
+                                          ? 'bg-rose-105 text-rose-600 border border-rose-200/40'
+                                          : 'bg-[#FF4D00]/10 text-[#FF4D00]'
+                                      }`}>
+                                        {order.status === 'Cancelled' ? 'HALTED' : order.status === 'Pending Payment' ? 'AWAITING PAY' : 'LATEST'}
+                                      </span>
+                                    )}
+                                  </div>
+                                  
+                                  <span className="text-[10px] font-mono font-black text-zinc-550 uppercase">
+                                    {log.timestamp.toLocaleDateString('en-IN', {
+                                      day: 'numeric',
+                                      month: 'short',
+                                      year: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                      hour12: true
+                                    })}
+                                  </span>
+                                </div>
+                                <p className="text-[10.5px] text-zinc-450 font-medium leading-relaxed mt-1">
+                                  {log.desc}
+                                </p>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </motion.div>
+                    );
+                  })()}
 
                   {/* Smart Client-Seller Design Annotation & Consultation Arena */}
                   <DesignApprovalWorkflow
@@ -976,13 +1162,35 @@ ${separator}
 
                   {/* 100% payment clearance widget */}
                   <div className="bg-white rounded-[32px] p-6 border border-zinc-200/80 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-6">
-                    <div className="space-y-1.5">
-                      <p className="font-micro text-gray-400 block">PAYMENT SETTLEMENT</p>
-                      <div className="flex items-center gap-2 text-emerald-600 font-heavy text-base uppercase">
-                        <CheckCircle className="w-5 h-5 text-emerald-500 font-bold" />
-                        <span>₹{order.totalAmount.toLocaleString('en-IN')} Secured (100% Paid Upfront)</span>
+                    <div className="space-y-2.5 w-full sm:w-auto">
+                      <p className="font-micro text-gray-400 block">PAYMENT SETTLEMENT BREAKDOWN</p>
+                      
+                      <div className="space-y-1.5 text-zinc-800 text-[11px] font-bold uppercase tracking-wider font-mono">
+                        <div className="flex justify-between gap-12 text-zinc-550">
+                          <span>Items Subtotal:</span>
+                          <span className="text-zinc-900 font-semibold">₹{(order.totalAmount - (order.shippingCharge || 0)).toLocaleString('en-IN')}</span>
+                        </div>
+                        {order.shippingCharge && order.shippingCharge > 0 ? (
+                          <div className="flex justify-between gap-12 text-zinc-550">
+                            <span>Delivery Charges:</span>
+                            <span className="text-zinc-900 font-semibold">₹{order.shippingCharge.toLocaleString('en-IN')}</span>
+                          </div>
+                        ) : (
+                          <div className="flex justify-between gap-12 text-emerald-600 font-black">
+                            <span>Delivery Charges:</span>
+                            <span>FREE SHIPPING</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between gap-12 text-slate-900 border-t border-zinc-200 pt-2 font-sans font-heavy text-xs mt-1.5">
+                          <span className="flex items-center gap-1 text-emerald-600">
+                            <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
+                            Total Amount Paid:
+                          </span>
+                          <span className="text-emerald-600 font-extrabold text-sm">₹{order.totalAmount.toLocaleString('en-IN')}</span>
+                        </div>
                       </div>
-                      <p className="text-[10px] text-zinc-500 font-mono font-bold uppercase">
+                      
+                      <p className="text-[9.5px] text-zinc-400 font-mono font-bold uppercase mt-1">
                         Transaction ID: {order.payments[0]?.txId || 'TXN_SYSTEM_AUTO'} • Stamp: {order.payments[0] ? new Date(order.payments[0].timestamp).toLocaleString('en-IN') : 'AUTO'}
                       </p>
                     </div>

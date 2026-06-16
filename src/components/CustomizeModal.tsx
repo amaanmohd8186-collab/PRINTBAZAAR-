@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Upload, CheckCircle2, AlertCircle, Sparkles, HelpCircle, FileText, Loader2, Share2, Download } from 'lucide-react';
+import { X, Upload, CheckCircle2, AlertCircle, Sparkles, HelpCircle, FileText, Loader2, Share2, Download, Layers } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Product, SizeOption, MaterialOption, CartItem, CustomFile } from '../types';
 import { calculateItemPrice, CATEGORY_DEFAULT_IMAGES } from '../data';
@@ -49,6 +49,7 @@ export default function CustomizeModal({
   
   // Custom QR Share State
   const [showQr, setShowQr] = useState<boolean>(false);
+  const [proofToggle, setProofToggle] = useState<'mockup' | 'bleed'>('mockup');
 
   // Query server side Gemini recommendations proxy
   const generateAiSuggestions = async () => {
@@ -222,26 +223,43 @@ export default function CustomizeModal({
     }, 2500);
   };
 
-  const validateAndUploadFile = (file: File) => {
+  const validateAndUploadMultipleFiles = async (files: File[]) => {
     setFileError(null);
     setPrintWarnings([]);
+    
+    if (files.length === 0) return;
+
     const allowedExtensions = ['ai', 'pdf', 'png', 'jpg', 'jpeg'];
-    const fileExt = file.name.split('.').pop()?.toLowerCase() || '';
-    
-    if (!allowedExtensions.includes(fileExt)) {
-      setFileError('Invalid print format. Allowed extensions: .AI, .PDF, .PNG, .JPG');
+    const invalidFiles = files.filter(f => {
+      const ext = f.name.split('.').pop()?.toLowerCase() || '';
+      return !allowedExtensions.includes(ext);
+    });
+
+    if (invalidFiles.length > 0) {
+      setFileError(`Some files have invalid print formats (${invalidFiles.map(i => i.name).join(', ')}). Allowed: .AI, .PDF, .PNG, .JPG`);
       return;
     }
 
-    if (file.size > 50 * 1024 * 1024) { // 50MB
-      setFileError('Design file dimension exceeds limit. Maximum file weight limit is 50MB.');
+    const overSizedFiles = files.filter(f => f.size > 50 * 1024 * 1024);
+    if (overSizedFiles.length > 0) {
+      setFileError('Design file dimension exceeds limit. Maximum file weight limit is 50MB per file.');
       return;
     }
 
-    // Smart Print Checker
-    const warnings: string[] = [];
+    setUploadProgress(0);
     
-    // DPI Check Logic
+    // Simulate batch progress
+    const progressInterval = setInterval(() => {
+      setUploadProgress(prev => {
+        if (prev === null) return 0;
+        if (prev >= 100) {
+          clearInterval(progressInterval);
+          return 100;
+        }
+        return prev + 15;
+      });
+    }, 100);
+
     const parseDimensions = (sizeName: string): { width: number, height: number } | null => {
       const match = sizeName.match(/\((\d+\.?\d*)["']?\s*[xX*]\s*(\d+\.?\d*)["']?\)/);
       if (match) return { width: parseFloat(match[1]), height: parseFloat(match[2]) };
@@ -254,111 +272,113 @@ export default function CustomizeModal({
     };
 
     const dimensions = parseDimensions(selectedSize.name);
-    
-    setUploadProgress(0);
-    const interval = setInterval(() => {
-      setUploadProgress((prev) => {
-        if (prev === null) return 0;
-        if (prev >= 100) {
-          clearInterval(interval);
-          
-          if (['png', 'jpg', 'jpeg'].includes(fileExt)) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-              const srcData = e.target?.result as string;
-              const img = new Image();
-              img.onload = () => {
-                let width = img.width;
-                let height = img.height;
-                
-                // Calculate DPI
-                if (dimensions) {
-                    const dpiX = width / dimensions.width;
-                    const dpiY = height / dimensions.height;
-                    const minDpi = Math.min(dpiX, dpiY);
-                    if (minDpi < 300) {
-                        warnings.push(`⚠️ Low Resolution: ${Math.round(minDpi)} DPI detected. 300 DPI mandatory for sharp prints.`);
-                    }
-                } else if (file.size < 800 * 1024) {
-                    warnings.push('⚠️ File weight too low. High-resolution print requires larger files.');
-                }
+    const warnings: string[] = [];
 
-                // Professional Offset Bleed Logic
-                const isProfessionalOffset = selectedMaterial.name.includes('Professional Offset');
-                let bleedMeta = '';
-                if (isProfessionalOffset) {
-                    bleedMeta = ' + 3mm Bleed Applied';
-                    warnings.push('✨ Professional Offset: 3mm Bleed Margin automatically calculated.');
-                }
-                
-                setPrintWarnings(warnings);
+    // Process all files
+    const processedFiles: any[] = await Promise.all(files.map(async (file, idx) => {
+      const fileExt = file.name.split('.').pop()?.toLowerCase() || '';
+      const isProfessionalOffset = selectedMaterial.name.includes('Professional Offset');
+      const bleedMeta = isProfessionalOffset ? ' + 3mm Bleed Applied' : '';
 
-                const canvas = document.createElement('canvas');
-                const MAX_DIM = 1500;
-                if (width > MAX_DIM || height > MAX_DIM) {
-                  if (width > height) {
-                    height = Math.round((height * MAX_DIM) / width);
-                    width = MAX_DIM;
-                  } else {
-                    width = Math.round((width * MAX_DIM) / height);
-                    height = MAX_DIM;
-                  }
-                }
-                
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                if (ctx) {
-                  ctx.drawImage(img, 0, 0, width, height);
-                  const compressed = canvas.toDataURL('image/jpeg', 0.85);
-                  setDesignFile({
-                    name: file.name + bleedMeta,
-                    size: file.size,
-                    type: file.type,
-                    fileData: compressed
-                  });
-                } else {
-                  setDesignFile({
-                    name: file.name + bleedMeta,
-                    size: file.size,
-                    type: file.type,
-                    fileData: srcData
-                  });
-                }
-              };
-              img.src = srcData;
-            };
-            reader.readAsDataURL(file);
-          } else {
-            const isProfessionalOffset = selectedMaterial.name.includes('Professional Offset');
-            if (isProfessionalOffset) {
-                warnings.push('✨ Professional Offset: 3mm Bleed Margin suggested for PDF/AI vector layers.');
-            }
-            setPrintWarnings(warnings);
-            setDesignFile({
-              name: file.name + (isProfessionalOffset ? ' (Bleed Applied)' : ''),
-              size: file.size,
-              type: file.type
-            });
-          }
-          return null;
+      if (idx === 0) {
+        if (isProfessionalOffset) {
+          warnings.push('✨ Professional Offset: 3mm Bleed Margin automatically calculated.');
         }
-        return prev + 25;
+      }
+
+      if (['png', 'jpg', 'jpeg'].includes(fileExt)) {
+        return new Promise<any>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const srcData = e.target?.result as string;
+            const img = new Image();
+            img.onload = () => {
+              let width = img.width;
+              let height = img.height;
+              
+              if (idx === 0 && dimensions) {
+                const dpiX = width / dimensions.width;
+                const dpiY = height / dimensions.height;
+                const minDpi = Math.min(dpiX, dpiY);
+                if (minDpi < 300) {
+                  warnings.push(`⚠️ Primary File Resolution: ${Math.round(minDpi)} DPI. 300 DPI is optimal.`);
+                }
+              }
+
+              const canvas = document.createElement('canvas');
+              const MAX_DIM = 1200;
+              if (width > MAX_DIM || height > MAX_DIM) {
+                if (width > height) {
+                  height = Math.round((height * MAX_DIM) / width);
+                  width = MAX_DIM;
+                } else {
+                  width = Math.round((width * MAX_DIM) / height);
+                  height = MAX_DIM;
+                }
+              }
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext('2d');
+              if (ctx) {
+                ctx.drawImage(img, 0, 0, width, height);
+                resolve({
+                  name: file.name + bleedMeta,
+                  size: file.size,
+                  type: file.type,
+                  fileData: canvas.toDataURL('image/jpeg', 0.8)
+                });
+              } else {
+                resolve({
+                  name: file.name + bleedMeta,
+                  size: file.size,
+                  type: file.type,
+                  fileData: srcData
+                });
+              }
+            };
+            img.src = srcData;
+          };
+          reader.readAsDataURL(file);
+        });
+      } else {
+        if (idx === 0 && isProfessionalOffset) {
+          warnings.push('✨ Professional Offset: 3mm Bleed Margin suggested for vector formats.');
+        }
+        return {
+          name: file.name + (isProfessionalOffset ? ' (Bleed Applied)' : ''),
+          size: file.size,
+          type: file.type
+        };
+      }
+    }));
+
+    setTimeout(() => {
+      clearInterval(progressInterval);
+      setUploadProgress(null);
+      setPrintWarnings(warnings);
+
+      const primary = processedFiles[0];
+      const variations = processedFiles.slice(1);
+      
+      setDesignFile({
+        ...primary,
+        variations: variations.length > 0 ? variations : undefined
       });
-    }, 120);
+      setProofToggle('bleed');
+    }, 850);
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      validateAndUploadFile(e.dataTransfer.files[0]);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      validateAndUploadMultipleFiles(Array.from(e.dataTransfer.files));
     }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      validateAndUploadFile(e.target.files[0]);
+    if (e.target.files && e.target.files.length > 0) {
+      validateAndUploadMultipleFiles(Array.from(e.target.files));
     }
   };
 
@@ -431,34 +451,121 @@ export default function CustomizeModal({
           </div>
 
           <div className="my-6 hidden md:block">
-            <div className="rounded-[24px] overflow-hidden border border-slate-800 shadow-lg aspect-4/3 relative bg-slate-900 group">
-              {product.video ? (
-                <video 
-                  src={product.video} 
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                  className="w-full h-full object-cover grayscale-0 hover:scale-105 transition-all duration-500"
-                />
-              ) : (
-                <img
-                  src={activeImage}
-                  alt={product.name}
-                  className="w-full h-full object-cover grayscale-0 hover:scale-105 transition-all duration-500"
-                  referrerPolicy="no-referrer"
-                  onError={(e) => {
-                    console.warn(`[CustomizeModal Image Error] Broken URL fallback active: ${activeImage}`);
-                    e.currentTarget.src = CATEGORY_DEFAULT_IMAGES[product.category] || CATEGORY_DEFAULT_IMAGES['Business Cards'];
-                  }}
-                />
-              )}
-              {product.video && (
-                <span className="absolute bottom-4 left-4 bg-black/80 backdrop-blur-md text-white font-micro px-3 py-1.5 rounded-full shadow-sm z-10 pointer-events-none flex items-center gap-1">
-                  ▶ MEDIA PLAYING
-                </span>
-              )}
-            </div>
+            {/* View Mode Toggle when custom design vector asset is active */}
+            {designFile && (
+              <div className="flex bg-neutral-900 border border-slate-800 p-1.5 rounded-2xl gap-2 mb-4 w-full">
+                <button
+                  type="button"
+                  onClick={() => setProofToggle('mockup')}
+                  className={`flex-1 py-2 text-center text-[10px] uppercase tracking-wider font-extrabold rounded-xl transition cursor-pointer ${
+                    proofToggle === 'mockup' 
+                      ? 'bg-black text-white border border-slate-800 shadow-xs' 
+                      : 'text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  📷 Mockup View
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setProofToggle('bleed')}
+                  className={`flex-1 py-1.5 text-center text-[10px] uppercase tracking-wider font-extrabold rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                    proofToggle === 'bleed' 
+                      ? 'bg-[#FF4D00]' : 'text-zinc-405'
+                  } text-white shadow-xs`}
+                >
+                  📐 2D Digital Bleed Proof (Live)
+                </button>
+              </div>
+            )}
+
+            {proofToggle === 'bleed' && designFile ? (
+              /* Dynamic 2D Bleed Proof Visualizer Overlay */
+              <div className="w-full bg-[#0a0a0c] border border-slate-800 rounded-[28px] p-6 flex flex-col justify-between aspect-4/3 relative overflow-hidden shadow-2xl">
+                {/* Visual Grid Sheet Lines Background */}
+                <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:16px_16px] pointer-events-none" />
+                
+                {/* Visual Bounding Layout Card Substrate Sheet representation */}
+                <div className="w-full flex-1 flex flex-col items-center justify-center max-h-[160px] relative z-10 mt-1">
+                  <div className="relative w-full max-w-[230px] aspect-[1.58] bg-zinc-950 border border-zinc-800 rounded-lg overflow-hidden flex items-center justify-center shadow-lg">
+                    {/* Rendered Design Asset */}
+                    {designFile.fileData && (
+                      <img 
+                        src={designFile.fileData} 
+                        alt="Bleed Visual Layer Preview Frame" 
+                        className="absolute inset-0 w-full h-full object-cover opacity-85"
+                        referrerPolicy="no-referrer"
+                      />
+                    )}
+
+                    {/* Outer Bleed Margin Bounds: dashed rose contour */}
+                    <div className="absolute inset-0 border-2 border-dashed border-rose-500/80 pointer-events-none flex items-start justify-start p-1.5">
+                      <span className="text-[7.5px] font-mono text-rose-300 bg-black/85 px-1 rounded-sm leading-none uppercase font-extrabold tracking-widest scale-90 origin-left">Bleed Area (+3mm)</span>
+                    </div>
+
+                    {/* Trim Line cutout Contour: solid cyan rectangle */}
+                    <div className="absolute inset-1.5 border border-cyan-500 pointer-events-none flex items-end justify-start p-1 flex-wrap content-end">
+                      <span className="text-[7.5px] font-mono text-cyan-300 bg-black/85 px-1 rounded-sm leading-none uppercase font-extrabold tracking-widest scale-90 origin-left">Trim Line (Finished Cut)</span>
+                    </div>
+
+                    {/* Safety Margin Contour: dashed emerald zone */}
+                    <div className="absolute inset-3 border border-dashed border-emerald-500/90 pointer-events-none flex items-start justify-end p-1">
+                      <span className="text-[7.5px] font-mono text-emerald-300 bg-black/85 px-1 rounded-sm leading-none uppercase font-extrabold tracking-widest scale-90 origin-right">Text Safe zone</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Substrate Legend Specs details */}
+                <div className="bg-white/5 border border-white/5 rounded-2xl p-3.5 space-y-1 mt-auto relative z-10">
+                  <div className="flex items-center justify-between text-[8px] font-black uppercase text-[#FF4D00] tracking-widest font-mono">
+                    <span>BLEED SPECIFICATION METADATA</span>
+                    <span className="text-emerald-400">STATUS: APPROVED FOR RUNS</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 pt-2 border-t border-white/5">
+                    <div className="space-y-0.5 text-left">
+                      <span className="text-[7.5px] font-mono text-zinc-400 font-extrabold uppercase block">• Outer Bleed</span>
+                      <p className="text-[10px] text-zinc-200 font-bold font-mono">3.00 mm Standard</p>
+                    </div>
+                    <div className="space-y-0.5 text-left">
+                      <span className="text-[7.5px] font-mono text-zinc-400 font-extrabold uppercase block">• Finished Cut Size</span>
+                      <p className="text-[10px] text-zinc-200 font-bold font-mono">{selectedSize.name.split(' ')[0]}</p>
+                    </div>
+                    <div className="space-y-0.5 text-left">
+                      <span className="text-[7.5px] font-mono text-zinc-400 font-extrabold uppercase block">• Safe Zone Inner</span>
+                      <p className="text-[10px] text-zinc-200 font-bold font-mono">2.50 mm Inward</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-[24px] overflow-hidden border border-slate-800 shadow-lg aspect-4/3 relative bg-slate-900 group">
+                {product.video ? (
+                  <video 
+                    src={product.video} 
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="w-full h-full object-cover grayscale-0 hover:scale-105 transition-all duration-500"
+                  />
+                ) : (
+                  <img
+                    src={activeImage}
+                    alt={product.name}
+                    className="w-full h-full object-cover grayscale-0 hover:scale-105 transition-all duration-500"
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      console.warn(`[CustomizeModal Image Error] Broken URL fallback active: ${activeImage}`);
+                      e.currentTarget.src = CATEGORY_DEFAULT_IMAGES[product.category] || CATEGORY_DEFAULT_IMAGES['Business Cards'];
+                    }}
+                  />
+                )}
+                {product.video && (
+                  <span className="absolute bottom-4 left-4 bg-black/80 backdrop-blur-md text-white font-micro px-3 py-1.5 rounded-full shadow-sm z-10 pointer-events-none flex items-center gap-1">
+                    ▶ MEDIA PLAYING
+                  </span>
+                )}
+              </div>
+            )}
             
             {/* Gallery Thumbnails List */}
             {allImages.length > 1 && (
@@ -702,38 +809,71 @@ export default function CustomizeModal({
               >
                 <input
                   type="file"
-                  ref={fileInputRef}
+                  ref={fileInputRef as any}
                   onChange={handleFileSelect}
                   accept=".ai,.pdf,.png,.jpg,.jpeg"
+                  multiple
                   className="hidden"
                 />
 
                 {uploadProgress !== null ? (
                   <div className="space-y-2 py-2">
                     <Loader2 className="w-8 h-8 text-[#FF4D00] animate-spin mx-auto" />
-                    <p className="text-xs font-black text-zinc-700 font-mono text-center">UPLOADING DRAFT: {uploadProgress}%</p>
+                    <p className="text-xs font-black text-zinc-700 font-mono text-center">PROCESSING FILES: {uploadProgress}%</p>
                     <div className="w-48 h-1.5 bg-zinc-100 rounded-full overflow-hidden mx-auto">
-                      <div className="bg-[#FF4D00] h-full transition-all duration-150" style={{ width: `${uploadProgress}%` }} />
+                      <div className="bg-[#FF4D00] h-full transition-all duration-155" style={{ width: `${uploadProgress}%` }} />
                     </div>
                   </div>
                 ) : designFile ? (
-                  <div className="flex items-center gap-3.5 text-left w-full py-1">
-                    <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-200">
-                      {designFile.fileData ? (
-                        <img src={designFile.fileData} alt="Preview" className="w-full h-full object-cover rounded-xl" />
-                      ) : (
-                        <FileText className="w-6 h-6" />
-                      )}
+                  <div className="space-y-3.5 w-full text-left py-1">
+                    {/* Primary File details */}
+                    <div className="flex items-center gap-3 bg-zinc-50/50 p-2.5 rounded-2xl border border-zinc-150/60 w-full">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-200 shadow-3xs">
+                        {designFile.fileData ? (
+                          <img src={designFile.fileData} alt="Preview" className="w-full h-full object-cover rounded-xl" />
+                        ) : (
+                          <FileText className="w-5 h-5 text-emerald-500" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0 space-y-0.5">
+                        <p className="text-[11px] font-extrabold text-zinc-805 truncate font-mono uppercase tracking-wide">
+                          PRIMARY: {designFile.name}
+                        </p>
+                        <p className="text-[9px] text-zinc-450 font-mono font-bold">
+                          {(designFile.size / (1024 * 1024)).toFixed(2)} MB • MAIN ASSEMBLY FILE
+                        </p>
+                      </div>
+                      <span className="text-[9px] font-black bg-emerald-50 text-emerald-600 border border-emerald-150 px-2.5 py-0.5 rounded-full uppercase shrink-0">
+                        Primary OK
+                      </span>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-zinc-800 truncate font-mono">{designFile.name}</p>
-                      <p className="text-[10px] text-zinc-400 mt-0.5 font-mono">
-                        {(designFile.size / (1024 * 1024)).toFixed(2)} MB • File Added Successfully
-                      </p>
-                    </div>
-                    <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full uppercase shrink-0">
-                      Ready
-                    </span>
+
+                    {/* Variations list */}
+                    {designFile.variations && designFile.variations.length > 0 && (
+                      <div className="space-y-2 pl-3 border-l-2 border-dashed border-[#FF4D00]/30 mt-2">
+                        <p className="text-[9px] font-black text-[#FF4D00] tracking-widest uppercase font-mono mb-1.5 flex items-center gap-1">
+                          <Layers className="w-3 h-3 animate-pulse" />
+                          Design Variations Added ({designFile.variations.length})
+                        </p>
+                        <div className="grid grid-cols-1 gap-1.5 max-h-[140px] overflow-y-auto pr-1">
+                          {designFile.variations.map((v: any, idx: number) => (
+                            <div key={idx} className="flex items-center gap-2.5 bg-white p-2 rounded-xl border border-zinc-150/80 shadow-3xs" onClick={(e) => e.stopPropagation()}>
+                              <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 border border-indigo-100">
+                                {v.fileData ? (
+                                  <img src={v.fileData} alt="" className="w-full h-full object-cover rounded-lg" />
+                                ) : (
+                                  <FileText className="w-4 h-4 text-indigo-500" />
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[10px] font-bold text-zinc-700 truncate font-mono">Var #{idx+1}: {v.name}</p>
+                               <p className="text-[9px] text-zinc-400 font-mono uppercase font-semibold">{(v.size / (1024 * 1024)).toFixed(2)} MB • Batch asset</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="space-y-2 py-3">

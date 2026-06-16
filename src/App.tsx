@@ -97,6 +97,7 @@ import { VerificationAuditDashboard } from './components/VerificationAuditDashbo
 import TermsOfService from './components/TermsOfService';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import { PrivacySecurity } from './components/PrivacySecurity';
+import PushNotificationManager from './components/PushNotificationManager';
 import { AnimatePresence, motion } from 'motion/react';
 
 // Helper to recursively remove undefined fields so Firestore doesn't reject writes
@@ -163,23 +164,32 @@ function ZoomableImage({ src, alt, className = "", category }: ZoomableImageProp
 
   return (
     <div
-      className="relative overflow-hidden w-full h-full cursor-zoom-in rounded-[30px]"
+      className="relative overflow-hidden w-full h-full cursor-zoom-in rounded-[30px] bg-zinc-50"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onMouseMove={handleMouseMove}
     >
+      {/* 1. PROGRESSIVE BLUR-UP PLACEHOLDER LAYER */}
       {isLoading && (
-        <div className="absolute inset-0 bg-zinc-100 animate-pulse flex items-center justify-center">
-          <span className="text-[10px] font-mono text-zinc-400">Loading...</span>
-        </div>
+        <img
+          src={imgSrc}
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 w-full h-full object-cover filter blur-[24px] scale-[1.1] opacity-80 select-none pointer-events-none transition-opacity duration-500"
+          referrerPolicy="no-referrer"
+        />
       )}
+
+      {/* 2. CORE SHARP IMAGE LAYER WITH FADE + DISSOLVE TRANSITIONS */}
       <img
         src={imgSrc}
         alt={alt}
         referrerPolicy="no-referrer"
-        className={`w-full h-full object-cover transition-transform duration-250 ease-out ${isLoading ? 'opacity-0' : 'opacity-100'} ${className}`}
+        className={`w-full h-full object-cover transition-all duration-700 ease-out ${
+          isLoading ? 'opacity-0 scale-[1.03] filter blur-[8px]' : 'opacity-100 scale-100 filter blur-0'
+        } ${className}`}
         style={{
-          transform: isHovered ? 'scale(2.2)' : 'scale(1)',
+          transform: isHovered ? 'scale(2.2)' : undefined,
           transformOrigin: `${coords.x}% ${coords.y}%`
         }}
         onError={() => {
@@ -191,6 +201,14 @@ function ZoomableImage({ src, alt, className = "", category }: ZoomableImageProp
           }
         }}
       />
+
+      {/* Elegant glassmorphic active-loader status badge */}
+      {isLoading && (
+        <div className="absolute bottom-3 right-3 bg-white/70 backdrop-blur-md px-2.5 py-1 rounded-xl text-[8px] font-mono border border-white/50 text-zinc-500 flex items-center gap-1.5 shadow-2xs pointer-events-none uppercase tracking-wider select-none animate-pulse">
+          <div className="w-1.5 h-1.5 rounded-full bg-[#FF4D00] animate-ping" />
+          Pre-rendering...
+        </div>
+      )}
     </div>
   );
 }
@@ -305,6 +323,7 @@ export default function App() {
   }, [activePolicyView]);
 
   const prevOrdersRef = useRef<Order[]>([]);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Support globally dispatched custom toast actions
   useEffect(() => {
@@ -739,10 +758,29 @@ export default function App() {
         e.preventDefault();
         setShowDiagnostics(prev => !prev);
       }
+      if (e.ctrlKey && e.key.toLowerCase() === 'k') {
+        // Prevent default browser search behavior
+        e.preventDefault();
+        setCustomerActiveTab('shop');
+        setTimeout(() => {
+          if (searchInputRef.current) {
+            searchInputRef.current.focus();
+            searchInputRef.current.select();
+          }
+        }, 80);
+      }
+      if (e.ctrlKey && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        setCustomerActiveTab('cart');
+      }
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'o') {
+        e.preventDefault();
+        setCustomerActiveTab('status');
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [setCustomerActiveTab]);
 
   useEffect(() => {
     // Auth State Listener
@@ -1705,32 +1743,60 @@ export default function App() {
                   <div className="w-full max-w-full px-4 sm:px-6 lg:px-8 py-8 space-y-12">
                 {/* Promo Billboard Accent */}
                 {customerActiveTab === 'shop' && (
-                  <div className="bg-[#0F172A] text-white p-8 md:p-10 rounded-[36px] border border-slate-800 shadow-xl flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-8">
-                      <div className="w-16 h-16 border border-white/10 rounded-full flex items-center justify-center font-heavy text-[10px] text-[#FF4D00] rotate-12 uppercase">
-                        PRINT<br/>CERT
+                  <div className="relative bg-[#090b11] text-white p-8 md:p-12 rounded-[32px] border-[3px] border-black shadow-[12px_12px_0px_#000] flex flex-col md:flex-row items-center justify-between gap-8 overflow-hidden group">
+                    {/* 3D dynamic gradient fluid orbs */}
+                    <div className="absolute -top-[120px] -left-[120px] w-[350px] h-[350px] bg-[#FF4D00]/10 rounded-full blur-[140px] pointer-events-none" />
+                    <div className="absolute -bottom-[120px] right-[10%] w-[300px] h-[300px] bg-indigo-500/10 rounded-full blur-[130px] pointer-events-none" />
+                    
+                    {/* Mechanical press crosshair simulation graphic */}
+                    <div className="absolute top-6 right-6 opacity-25 select-none hidden md:block pointer-events-none">
+                      <div className="w-16 h-16 border-2 border-dashed border-zinc-700 rounded-full flex items-center justify-center relative animate-[spin_45s_linear_infinite]">
+                        <div className="absolute inset-0 border-t-2 border-zinc-400 rounded-full" />
+                        <div className="w-8 h-8 border border-zinc-600 rounded-full" />
+                        <div className="w-0.5 h-16 bg-zinc-600 absolute" />
+                        <div className="h-0.5 w-16 bg-zinc-600 absolute" />
                       </div>
                     </div>
-                    <div className="space-y-3 max-w-xl text-center md:text-left relative z-10">
-                      <span className="bg-[#FF4D00] text-white font-micro px-3 py-1 rounded-full text-[9px]">
-                        Offset Pioneer
-                      </span>
-                      <h2 className="text-3xl md:text-5xl font-heavy leading-none tracking-tight uppercase">
-                        PROFESSIONAL OFFSET <br/>
-                        <span className="text-[#FF4D00]">PRINTING AT WHOLESALE</span>
+
+                    <div className="space-y-4 max-w-2xl text-center md:text-left relative z-10">
+                      <div className="flex items-center justify-center md:justify-start gap-2 flex-wrap">
+                        <span className="bg-[#FF4D00] text-black font-mono text-[9px] font-black uppercase tracking-[0.16em] px-3.5 py-1 rounded-full shadow-lg shadow-[#FF4D00]/20">
+                          DIRECT-TO-PLATE PLATFORM
+                        </span>
+                        <span className="bg-white/5 text-zinc-300 font-mono text-[8.5px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-white/5">
+                          ⭐ Heidelberg Speedmaster S1
+                        </span>
+                      </div>
+                      
+                      <h2 className="text-3xl sm:text-4xl md:text-5xl font-black leading-tight tracking-tight uppercase font-sans">
+                        PROFESSIONAL 3D <br className="hidden md:block" />
+                        <span className="text-[#FF4D00] inline-block relative font-black">
+                          OFFSET PRINT MATRIX
+                          <span className="absolute bottom-1 left-0 w-full h-[3px] bg-[#FF4D00]/45 rounded-xl" />
+                        </span>
                       </h2>
-                      <p className="text-xs text-slate-300 max-w-lg leading-relaxed font-normal">
-                        Configure high-volume corporate collateral with ease. Pay 100% upfront to trigger instant pre-press preflight audits, automated bleed alignments, and launch lightning fast offset production runs!
+                      <p className="text-[11px] sm:text-xs text-zinc-350 max-w-lg leading-relaxed font-semibold mt-1">
+                        Configure high-volume corporate stationery or banners. Post upfront payment, trigger instant cloud-hosted preflight checks, vector bleed calibrations, and launch live heavy-duty press runs today.
                       </p>
                     </div>
                     
-                    <div className="bg-white/5 p-6 rounded-2xl border border-white/10 space-y-3 text-xs text-center md:text-left max-w-[250px] shrink-0 relative z-10">
-                      <p className="font-micro text-blue-400">STAGE: HIGH PRESS DUPLEX</p>
-                      <p className="text-xs font-heavy uppercase leading-tight text-white">
-                        GUARANTEED COURIER <br/>
-                        RELEASE WITHIN 24-48H
-                      </p>
-                      <p className="text-[10px] text-slate-400 font-mono leading-none">NO EXCHANGE POLICY</p>
+                    {/* Physical glass deck readout */}
+                    <div className="bg-black/40 backdrop-blur-md p-6 rounded-[28px] border border-white/10 space-y-3 text-xs text-center md:text-left max-w-[260px] shrink-0 relative z-10 shadow-3xl">
+                      <div className="flex items-center gap-2 justify-center md:justify-start">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                        <span className="font-mono text-[9px] font-black tracking-widest text-[#FF4D00] uppercase">AUTOMATION: CALIBRATED</span>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-zinc-500 font-bold uppercase tracking-wider text-[8.5px]">DELIVERABILITY TIME</p>
+                        <p className="text-[11.5px] font-heavy uppercase leading-tight text-white">
+                          GUARANTEED RELEASE <br />
+                          IN 24-48 HOURS MAX
+                        </p>
+                      </div>
+                      <div className="flex items-center justify-between pt-2 border-t border-white/5 text-[9px] font-mono text-zinc-400 font-bold uppercase">
+                        <span>• DIRECT FACTORY VALUE</span>
+                        <span className="text-[#FF4D00] font-black">100%</span>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1787,9 +1853,13 @@ export default function App() {
                       </div>
 
                       <div className="flex-1 space-y-3 w-full">
-                        <span className="font-micro text-gray-500 block">Keyword Search Catalog</span>
+                        <div className="flex items-center">
+                          <span className="font-micro text-gray-500 block">Keyword Search Catalog</span>
+                          <span className="text-[9px] text-zinc-400 bg-zinc-150 px-1.5 py-0.5 rounded-md font-mono ml-2 uppercase font-black">Ctrl + K</span>
+                        </div>
                         <div className="relative">
                           <input
+                            ref={searchInputRef}
                             type="text"
                             value={catalogSearchQuery}
                             onChange={(e) => setCatalogSearchQuery(e.target.value)}
@@ -1860,15 +1930,16 @@ export default function App() {
                         <motion.div 
                           key={p.id}
                           variants={{
-                            hidden: { opacity: 0, scale: 0.95, y: 15 },
+                            hidden: { opacity: 0, scale: 0.93, y: 20 },
                             show: { opacity: 1, scale: 1, y: 0 }
                           }}
-                          transition={{ type: "spring", stiffness: 200, damping: 15 }}
-                          className="bg-white rounded-[40px] border border-gray-200/60 p-6 shadow-sm hover:shadow-xl hover:-translate-y-2 transition-transform duration-300 flex flex-col justify-between group"
+                          whileHover={{ y: -8, x: -2 }}
+                          transition={{ type: "spring", stiffness: 260, damping: 18 }}
+                          className="bg-white rounded-[32px] border-[3px] border-black p-6 flex flex-col justify-between relative overflow-hidden shadow-[8px_8px_0px_#000] hover:shadow-[12px_12px_0px_#FF4D00] hover:border-black active:translate-y-0 active:translate-x-0 active:shadow-[4px_4px_0px_#000] transition-all duration-300 group cursor-default"
                         >
                           <div className="space-y-5">
                             {/* Image container with ratio with zoom-on-hover effect */}
-                            <div className="rounded-[30px] overflow-hidden bg-zinc-50 border border-zinc-200/50 aspect-4/3 relative">
+                            <div className="rounded-[30px] overflow-hidden bg-zinc-100 border border-zinc-200/50 aspect-4/3 relative shadow-[inset_0_4px_12px_rgba(0,0,0,0.02)] group-hover:shadow-[inset_0_4px_16px_rgba(255,77,0,0.03)] transition-all">
                               {p.video ? (
                                 <HoverVideoPlayer 
                                   src={p.video} 
@@ -1884,18 +1955,18 @@ export default function App() {
                                   category={p.category}
                                 />
                               )}
-                              <span className="absolute top-4 left-4 bg-black text-[#FF4D00] font-micro px-3 py-1.5 rounded-full shadow-sm z-10 pointer-events-none">
+                              <span className="absolute top-4 left-4 bg-black/85 backdrop-blur-md text-white font-mono text-[8px] font-black uppercase tracking-[0.15em] px-3 py-1.5 rounded-full shadow-sm z-10 pointer-events-none border border-white/10">
                                 {p.category}
                               </span>
                               
                               {/* Premium top-right badges next to wishlist toggle */}
                               {(p.id === 'prod-1' || p.id === 'prod-5' || p.id === 'prod-7' || p.isNew) && (
-                                <span className="absolute top-4 right-14 bg-emerald-600 text-white font-mono text-[9px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full shadow-md z-15 pointer-events-none">
+                                <span className="absolute top-4 right-14 bg-emerald-600/90 backdrop-blur-xs text-white font-mono text-[8px] font-black uppercase tracking-[0.15em] px-2.5 py-1.5 rounded-full shadow-md z-15 pointer-events-none border border-emerald-500/20">
                                   ✨ NEW
                                 </span>
                               )}
                               {(p.id === 'prod-2' || p.id === 'prod-3' || p.id === 'prod-6' || p.isBestseller) && (
-                                <span className="absolute top-4 right-14 bg-amber-500 text-black font-mono text-[9px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full shadow-md z-15 pointer-events-none">
+                                <span className="absolute top-4 right-14 bg-amber-500/95 backdrop-blur-xs text-black font-mono text-[8px] font-black uppercase tracking-[0.12em] px-2.5 py-1.5 rounded-full shadow-md z-15 pointer-events-none border border-amber-400/20">
                                   🔥 BEST
                                 </span>
                               )}
@@ -1934,7 +2005,7 @@ export default function App() {
                           </div>
 
                           <div className="space-y-2">
-                            <h3 className="font-heavy text-xl uppercase text-slate-900 tracking-tight leading-none">
+                            <h3 className="font-heavy text-lg uppercase text-slate-900 tracking-tight leading-none group-hover:text-[#FF4D00] transition-colors">
                               {p.name}
                             </h3>
                             <p className="text-xs text-gray-500 font-normal leading-relaxed line-clamp-2">
@@ -1954,7 +2025,7 @@ export default function App() {
                           </div>
                         </div>
 
-                        <div className="border-t border-gray-100 pt-5 mt-5 flex items-center justify-between gap-1">
+                        <div className="border-t border-gray-150 pt-5 mt-5 flex items-center justify-between gap-1">
                           <div className="shrink-0 group relative">
                             <span className="font-micro text-gray-400 block font-normal text-[10px] cursor-help">Starts from</span>
                             <div className="absolute bottom-full left-0 mb-2 w-48 p-2 bg-zinc-900 text-white rounded-lg text-[9px] font-bold opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 border border-zinc-800 shadow-xl leading-relaxed">
@@ -1974,7 +2045,7 @@ export default function App() {
                                 e.stopPropagation();
                                 handleQuickBuy(p);
                               }}
-                              className="py-2.5 px-3 bg-zinc-100 text-zinc-800 hover:bg-zinc-200 rounded-2xl text-[10px] font-bold uppercase tracking-tight transition shadow-xs cursor-pointer flex items-center gap-1 shrink-0"
+                              className="py-2.5 px-3.5 bg-zinc-100 text-zinc-800 hover:bg-zinc-200 active:scale-95 rounded-2xl text-[10px] font-bold uppercase tracking-tight transition duration-150 cursor-pointer flex items-center gap-1 shrink-0 shadow-2xs"
                               title="Quick Add Default Quantity"
                             >
                               <span>Quick Buy</span>
@@ -1983,7 +2054,7 @@ export default function App() {
                             <button
                               type="button"
                               onClick={() => setFocusConfigProduct(p)}
-                              className="py-2.5 px-3.5 bg-black text-white hover:bg-[#FF4D00] rounded-2xl text-[10px] font-bold uppercase tracking-tight transition flex items-center gap-1 cursor-pointer shrink-0"
+                              className="py-2.5 px-4 bg-black text-white hover:bg-[#FF4D00] active:scale-95 rounded-2xl text-[10px] font-bold uppercase tracking-tight transition duration-150 flex items-center gap-1 cursor-pointer shrink-0 shadow-sm"
                             >
                               <span>Configure</span>
                               <ChevronRight className="w-3.5 h-3.5" />
@@ -2119,6 +2190,12 @@ export default function App() {
                     <span className="text-base font-black text-[#FF4D00] font-mono">{userStats.aiCredits} 🎇</span>
                   </button>
                 </div>
+
+                <PushNotificationManager 
+                  userId={user?.uid || null} 
+                  userEmail={session.email} 
+                  triggerToast={(title, t) => triggerToast(title, t === 'success' ? 'success' : 'warn')}
+                />
 
                 {/* ENTERPRISE SYSTEMS AND FRAUD VERIFICATIONS CONNECTORS */}
                 <div className="border-t border-dashed border-zinc-200 pt-4 space-y-2">

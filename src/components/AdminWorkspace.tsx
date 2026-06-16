@@ -824,9 +824,15 @@ export default function AdminWorkspace({
                     <p className="text-xs text-zinc-500 leading-none font-bold uppercase tracking-wide">Placed by <strong className="text-[#FF4D00] font-black">{selectedOrder.customerName}</strong> ({selectedOrder.customerEmail})</p>
                   </div>
 
-                  <div className="text-left sm:text-right">
-                    <p className="text-[9px] text-zinc-450 font-black uppercase tracking-wider">Dynamic valuation</p>
-                    <p className="text-2xl font-heavy text-black font-mono">₹{selectedOrder.totalAmount.toLocaleString('en-IN')}</p>
+                  <div className="text-left sm:text-right space-y-1">
+                    <p className="text-[9px] text-zinc-450 font-black uppercase tracking-wider">Order Value Breakdown</p>
+                    <div className="text-[10px] font-mono text-zinc-600 font-bold uppercase tracking-wider">
+                      Items Subtotal: <span className="text-zinc-800">₹{(selectedOrder.totalAmount - (selectedOrder.shippingCharge || 0)).toLocaleString('en-IN')}</span>
+                    </div>
+                    <div className="text-[10px] font-mono text-zinc-650 font-bold uppercase tracking-wider">
+                      Shipping Charge: <span className="text-zinc-800">{selectedOrder.shippingCharge && selectedOrder.shippingCharge > 0 ? `₹${selectedOrder.shippingCharge.toLocaleString('en-IN')}` : 'FREE'}</span>
+                    </div>
+                    <p className="text-xl font-heavy text-black font-mono pt-1">₹{selectedOrder.totalAmount.toLocaleString('en-IN')}</p>
                   </div>
                 </div>
 

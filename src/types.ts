@@ -78,6 +78,7 @@ export interface DesignFile {
   type: string;
   url?: string;
   fileData?: string;
+  variations?: DesignFile[];
 }
 
 export interface CartItem {

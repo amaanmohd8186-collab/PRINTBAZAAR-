@@ -76,11 +76,15 @@ export default function WhatsAppFloatingButton({ product, cartItems }: WhatsAppF
     if (product) {
       msg += `Product: ${product.name}\n`;
       msg += `Category: ${product.category}\n`;
+      const imageUrl = product.image.startsWith('http') ? product.image : `${window.location.origin}${product.image}`;
+      msg += `Product Image preview: ${imageUrl}\n`;
     } else if (cartItems && cartItems.length > 0) {
       msg += `I have ${cartItems.length} items in my cart.\n`;
       msg += `Total Amount Estimate: ₹${cartItems.reduce((acc, item) => acc + item.itemTotal, 0)}\n\n`;
-      cartItems.forEach(item => {
-        msg += `- ${item.productName} (${item.selectedQuantity} pcs, ${item.selectedSize.name})\n`;
+      cartItems.forEach((item, idx) => {
+        msg += `${idx + 1}. ${item.productName} (${item.selectedQuantity} pcs, ${item.selectedSize.name})\n`;
+        const itemImg = item.productImage.startsWith('http') ? item.productImage : `${window.location.origin}${item.productImage}`;
+        msg += `   Image preview: ${itemImg}\n`;
       });
     } else {
       msg += `I would like to inquire about your custom print services.\n`;
