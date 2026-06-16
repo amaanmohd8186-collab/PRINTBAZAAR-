@@ -170,7 +170,8 @@ export const INITIAL_PRODUCTS: Product[] = [
       { quantity: 1000, unitPrice: 11 }
     ],
     image: CATEGORY_DEFAULT_IMAGES['Posters'],
-    published: true
+    published: true,
+    inventory: 45
   },
   {
     id: 'prod-5',
@@ -194,7 +195,8 @@ export const INITIAL_PRODUCTS: Product[] = [
       { quantity: 5000, unitPrice: 3.8 }
     ],
     image: CATEGORY_DEFAULT_IMAGES['Brochures'],
-    published: true
+    published: true,
+    inventory: 65
   },
   {
     id: 'prod-6',

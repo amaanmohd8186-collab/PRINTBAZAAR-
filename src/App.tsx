@@ -14,6 +14,7 @@ import {
   Clock, 
   Truck,
   ChevronRight, 
+  ChevronDown,
   Plus, 
   Sparkles, 
   Info, 
@@ -266,6 +267,7 @@ export default function App() {
   );
   const [selectedCategory, setSelectedCategory] = useState<ProductCategory | 'All'>('All');
   const [catalogSearchQuery, setCatalogSearchQuery] = useState('');
+  const [catalogSortOrder, setCatalogSortOrder] = useState<'price-low' | 'price-high' | 'newest'>('newest');
   
   // Subscriber states
   const [subscriberEmail, setSubscriberEmail] = useState('');
@@ -273,6 +275,7 @@ export default function App() {
   
   // Dynamic screen size type (mobile, tablet, laptop, desktop)
   const [screenSize, setScreenSize] = useState<'mobile' | 'tablet' | 'laptop' | 'desktop'>('desktop');
+  const [isCartAnimating, setIsCartAnimating] = useState(false);
 
   // 3. User session info custom assigned
   const [session, setSession] = useState<UserSession>({
@@ -951,6 +954,8 @@ export default function App() {
     setCartItems((prev) => [...prev, item]);
     setFocusConfigProduct(null);
     triggerToast(`Added ${item.productName} configuration to your printing cart!`);
+    setIsCartAnimating(true);
+    setTimeout(() => setIsCartAnimating(false), 600);
     setCustomerActiveTab('cart');
   };
 
@@ -1143,6 +1148,15 @@ export default function App() {
     const productDescLower = p.description.toLowerCase();
 
     return keywords.every(kw => productNameLower.includes(kw) || productDescLower.includes(kw));
+  }).sort((a, b) => {
+    if (catalogSortOrder === 'price-low' || catalogSortOrder === 'price-high') {
+      const aMin = Math.min(...a.slabs.map(s => s.unitPrice));
+      const bMin = Math.min(...b.slabs.map(s => s.unitPrice));
+      return catalogSortOrder === 'price-low' ? aMin - bMin : bMin - aMin;
+    } else if (catalogSortOrder === 'newest') {
+      return b.id.localeCompare(a.id);
+    }
+    return 0;
   });
 
   return (
@@ -1356,9 +1370,14 @@ export default function App() {
                 <span>Browse Catalog</span>
               </button>
 
-              <button
+              <motion.button
                 type="button"
                 onClick={() => setCustomerActiveTab('cart')}
+                animate={isCartAnimating ? { 
+                  scale: [1, 1.15, 1],
+                  rotate: [0, -5, 5, -5, 5, 0]
+                } : { scale: 1, rotate: 0 }}
+                transition={{ duration: 0.5 }}
                 className={`py-2 px-4.5 rounded-2xl text-xs font-heavy uppercase tracking-wider transition flex items-center gap-1.5 relative border border-transparent cursor-pointer ${
                   customerActiveTab === 'cart'
                     ? 'bg-[#FF4D00] text-white shadow-md'
@@ -1372,7 +1391,7 @@ export default function App() {
                     {cartItems.length}
                   </span>
                 )}
-              </button>
+              </motion.button>
 
               <button
                 type="button"
@@ -1750,28 +1769,46 @@ export default function App() {
                       </div>
                     </div>
                     
-                    <div className="space-y-3">
-                      <span className="font-micro text-gray-500 block">Keyword Search Catalog</span>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          value={catalogSearchQuery}
-                          onChange={(e) => setCatalogSearchQuery(e.target.value)}
-                          placeholder="Search custom specs, banners, cards..."
-                          className="w-full pl-9 pr-8 py-2.5 bg-zinc-50 border border-zinc-200 rounded-[20px] text-xs font-semibold focus:outline-hidden focus:ring-2 focus:ring-[#FF4D00]/25 text-zinc-800 transition shadow-inner font-sans"
-                        />
-                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                          <Search className="w-3.5 h-3.5" />
-                        </div>
-                        {catalogSearchQuery && (
-                          <button
-                            type="button"
-                            onClick={() => setCatalogSearchQuery('')}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-650 text-xs font-bold font-mono transition"
+                    <div className="flex flex-col md:flex-row gap-4 items-end">
+                      <div className="w-full md:w-auto space-y-3">
+                        <span className="font-micro text-gray-500 block">Sort Catalog</span>
+                        <div className="relative">
+                          <select
+                            value={catalogSortOrder}
+                            onChange={(e) => setCatalogSortOrder(e.target.value as any)}
+                            className="w-full md:w-48 pl-3 pr-8 py-2.5 bg-zinc-50 border border-zinc-200 rounded-[20px] text-xs font-semibold focus:outline-hidden focus:ring-2 focus:ring-[#FF4D00]/25 text-zinc-800 transition appearance-none cursor-pointer"
                           >
-                            ✕
-                          </button>
-                        )}
+                            <option value="newest">Newest First</option>
+                            <option value="price-low">Price: Low to High</option>
+                            <option value="price-high">Price: High to Low</option>
+                          </select>
+                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+                        </div>
+                      </div>
+
+                      <div className="flex-1 space-y-3 w-full">
+                        <span className="font-micro text-gray-500 block">Keyword Search Catalog</span>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={catalogSearchQuery}
+                            onChange={(e) => setCatalogSearchQuery(e.target.value)}
+                            placeholder="Search custom specs, banners, cards..."
+                            className="w-full pl-9 pr-8 py-2.5 bg-zinc-50 border border-zinc-200 rounded-[20px] text-xs font-semibold focus:outline-hidden focus:ring-2 focus:ring-[#FF4D00]/25 text-zinc-800 transition shadow-inner font-sans"
+                          />
+                          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                            <Search className="w-3.5 h-3.5" />
+                          </div>
+                          {catalogSearchQuery && (
+                            <button
+                              type="button"
+                              onClick={() => setCatalogSearchQuery('')}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-650 text-xs font-bold font-mono transition"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1918,9 +1955,13 @@ export default function App() {
                         </div>
 
                         <div className="border-t border-gray-100 pt-5 mt-5 flex items-center justify-between gap-1">
-                          <div className="shrink-0">
-                            <span className="font-micro text-gray-400 block font-normal text-[10px]">Starts from</span>
-                            <p className="text-sm font-heavy text-slate-900 font-mono tracking-tighter">
+                          <div className="shrink-0 group relative">
+                            <span className="font-micro text-gray-400 block font-normal text-[10px] cursor-help">Starts from</span>
+                            <div className="absolute bottom-full left-0 mb-2 w-48 p-2 bg-zinc-900 text-white rounded-lg text-[9px] font-bold opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 border border-zinc-800 shadow-xl leading-relaxed">
+                              This price is based on the default slab quantity ({smallestSlab?.quantity} pcs). Select customizations for exact pricing.
+                              <div className="absolute top-full left-4 border-8 border-transparent border-t-zinc-900" />
+                            </div>
+                            <p className="text-sm font-heavy text-slate-900 font-mono tracking-tighter cursor-help">
                               ₹{startingValPrice.toLocaleString('en-IN')}{' '}
                               <span className="text-[9px] text-gray-400 font-heavy">({smallestSlab?.quantity} PCS)</span>
                             </p>
@@ -2004,6 +2045,28 @@ export default function App() {
               <OrdersTracker
                 orders={currentCustomerOrders}
                 onPayBalanceSuccess={handleBalancePaymentSuccess}
+                onUpdateOrder={async (orderId, updates) => {
+                  const orderRef = doc(db, 'orders', orderId);
+                  const orderSnap = await getDoc(orderRef);
+                  
+                  if (orderSnap.exists()) {
+                    await updateDoc(orderRef, {
+                      ...updates,
+                      updatedAt: serverTimestamp()
+                    });
+                  } else {
+                    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updates, updatedAt: new Date().toISOString() } : o));
+                  }
+                  
+                  if (updates.notifyOnDispatch !== undefined) {
+                    triggerToast(
+                      updates.notifyOnDispatch 
+                        ? "SMS alerts enabled for this order dispatch!" 
+                        : "Dispatch notifications disabled.",
+                      'success'
+                    );
+                  }
+                }}
                 onReorder={handleReorder}
                 userRole={session.role}
                 userEmail={session.email}

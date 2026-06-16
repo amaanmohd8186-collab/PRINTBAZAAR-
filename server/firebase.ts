@@ -1,6 +1,6 @@
-import * as admin from 'firebase-admin';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+export { FieldValue };
 import { getApp, getApps, initializeApp, cert, App } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import { getStorage } from 'firebase-admin/storage';
 import * as fs from 'fs';
@@ -154,6 +154,10 @@ export const adminStorage = () => {
     }
   }
   return cachedStorage;
+};
+
+export const logDbWarning = (msg: string, err: any) => {
+  console.warn(`[Firestore Warning] ${msg}:`, err.message || err);
 };
 
 /**

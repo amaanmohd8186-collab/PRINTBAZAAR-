@@ -30,7 +30,7 @@ export default function AdminWorkspace({
   onDeleteProduct,
   onShowAudit
 }: AdminWorkspaceProps) {
-  const [activeTab, setActiveTab ] = useState<'insights' | 'incoming' | 'products' | 'diagnostics' | 'users' | 'platform'>('insights');
+  const [activeTab, setActiveTab ] = useState<'insights' | 'incoming' | 'products' | 'diagnostics' | 'users' | 'platform' | 'low-inventory'>('insights');
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [showAddProductModal, setShowAddProductModal] = useState(false);
   const [showDesignModal, setShowDesignModal] = useState<{ name: string; type: string; data?: string } | null>(null);
@@ -145,6 +145,10 @@ export default function AdminWorkspace({
       receivablesCalculated: pendingPaymentsDue
     };
   }, [orders]);
+
+  const lowStockProducts = React.useMemo(() => {
+    return products.filter(p => p.inventory !== undefined && p.inventory < 50);
+  }, [products]);
 
   // Chart data calculation
   const chartData = React.useMemo(() => {
@@ -446,6 +450,22 @@ export default function AdminWorkspace({
 
           <button
             type="button"
+            onClick={() => setActiveTab('low-inventory')}
+            className={`py-2 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition flex items-center gap-2 relative ${
+              activeTab === 'low-inventory' ? 'bg-rose-600 text-white shadow-xs' : 'text-zinc-400 hover:text-white'
+            }`}
+          >
+            <AlertTriangle className="w-4 h-4" />
+            <span>Low Stock</span>
+            {lowStockProducts.filter(p => (p.inventory || 0) < 10).length > 0 && (
+              <span className="absolute -top-1 -right-1 bg-rose-500 text-white font-mono font-black text-[9px] w-5 h-5 rounded-full flex items-center justify-center border border-white animate-pulse">
+                {lowStockProducts.filter(p => (p.inventory || 0) < 10).length}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab('diagnostics')}
             className={`py-2 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition flex items-center gap-2 ${
               activeTab === 'diagnostics' ? 'bg-[#FF4D00] text-white shadow-xs' : 'text-zinc-400 hover:text-white'
@@ -555,6 +575,28 @@ export default function AdminWorkspace({
               </div>
             </div>
             {/* End Added for Monetization Engine */}
+
+            {lowStockProducts.length > 0 && (
+              <div className="col-span-2 lg:col-span-4 bg-rose-50 p-6 rounded-[32px] border border-rose-200 shadow-xs flex flex-col md:flex-row items-center justify-between animate-pulse gap-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-rose-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-rose-500/30">
+                    <AlertTriangle className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black uppercase text-rose-900 tracking-tight">Inventory Alert: Low Stock Levels Detected</h4>
+                    <p className="text-[10px] text-rose-700 font-bold uppercase tracking-wider font-mono mt-1">
+                      {lowStockProducts.length} items are below the threshold: {lowStockProducts.slice(0, 3).map(p => p.name).join(', ')}{lowStockProducts.length > 3 ? '...' : ''}
+                    </p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setActiveTab('products')}
+                  className="px-6 py-2.5 bg-rose-500 text-white text-[10px] font-black uppercase tracking-wider rounded-xl hover:bg-rose-600 transition shadow-sm font-mono cursor-pointer shrink-0"
+                >
+                  Restock Products
+                </button>
+              </div>
+            )}
 
           </div>
 
@@ -1448,6 +1490,98 @@ export default function AdminWorkspace({
                 Force Delete Immediately
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* TAB: LOW INVENTORY */}
+      {activeTab === 'low-inventory' && (
+        <div className="bg-white rounded-[32px] p-8 border border-zinc-200/80 shadow-md space-y-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-150 pb-5">
+            <div>
+              <h3 className="text-xl md:text-2xl font-heavy text-rose-900 uppercase tracking-tight">Critical Stock Alerts</h3>
+              <p className="text-xs text-zinc-500 font-bold uppercase tracking-wider mt-0.5">Inventory units below replenishment threshold (10 units)</p>
+            </div>
+            <div className="p-3 bg-rose-50 text-rose-600 rounded-2xl border border-rose-200 flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5" />
+              <span className="text-[10px] font-mono font-heavy tracking-wide uppercase">Replenishment Required</span>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto rounded-[24px] border border-zinc-150">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-zinc-900 text-white">
+                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Product variant</th>
+                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Niche Category</th>
+                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Curr. Inventory</th>
+                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Status</th>
+                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {products.filter(p => (p.inventory || 0) < 10).length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-12 text-center text-zinc-400 font-mono text-[11px] font-bold uppercase">
+                      All systems green. No low-stock variants detected.
+                    </td>
+                  </tr>
+                ) : (
+                  products.filter(p => (p.inventory || 0) < 10).map((p) => {
+                    const isCritical = (p.inventory || 0) < 5;
+                    return (
+                      <tr 
+                        key={p.id} 
+                        className={`border-b border-zinc-100 transition-colors ${isCritical ? 'bg-rose-50/70 hover:bg-rose-100/70' : 'bg-orange-50/30 hover:bg-orange-100/30'}`}
+                      >
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-zinc-200 overflow-hidden border border-zinc-300">
+                              <img src={p.image} alt={p.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            </div>
+                            <div>
+                              <p className="text-xs font-black text-zinc-900 uppercase leading-none">{p.name}</p>
+                              <p className="text-[9px] text-zinc-400 font-mono mt-1 tracking-tight">{p.id}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">{p.category}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                             <span className={`text-xs font-mono font-black ${isCritical ? 'text-rose-600' : 'text-orange-600'}`}>
+                               {p.inventory || 0} PCS 
+                             </span>
+                             <div className="w-24 h-1.5 bg-zinc-200 rounded-full overflow-hidden">
+                               <div 
+                                 className={`h-full ${isCritical ? 'bg-rose-500' : 'bg-orange-500'}`} 
+                                 style={{ width: `${Math.min(100, ((p.inventory || 0) / 10) * 100)}%` }} 
+                               />
+                             </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-widest border ${
+                            isCritical ? 'bg-rose-100 text-rose-700 border-rose-200' : 'bg-orange-100 text-orange-700 border-orange-200'
+                          }`}>
+                            {isCritical ? 'Critical' : 'Low Stock'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <button 
+                            onClick={() => alert(`Replenishment protocol initiated for ${p.name}`)}
+                            className="px-4 py-2 bg-zinc-950 hover:bg-black text-white text-[9px] font-black uppercase tracking-widest rounded-xl transition cursor-pointer font-mono"
+                          >
+                            Restock Variant
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Package, Truck, Calendar, Wallet, CheckCircle, Clock, AlertTriangle, ChevronDown, ChevronUp, FileSpreadsheet, ShieldAlert, Loader2, Download, FileText, RefreshCcw } from 'lucide-react';
+import { Package, Truck, Calendar, Wallet, CheckCircle, Clock, AlertTriangle, ChevronDown, ChevronUp, FileSpreadsheet, ShieldAlert, Loader2, Download, FileText, RefreshCcw, Bell, BellRing, Info, Phone, MessageCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 import { jsPDF } from 'jspdf';
 import { Order, OrderStatus, PaymentDetails } from '../types';
@@ -104,6 +104,7 @@ function SlaCountdownTimer({ createdAt, status }: { createdAt: string; status: O
 interface OrdersTrackerProps {
   orders: Order[];
   onPayBalanceSuccess: (orderId: string, payment: PaymentDetails) => void;
+  onUpdateOrder?: (orderId: string, updates: Partial<Order>) => void;
   onReorder?: (order: Order) => void;
   userRole?: 'customer' | 'seller' | 'admin';
   userEmail?: string;
@@ -112,16 +113,34 @@ interface OrdersTrackerProps {
 export default function OrdersTracker({
   orders,
   onPayBalanceSuccess,
+  onUpdateOrder,
   onReorder,
   userRole = 'customer',
   userEmail = 'amaanmohd8681@gmail.com'
 }: OrdersTrackerProps) {
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const [expandedSpecs, setExpandedSpecs] = useState<Set<string>>(new Set());
   const [payingOrderId, setPayingOrderId] = useState<string | null>(null);
   const [balanceAmountToPay, setBalanceAmountToPay] = useState<number>(0);
 
   const toggleExpand = (orderId: string) => {
     setExpandedOrderId(expandedOrderId === orderId ? null : orderId);
+  };
+
+  const toggleSpecs = (orderId: string) => {
+    const next = new Set(expandedSpecs);
+    if (next.has(orderId)) {
+      next.delete(orderId);
+    } else {
+      next.add(orderId);
+    }
+    setExpandedSpecs(next);
+  };
+
+  const handleToggleNotification = (order: Order) => {
+    if (onUpdateOrder) {
+      onUpdateOrder(order.id, { notifyOnDispatch: !order.notifyOnDispatch });
+    }
   };
 
   const handleDownloadReceipt = (order: Order) => {
@@ -391,6 +410,54 @@ ${separator}
     doc.save(`PrintBazaar_Invoice_${order.id}.pdf`);
   };
 
+  const handleDownloadCSV = () => {
+    if (orders.length === 0) {
+      alert('No orders found to export.');
+      return;
+    }
+
+    const headers = [
+      'Order ID',
+      'Date',
+      'Status',
+      'Items',
+      'Total Amount (INR)',
+      'Upfront Paid (INR)',
+      'Balance Status',
+      'Tracking Number',
+      'Courier'
+    ];
+
+    const rows = orders.map(order => {
+      const itemsStr = order.items.map(i => `${i.productName} (${i.selectedQuantity} Pcs)`).join('; ');
+      const paidAmount = order.payments.reduce((sum, p) => sum + p.amount, 0);
+      return [
+        order.id,
+        new Date(order.createdAt).toLocaleDateString('en-IN'),
+        order.status,
+        itemsStr,
+        order.totalAmount,
+        paidAmount,
+        order.balancePaid ? 'FULLY SETTLED' : 'PENDING',
+        order.trackingNumber || 'N/A',
+        order.courierName || 'N/A'
+      ];
+    });
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `PrintBazaar_Orders_${Date.now()}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   const initBalancePayment = (order: Order) => {
     const outstanding = order.totalAmount - order.payments.reduce((sum, p) => sum + p.amount, 0);
     setBalanceAmountToPay(outstanding > 0 ? outstanding : Math.round(order.totalAmount / 2));
@@ -485,6 +552,15 @@ ${separator}
           <h2 className="font-heavy text-xl uppercase leading-none tracking-tight">MY PRINTING ACCOUNTS</h2>
           <p className="text-xs text-zinc-500 font-bold uppercase tracking-wider mt-1.5 font-mono">Track production stages, verify file clearances, and finalize balance dues.</p>
         </div>
+        
+        <button
+          type="button"
+          onClick={handleDownloadCSV}
+          className="ml-auto flex items-center gap-2 px-5 py-2.5 bg-black hover:bg-zinc-800 text-white text-[10px] font-black uppercase tracking-wider rounded-xl transition shadow-xs cursor-pointer font-mono"
+        >
+          <FileSpreadsheet className="w-4 h-4 text-[#FF4D00]" />
+          <span>Export History (CSV)</span>
+        </button>
       </div>
 
       {/* Spending Trend Analytics Section */}
@@ -608,6 +684,22 @@ ${separator}
                        </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
+                      <a
+                        href={`https://wa.me/919999999999?text=${encodeURIComponent(`Hi PrintBazaar, I have a query regarding my Order ID: ${order.id}`)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#25D366] hover:bg-[#128C7E] text-white text-[11px] font-black uppercase tracking-wider rounded-xl transition duration-155 shadow-xs cursor-pointer select-none no-underline"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5 text-white" />
+                        <span>WhatsApp Support</span>
+                      </a>
+                      <a
+                        href="tel:+919999999999"
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-black uppercase tracking-wider rounded-xl transition duration-155 shadow-xs cursor-pointer select-none no-underline"
+                      >
+                        <Phone className="w-3.5 h-3.5 text-white" />
+                        <span>Quick Call</span>
+                      </a>
                       <button
                         type="button"
                         onClick={(e) => {
@@ -619,7 +711,7 @@ ${separator}
                         className="inline-flex items-center gap-2 px-4 py-2.5 bg-zinc-900 hover:bg-black text-white text-[11px] font-black uppercase tracking-wider rounded-xl transition duration-155 shadow-xs cursor-pointer select-none"
                       >
                         <RefreshCcw className="w-3.5 h-3.5" />
-                        <span>Buy Again</span>
+                        <span>Reorder</span>
                       </button>
                       <button
                         type="button"
@@ -784,42 +876,103 @@ ${separator}
                     }}
                   />
 
-                  {/* Item customization specifications summary */}
+                  {/* Item customization specifications accordion */}
                   <div className="space-y-3">
-                    <h4 className="font-micro text-gray-450 block">Custom Print Specifications</h4>
-                    <div className="space-y-2">
-                      {order.items.map((item) => (
-                        <div key={item.id} className="bg-white rounded-[24px] p-5 border border-zinc-200/60 shadow-xs flex items-start justify-between gap-4">
-                          <div className="flex items-start gap-4">
-                            {/* Product photograph thumbnail */}
-                            <div className="w-14 h-14 rounded-xl overflow-hidden bg-zinc-100 border border-zinc-200 shrink-0 relative shadow-2xs">
-                              {item.productImage ? (
-                                <img
-                                  src={item.productImage}
-                                  alt={item.productName}
-                                  className="w-full h-full object-cover"
-                                  referrerPolicy="no-referrer"
-                                />
-                              ) : (
-                                <span className="text-[9px] font-bold text-zinc-400 font-mono flex items-center justify-center h-full">N/A</span>
-                              )}
-                            </div>
-                            
-                            <div className="space-y-1">
-                              <p className="text-sm font-heavy text-slate-950 uppercase tracking-tight">{item.productName}</p>
-                              <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wide leading-tight">
-                                Size: {item.selectedSize.name} • Finish: {item.selectedMaterial.name} • Qty: {item.selectedQuantity} Pcs
-                              </p>
-                              <div className="inline-flex items-center gap-1.5 bg-[#fff5f0] text-[#FF4D00] text-[9px] font-bold uppercase px-3 py-1 rounded-md border border-[#FF4D00]/10 mt-1.5 font-mono">
-                                <span>Asset Vector: {item.designFile.name} ({(item.designFile.size / (1024 * 1024)).toFixed(2)} MB)</span>
+                    <button
+                      type="button"
+                      onClick={() => toggleSpecs(order.id)}
+                      className="flex items-center justify-between w-full group hover:text-black transition"
+                    >
+                      <h4 className="font-micro text-gray-450 block uppercase tracking-widest text-[9px] font-black group-hover:text-zinc-600 flex items-center gap-2">
+                        <Info className="w-3 h-3" />
+                        <span>Itemized Technical Specifications</span>
+                      </h4>
+                      <div className="flex items-center gap-2 text-[9px] font-bold text-zinc-400 uppercase tracking-tighter">
+                        <span>{expandedSpecs.has(order.id) ? 'Collapse Details' : 'View Full Breakdown'}</span>
+                        {expandedSpecs.has(order.id) ? (
+                          <ChevronUp className="w-3 h-3 group-hover:text-black" />
+                        ) : (
+                          <ChevronDown className="w-3 h-3 group-hover:text-black" />
+                        )}
+                      </div>
+                    </button>
+                    
+                    {expandedSpecs.has(order.id) && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        className="space-y-2 overflow-hidden"
+                      >
+                        {order.items.map((item) => (
+                          <div key={item.id} className="bg-white rounded-[24px] p-5 border border-zinc-200/60 shadow-xs flex items-start justify-between gap-4">
+                            <div className="flex items-start gap-4">
+                              {/* Product photograph thumbnail */}
+                              <div className="w-14 h-14 rounded-xl overflow-hidden bg-zinc-100 border border-zinc-200 shrink-0 relative shadow-2xs">
+                                {item.productImage ? (
+                                  <img
+                                    src={item.productImage}
+                                    alt={item.productName}
+                                    className="w-full h-full object-cover"
+                                    referrerPolicy="no-referrer"
+                                  />
+                                ) : (
+                                  <span className="text-[9px] font-bold text-zinc-400 font-mono flex items-center justify-center h-full">N/A</span>
+                                )}
+                              </div>
+                              
+                              <div className="space-y-1">
+                                <p className="text-sm font-heavy text-slate-950 uppercase tracking-tight">{item.productName}</p>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-1 text-[10px] text-zinc-500 font-bold uppercase tracking-wide leading-tight">
+                                  <span><strong className="text-zinc-800">Size:</strong> {item.selectedSize.name}</span>
+                                  <span><strong className="text-zinc-800">Material:</strong> {item.selectedMaterial.name}</span>
+                                  <span><strong className="text-zinc-800">Quantity:</strong> {item.selectedQuantity} Pcs</span>
+                                </div>
+                                <div className="inline-flex items-center gap-1.5 bg-[#fff5f0] text-[#FF4D00] text-[9px] font-bold uppercase px-3 py-1 rounded-md border border-[#FF4D00]/10 mt-1.5 font-mono">
+                                  <span>Asset Vector: {item.designFile.name} ({(item.designFile.size / (1024 * 1024)).toFixed(2)} MB)</span>
+                                </div>
                               </div>
                             </div>
+                            <span className="text-sm font-bold text-slate-900 font-mono whitespace-nowrap">₹{item.itemTotal.toLocaleString('en-IN')}</span>
                           </div>
-                          <span className="text-sm font-bold text-slate-900 font-mono whitespace-nowrap">₹{item.itemTotal.toLocaleString('en-IN')}</span>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </motion.div>
+                    )}
                   </div>
+
+                  {/* SMS Dispatch Notification Toggle */}
+                  {['Order Received', 'Design Check', 'Printing In Progress'].includes(order.status) && (
+                    <div className="bg-zinc-900 rounded-[28px] p-6 border border-zinc-800 shadow-xl flex flex-col md:flex-row items-center justify-between gap-6 overflow-hidden relative">
+                      <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-[#FF4D00] to-transparent" />
+                      
+                      <div className="flex items-center gap-4">
+                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 transition-all duration-500 ${
+                          order.notifyOnDispatch ? 'bg-[#FF4D00] text-white shadow-lg shadow-[#FF4D00]/30' : 'bg-zinc-800 text-zinc-500'
+                        }`}>
+                          {order.notifyOnDispatch ? <BellRing className="w-6 h-6 animate-bounce" /> : <Bell className="w-6 h-6" />}
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-black uppercase text-white tracking-tight">Dispatch Telemetry Notifications</h4>
+                          <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider font-mono mt-1 leading-relaxed max-w-[280px]">
+                            {order.notifyOnDispatch 
+                              ? 'SMS alerts enabled! You will be notified the instant your items are ready for courier logistics.'
+                              : 'Enable Twilio SMS alerts to get real-time status transitions when your print run is finished.'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleToggleNotification(order)}
+                        className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 font-mono shadow-xs border cursor-pointer ${
+                          order.notifyOnDispatch 
+                            ? 'bg-emerald-600 text-white border-emerald-500 hover:bg-emerald-700' 
+                            : 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:text-white hover:bg-zinc-750'
+                        }`}
+                      >
+                        {order.notifyOnDispatch ? 'Alerts Optimized (Active)' : 'Enable SMS Alert'}
+                      </button>
+                    </div>
+                  )}
 
                   {/* 100% payment clearance widget */}
                   <div className="bg-white rounded-[32px] p-6 border border-zinc-200/80 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-6">

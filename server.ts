@@ -8,7 +8,7 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
-import { Cashfree, CFEnvironment } from "cashfree-pg";
+import { createOrderHandler, configHandler, verifyPaymentHandler, getCashfree } from "./server/cashfree_handlers";
 import crypto from "crypto";
 import twilio from "twilio";
 import nodemailer from "nodemailer";
@@ -244,6 +244,12 @@ function logDbWarning(context: string, err: any) {
   }
 }
 
+// TWILIO SECURE SMS GATEWAY INITIALIZATION
+const twilioSid = getCleanEnv("TWILIO_ACCOUNT_SID");
+const twilioAuth = getCleanEnv("TWILIO_AUTH_TOKEN");
+const twilioFrom = getCleanEnv("TWILIO_PHONE_NUMBER");
+const twilioClient = (twilioSid && twilioAuth) ? twilio(twilioSid, twilioAuth) : null;
+
 // AI Credit Config
 const CREDIT_COSTS: Record<string, number> = {
   'background-removal': 2,
@@ -399,6 +405,28 @@ export function createExpressApp() {
       req.rawBody = buf.toString();
     }
   }));
+
+  // GLOBAL ERROR HANDLER FOR JSON RESPONSES
+  app.use((err: any, req: any, res: any, next: any) => {
+    console.error("🔥 [FATAL SERVER ERROR]:", err);
+    res.status(500).json({
+      success: false,
+      error: "INTERNAL_SERVER_ERROR",
+      message: err.message || "An unexpected error occurred on the server.",
+      stack: process.env.NODE_ENV === 'production' ? undefined : err.stack
+    });
+  });
+
+  // Startup / Diagnostics for Serverless environment
+  console.log("====================================================");
+  console.log("🚀 [SERVER BOOT] Initializing PrintBazaar Express App Node...");
+  console.log(`🚀 [SERVER BOOT] NODE_ENV = ${process.env.NODE_ENV}`);
+  console.log(`🚀 [SERVER BOOT] VERCEL = ${process.env.VERCEL}`);
+  console.log(`🚀 [SERVER BOOT] CASHFREE_ENVIRONMENT = ${process.env.CASHFREE_ENVIRONMENT || 'NOT_SET (Default: SANDBOX)'}`);
+  console.log(`🚀 [SERVER BOOT] CASHFREE_CLIENT_ID Loaded = ${!!process.env.CASHFREE_CLIENT_ID}`);
+  console.log(`🚀 [SERVER BOOT] CASHFREE_CLIENT_SECRET Loaded = ${!!process.env.CASHFREE_CLIENT_SECRET}`);
+  console.log(`🚀 [SERVER BOOT] FIREBASE_PROJECT_ID = ${process.env.FIREBASE_PROJECT_ID}`);
+  console.log("====================================================");
 
   // Shared Gemini client utility initialized on server side
   const apiKey = process.env.GEMINI_API_KEY;
@@ -1335,12 +1363,46 @@ Customer's custom requirements or idea prompt: "${prompt}"`;
     }
   });
 
-  // Automated Email for Order Status Updates
+  // Automated Email & SMS for Order Status Updates
   app.post("/api/emails/order-status", async (req, res) => {
     try {
       const { email, orderId, status } = req.body;
       if (!email || !orderId || !status) {
         return res.status(400).json({ error: "Email, OrderId, and Status are required" });
+      }
+
+      // Check for notification preferences in Database
+      let notifyViaSms = false;
+      let customerPhone = "";
+      try {
+        const orderSnap = await adminDb().collection('orders').doc(orderId).get();
+        if (orderSnap.exists) {
+          const orderData = orderSnap.data();
+          notifyViaSms = orderData?.notifyOnDispatch || false;
+          customerPhone = orderData?.shippingAddress?.phone || "";
+        }
+      } catch (dbErr) {
+        console.warn(`[SMS PRECHECK] FAILED to fetch order ${orderId} from DB:`, dbErr);
+      }
+
+      // Trigger SMS if required and status is Dispatch Ready
+      if (status === 'Ready for Dispatch' && notifyViaSms && customerPhone) {
+        if (twilioClient && twilioFrom) {
+          try {
+            // Clean phone number (prefix +91 for India if not present)
+            const formattedPhone = customerPhone.startsWith('+') ? customerPhone : `+91${customerPhone}`;
+            await twilioClient.messages.create({
+              body: `PrintBazaar Alert: Your Order #${orderId} is READY FOR DISPATCH! Our courier logistics partner will collect it shortly for transit.`,
+              from: twilioFrom,
+              to: formattedPhone
+            });
+            console.log(`✅ DISPATCH SMS successfully routed to +91${customerPhone} via Twilio SID.`);
+          } catch (smsErr: any) {
+            console.error("❌ Twilio dispatch failed:", smsErr.message);
+          }
+        } else {
+          console.log(`\n📱 [SANDBOX SMS LOG] Dispatch Notification for Order ${orderId} would be sent to ${customerPhone} (Status: ${status})`);
+        }
       }
 
       const transporter = getMailer();
@@ -1647,257 +1709,11 @@ Customer's custom requirements or idea prompt: "${prompt}"`;
     }
   });
 
-  // Cashfree Gateway Configuration
-  let cashfreeInstance: Cashfree | null = null;
-  const getCashfree = () => {
-    if (cashfreeInstance) return cashfreeInstance;
+  app.get("/api/cashfree/config", configHandler);
 
-    const clientId = getCleanEnv("CASHFREE_CLIENT_ID");
-    const secretKey = getCleanEnv("CASHFREE_CLIENT_SECRET");
-    
-    if (!clientId || !secretKey) {
-      throw new Error("CRITICAL: Cashfree credentials (CASHFREE_CLIENT_ID and CASHFREE_CLIENT_SECRET) are missing.");
-    }
+  app.post("/api/cashfree/create-order", createOrderHandler);
 
-    let environment = getCleanEnv("CASHFREE_ENVIRONMENT") || getCleanEnv("CASHFREE_ENV") || "SANDBOX";
-    
-    // Auto-detect environment based strictly on Client ID format regardless of user env variable
-    // Cashfree Sandbox keys always contain 'TEST' or 'sandbox'
-    const looksLikeTestKey = clientId.toUpperCase().includes("TEST") || clientId.toUpperCase().includes("SANDBOX");
-    
-    if (environment.toUpperCase() === "SANDBOX" && !looksLikeTestKey) {
-       console.warn(`[CASHFREE OVERRIDE] CASHFREE_ENVIRONMENT is set to SANDBOX but Client ID (${clientId.substring(0,4)}...) looks like a LIVE key. Overriding to PRODUCTION to prevent authentication failure.`);
-       environment = "PRODUCTION";
-    }
-
-    if (environment.toUpperCase() === "PRODUCTION" && looksLikeTestKey) {
-       console.warn(`[CASHFREE OVERRIDE] CASHFREE_ENVIRONMENT is set to PRODUCTION but Client ID (${clientId.substring(0,4)}...) looks like a TEST key. Overriding to SANDBOX to prevent authentication failure.`);
-       environment = "SANDBOX";
-    }
-
-    const isSandboxEnv = environment.toUpperCase() === "SANDBOX" || environment.toUpperCase() === "TEST";
-    
-    cashfreeInstance = new Cashfree(
-      isSandboxEnv ? CFEnvironment.SANDBOX : CFEnvironment.PRODUCTION,
-      clientId,
-      secretKey
-    );
-    cashfreeInstance.XApiVersion = getCleanEnv("CASHFREE_API_VERSION") || "2023-08-01";
-    console.log(`✓ Cashfree initialized in ${isSandboxEnv ? 'SANDBOX' : 'PRODUCTION'} mode`);
-    return cashfreeInstance;
-  };
-
-  app.get("/api/cashfree/config", (req, res) => {
-    const clientId = getCleanEnv("CASHFREE_CLIENT_ID") || getCleanEnv("CASHFREE_APP_ID");
-    const secretKey = getCleanEnv("CASHFREE_CLIENT_SECRET") || getCleanEnv("CASHFREE_SECRET_KEY");
-    
-    let env = getCleanEnv("CASHFREE_ENVIRONMENT") || getCleanEnv("CASHFREE_ENV");
-    if (!env && clientId) {
-        env = (clientId.startsWith("TEST") || clientId.toLowerCase().includes("test")) ? "SANDBOX" : "PRODUCTION";
-    }
-
-    res.json({
-      success: true,
-      hasKeys: !!(clientId && secretKey),
-      appId: clientId || null,
-      env: env || "TEST"
-    });
-  });
-
-  app.post("/api/cashfree/create-order", async (req, res) => {
-    const { amount, customerId, customerPhone, customerEmail, customerName } = req.body;
-    try {
-      if (!amount || amount <= 0) {
-        return res.status(400).json({ success: false, error: "Valid amount greater than 0 is required" });
-      }
-      if (!customerId) return res.status(400).json({ success: false, error: "Customer ID is required" });
-      if (!customerPhone) return res.status(400).json({ success: false, error: "Customer Phone is required" });
-      if (!customerEmail) return res.status(400).json({ success: false, error: "Customer Email is required" });
-      
-      let cf;
-      try {
-        cf = getCashfree();
-      } catch (keyErr: any) {
-        console.error("Cashfree Configuration Error:", keyErr.message);
-        return res.status(500).json({ success: false, error: "Cashfree is not configured correctly: " + keyErr.message });
-      }
-
-      const orderId = "order_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
-      
-      // Override for strict production requirement
-      const appUrlForCashfree = process.env.NODE_ENV === 'production' || process.env.CASHFREE_ENVIRONMENT === 'PRODUCTION' 
-        ? 'https://printbazaar.vercel.app' 
-        : (getCleanEnv("APP_URL") || process.env.APP_URL || 'https://printbazaar.vercel.app');
-        
-      const returnUrl = `${appUrlForCashfree}/order-status?order_id={order_id}`;
-
-      const request = {
-        order_amount: amount,
-        order_currency: "INR",
-        order_id: orderId,
-        customer_details: {
-          customer_id: customerId,
-          customer_name: customerName || "Guest User",
-          customer_phone: customerPhone,
-          customer_email: customerEmail
-        },
-        order_meta: {
-          return_url: returnUrl
-        }
-      };
-
-      console.log(`[CASHFREE-NEW] return_url constructed: ${returnUrl}`);
-
-
-      let response;
-      try {
-        // PGCreateOrder expecting (request)
-        const startedAt = Date.now();
-        response = await cf.PGCreateOrder(request);
-        
-        console.log("========== CASHFREE RAW RESPONSE ==========");
-        console.log(JSON.stringify(response.data, null, 2));
-        console.log("===========================================");
-        console.log("payment_session_id:", response?.data?.payment_session_id);
-        console.log("order_id:", response?.data?.order_id);
-        console.log("order_status:", response?.data?.order_status);
-        
-        const cClientId = process.env.CASHFREE_CLIENT_ID || "";
-        console.log("CASHFREE_CLIENT_ID:", cClientId ? `Loaded (${cClientId.substring(0, 4)}***)` : "Missing");
-        console.log("CASHFREE_CLIENT_SECRET:", process.env.CASHFREE_CLIENT_SECRET ? "Loaded (***)" : "Missing");
-        console.log("CASHFREE_ENVIRONMENT:", process.env.CASHFREE_ENVIRONMENT);
-
-        if (!response.data || !response.data.payment_session_id) {
-          throw new Error("Cashfree API succeeded but returned no payment_session_id. Full Response: " + JSON.stringify(response.data));
-        }
-
-        console.log(`Cashfree order created on Live Gateway: ${response.data.order_id}`);
-      } catch (pgErr: any) {
-        console.log("========== CASHFREE HTTP ERROR ==========");
-        console.log("Status Code:", pgErr.response?.status);
-        console.log("Headers:", JSON.stringify(pgErr.response?.headers, null, 2));
-        console.log("Response Body:", JSON.stringify(pgErr.response?.data, null, 2));
-        console.log("=========================================");
-        console.error("Cashfree Gateway API error:", pgErr.response?.data || pgErr.message);
-        return res.status(502).json({ 
-          success: false, 
-          error: "Cashfree API Error: " + (pgErr.response?.data?.message || pgErr.message),
-          details: pgErr.response?.data
-        });
-      }
-
-      try {
-        const db = adminDb();
-        await db.collection('payments').doc(response.data.order_id).set({
-          order_id: response.data.order_id,
-          payment_session_id: response.data.payment_session_id,
-          customer_id: request.customer_details.customer_id,
-          amount: response.data.order_amount,
-          status: "CREATED",
-          updatedAt: FieldValue.serverTimestamp()
-        });
-
-        await db.collection('audit_logs').add({
-          userId: null,
-          action: "CASHFREE_ORDER_CREATED",
-          entityType: "ORDER",
-          entityId: response.data.order_id,
-          details: { amount: response.data.order_amount },
-          createdAt: FieldValue.serverTimestamp(),
-          ip: 'REDACTED'
-        });
-      } catch (dbErr: any) {
-        logDbWarning("Firestore logging failed for CF order", dbErr);
-        // We do not fail the order if the DB fails to log, but we log the error
-      }
-      
-      return res.json({
-        success: true,
-        isMock: false,
-        payment_session_id: response.data.payment_session_id,
-        order_id: response.data.order_id,
-        order_amount: response.data.order_amount,
-        environment: cf.XEnvironment === 2 ? 'PRODUCTION' : 'SANDBOX'
-      });
-    } catch (err: any) {
-      console.error("Cashfree Order flow exception:", err.message);
-      return res.status(500).json({ success: false, error: err.message });
-    }
-  });
-
-  app.post("/api/cashfree/verify-payment", async (req, res) => {
-    try {
-      const { order_id } = req.body;
-
-      if (!order_id) {
-        return res.status(400).json({ success: false, error: "order_id is required" });
-      }
-
-      let cf;
-      try {
-        cf = getCashfree();
-      } catch (e: any) {
-        console.error("Cashfree Configuration Error:", e.message);
-        return res.status(500).json({ success: false, error: "Cashfree config error: " + e.message });
-      }
-
-      try {
-        const response = await cf.PGOrderFetchPayments(order_id);
-        const payments = response.data || [];
-        
-        // Find success payment
-        const successPayment = Array.isArray(payments) ? payments.find((p: any) => p.payment_status === "SUCCESS") : (payments as any).payment_status === "SUCCESS" ? payments : null;
-        
-        if (successPayment) {
-          try {
-            const db = adminDb();
-            await db.collection('payments').doc(order_id).update({
-              status: "PAID",
-              payment_id: successPayment.cf_payment_id,
-              verification_result: "SUCCESS",
-              verifiedAt: FieldValue.serverTimestamp()
-            });
-
-            await db.collection('audit_logs').add({
-              userId: null,
-              action: "CASHFREE_PAYMENT_SUCCESS",
-              entityType: "ORDER",
-              entityId: order_id,
-              details: { payment_id: successPayment.cf_payment_id },
-              createdAt: FieldValue.serverTimestamp(),
-              ip: 'REDACTED'
-            });
-          } catch (dbErr) {
-            logDbWarning("Firestore DB Error on verify", dbErr);
-          }
-
-          return res.json({
-            success: true,
-            verified: true,
-            payment: successPayment
-          });
-        }
-        
-        try {
-          await adminDb().collection('audit_logs').add({
-            action: "CASHFREE_VERIFICATION_FAIL",
-            entityId: order_id,
-            details: { result: "No successful payment found on live gateway" },
-            createdAt: FieldValue.serverTimestamp(),
-            ip: 'REDACTED'
-          });
-        } catch (e) {}
-
-        return res.json({ success: true, verified: false, message: "No successful payment found for this order" });
-      } catch (err: any) {
-        console.error("Cashfree live payment lookup error:", err.message);
-        return res.status(502).json({ success: false, error: "Cashfree lookup failed: " + err.message });
-      }
-    } catch (err: any) {
-      console.error("Cashfree Verification general exception:", err.message);
-      return res.status(500).json({ success: false, error: err.message });
-    }
-  });
+  app.post("/api/cashfree/verify-payment", verifyPaymentHandler);
 
   app.get("/api/payment/health", async (req, res) => {
     const health = {

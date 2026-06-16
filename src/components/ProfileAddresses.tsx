@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, MapPin, Edit, Trash2, Plus, Phone, Mail, Calendar, Save } from 'lucide-react';
+import { User, MapPin, Edit, Trash2, Plus, Phone, Mail, Calendar, Save, Copy, Check, ExternalLink } from 'lucide-react';
 import { UserStats, Address } from '../types';
 
 interface ProfileAddressesProps {
@@ -21,6 +21,7 @@ export default function ProfileAddresses({ stats, userName, userEmail, onUpdateS
 
   const [showAddAddr, setShowAddAddr] = useState(false);
   const [newAddr, setNewAddr] = useState<Partial<Address>>({ label: 'Home', line1: '', city: '', state: '', pincode: '', isDefault: false });
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const handleSaveProfile = () => {
     onUpdateSession(name, email);
@@ -64,6 +65,13 @@ export default function ProfileAddresses({ stats, userName, userEmail, onUpdateS
     const updated = addresses.map(a => ({ ...a, isDefault: a.id === id }));
     setAddresses(updated);
     onUpdateStats({ ...stats, addresses: updated });
+  };
+
+  const handleCopyAddress = (addr: Address) => {
+    const fullAddr = `${addr.line1}, ${addr.city}, ${addr.state} - ${addr.pincode}`;
+    navigator.clipboard.writeText(fullAddr);
+    setCopiedId(addr.id);
+    setTimeout(() => setCopiedId(null), 2000);
   };
 
   return (
@@ -171,20 +179,58 @@ export default function ProfileAddresses({ stats, userName, userEmail, onUpdateS
                 </div>
               ) : (
                 addresses.map(a => (
-                  <div key={a.id} className={`p-4 rounded-[20px] border ${a.isDefault ? 'border-[#FF4D00] bg-orange-50/30' : 'border-zinc-200 bg-white'} relative flex items-start gap-3 transition`}>
-                    <div className="p-2 bg-zinc-100 rounded-xl text-zinc-500 shrink-0 mt-0.5"><MapPin className="w-4 h-4" /></div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[11px] font-black uppercase text-slate-900">{a.label}</span>
-                        {a.isDefault && <span className="bg-[#FF4D00] text-white text-[8px] font-black uppercase px-1.5 py-0.5 rounded-full">Default</span>}
+                  <div key={a.id} className={`p-4 rounded-[28px] border ${a.isDefault ? 'border-[#FF4D00] bg-orange-50/20 shadow-sm' : 'border-zinc-200 bg-white'} relative flex items-start gap-4 transition-all duration-300 group`}>
+                    <div className={`p-3 rounded-2xl shrink-0 mt-0.5 transition-colors ${a.isDefault ? 'bg-[#FF4D00] text-white shadow-lg shadow-[#FF4D00]/20' : 'bg-zinc-100 text-zinc-500'}`}>
+                      <MapPin className="w-5 h-5" />
+                    </div>
+                    
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[12px] font-black uppercase text-slate-900 tracking-tight">{a.label}</span>
+                          {a.isDefault && <span className="bg-[#FF4D00] text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-full shadow-xs">Default</span>}
+                        </div>
+                        
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button 
+                            onClick={() => handleCopyAddress(a)}
+                            className="p-1.5 hover:bg-zinc-100 rounded-lg text-zinc-400 hover:text-zinc-600 transition cursor-pointer"
+                            title="Copy Address"
+                          >
+                            {copiedId === a.id ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                          <a 
+                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${a.line1}, ${a.city}, ${a.state} ${a.pincode}`)}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="p-1.5 hover:bg-zinc-100 rounded-lg text-zinc-400 hover:text-zinc-600 transition cursor-pointer"
+                            title="View on Map"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                        </div>
                       </div>
-                      <p className="text-xs text-zinc-600 mt-1 leading-relaxed">{a.line1}, <br/>{a.city}, {a.state} - {a.pincode}</p>
                       
-                      <div className="flex gap-3 mt-3 pt-3 border-t border-zinc-100">
-                        <button onClick={() => handleDeleteAddress(a.id)} className="text-[10px] font-bold text-rose-500 hover:text-rose-700 uppercase cursor-pointer">Delete</button>
-                        {!a.isDefault && (
-                          <button onClick={() => handleSetDefault(a.id)} className="text-[10px] font-bold text-zinc-500 hover:text-slate-900 uppercase cursor-pointer">Make Default</button>
-                        )}
+                      <p className="text-[11px] text-zinc-600 font-medium mt-1.5 leading-relaxed break-words">
+                        {a.line1}, {a.city}, {a.state} - {a.pincode}
+                      </p>
+                      
+                      <div className="flex items-center justify-between gap-3 mt-4 pt-3 border-t border-zinc-100/60">
+                        <div className="flex gap-4">
+                          <button onClick={() => handleDeleteAddress(a.id)} className="text-[10px] font-black text-rose-500 hover:text-rose-700 uppercase tracking-wider transition cursor-pointer">Delete</button>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <span className={`text-[9px] font-black uppercase tracking-widest ${a.isDefault ? 'text-[#FF4D00]' : 'text-zinc-400'}`}>
+                            {a.isDefault ? 'Primary' : 'Secondary'}
+                          </span>
+                          <button 
+                            onClick={() => handleSetDefault(a.id)}
+                            className={`w-9 h-5 rounded-full relative transition-colors cursor-pointer ${a.isDefault ? 'bg-[#FF4D00]' : 'bg-zinc-200'}`}
+                          >
+                            <div className={`w-3.5 h-3.5 bg-white rounded-full absolute top-0.75 transition-all duration-200 ${a.isDefault ? 'left-4.75 shadow-xs' : 'left-0.75'}`} />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>

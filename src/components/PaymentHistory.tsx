@@ -19,7 +19,9 @@ import {
   Filter,
   CheckCircle2,
   AlertCircle,
-  Clock
+  Clock,
+  Copy,
+  Check
 } from 'lucide-react';
 import { WalletTransaction } from '../types';
 
@@ -151,7 +153,29 @@ export default function PaymentHistory({ userId, onBack }: PaymentHistoryProps) 
                         {formatDate(tx.timestamp)}
                       </span>
                       <span className="text-[9px] font-bold text-zinc-300 select-none">•</span>
-                      <span className="text-[9px] font-bold text-zinc-400 uppercase font-mono">ID: {tx.id.substring(0, 8)}</span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-[9px] font-bold text-zinc-400 uppercase font-mono">ID: {tx.id.substring(0, 8)}</span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigator.clipboard.writeText(tx.txId || tx.id);
+                            // Temporary feedback
+                            const target = e.currentTarget;
+                            const originalHtml = target.innerHTML;
+                            target.innerHTML = 'COPIED';
+                            target.classList.add('text-emerald-500');
+                            setTimeout(() => {
+                              target.innerHTML = originalHtml;
+                              target.classList.remove('text-emerald-500');
+                            }, 2000);
+                          }}
+                          className="p-1 hover:bg-zinc-100 rounded-md transition-colors group/copy relative"
+                          title="Copy Full Transaction ID"
+                        >
+                          <Copy className="w-2.5 h-2.5 text-zinc-400 group-hover/copy:text-zinc-600" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>

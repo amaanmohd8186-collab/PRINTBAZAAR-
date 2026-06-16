@@ -121,6 +121,7 @@ export interface Order {
   updatedAt: string;
   shippingCharge?: number;
   taxAmount?: number;
+  notifyOnDispatch?: boolean;
 }
 
 export interface UserSession {
