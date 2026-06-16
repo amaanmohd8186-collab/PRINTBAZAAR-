@@ -36,7 +36,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { jsPDF } from 'jspdf';
 import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, safeFetch } from '../firebase';
 import confetti from 'canvas-confetti';
 import { ToolType, Design, UserStats } from '../types';
 
@@ -142,8 +142,7 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
 
   const loadDesigns = async () => {
     try {
-      const res = await fetch('/api/designs/list');
-      const data = await res.json();
+      const data = await safeFetch<{ success: boolean; designs: Design[] }>('/api/designs/list');
       if (data.success) setDesigns(data.designs);
     } catch (err) {
       console.error("Failed to load designs", err);
@@ -298,7 +297,7 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
 
       console.log(`[AI Studio Dispatch] Tool: ${tool}, Cost: ${toolCost}`);
 
-      const res = await fetch('/api/studio/process', {
+      const data = await safeFetch<any>('/api/studio/process', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -309,9 +308,7 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
         })
       });
 
-      const data = await res.json();
-      
-      if (res.ok && data.success) {
+      if (data.success) {
         const img = await fabric.Image.fromURL(data.imageUrl, { crossOrigin: 'anonymous' });
         if (activeObject && activeObject instanceof fabric.Image) {
           // Replace matching size/rotation positions
@@ -414,7 +411,7 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
     const preview = fabricCanvas.current.toDataURL({ format: 'png', quality: 0.5 });
 
     try {
-      const res = await fetch('/api/designs/save', {
+      const result = await safeFetch<any>('/api/designs/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -424,7 +421,6 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
           userId: userId || 'anonymous'
         })
       });
-      const result = await res.json();
       if (result.success) {
         showStatus('success', 'Design synchronized to your Cloud Workspace!');
         loadDesigns();
