@@ -50,12 +50,17 @@ export const FirebaseDiagnosticsPanel = ({ onClose }: { onClose: () => void }) =
 
           // Fetch server diagnostics via robust safeFetch
           addLog("Synchronizing Server Health Data...");
-          const serverDiag = await safeFetch('/api/admin/diagnostics');
+          const [serverDiag, paymentHealth] = await Promise.all([
+            safeFetch('/api/admin/diagnostics'),
+            safeFetch('/api/payment/health')
+          ]);
           
           setDiagnostics(p => ({ 
             ...p, 
             ...serverDiag,
-            firestoreStatus: serverDiag.db_ops?.write === 'PASS' ? 'Triple-Verified (R/W/D)' : 'Degraded'
+            firestoreStatus: serverDiag.db_ops?.write === 'PASS' ? 'Triple-Verified (R/W/D)' : 'Degraded',
+            cashfree: { status: paymentHealth?.cashfreeConnected ? 'Connected' : 'Missing Keys' },
+            email: { status: 'Unknown' }
           }));
           
           addLog(`System Integrity Verified. Global Health: ${serverDiag.healthScore}%`);

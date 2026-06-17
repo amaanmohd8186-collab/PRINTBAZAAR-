@@ -2022,6 +2022,7 @@ async function startServer() {
   const PORT = 3000;
 
   // Serve static assets or mount Vite dev middleware
+  // Handle SPA fallback
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -2031,19 +2032,27 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+    app.get("*", (req, res, next) => {
+      res.sendFile(path.join(distPath, "index.html"), (err) => {
+        if (err) next(err);
+      });
     });
   }
 
-  // Global JSON Error Handler
+  // Global JSON Error Handler (Must be last middleware)
   app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
     console.error("GLOBAL SERVER ERROR:", err);
-    res.status(err.status || 500).json({
-      success: false,
-      error: err.message || "Internal Server Error",
-      type: "SYSTEM_EXCEPTION"
-    });
+    
+    if (req.path.startsWith('/api/')) {
+        res.status(err.status || 500).json({
+          success: false,
+          error: err.code || "INTERNAL_SERVER_ERROR",
+          message: err.message || "An unexpected error occurred on the server.",
+          type: "SYSTEM_EXCEPTION"
+        });
+    } else {
+        res.status(err.status || 500).send("Internal Server Error: " + err.message);
+    }
   });
 
   app.listen(PORT, "0.0.0.0", () => {

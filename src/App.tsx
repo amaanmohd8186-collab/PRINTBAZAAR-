@@ -423,6 +423,8 @@ export default function App() {
     achievements: []
   });
 
+  const [showWelcomeBonus, setShowWelcomeBonus] = useState(false);
+
   // Fetch real-time stats from server (Firestore Realtime)
   useEffect(() => {
     if (user) {
@@ -445,7 +447,7 @@ export default function App() {
             ordersCount: data.ordersCount || 0,
             wishlistCount: data.wishlistCount || 0,
             walletBalance: data.walletBalance || 0,
-            aiCredits: data.aiCredits || 10,
+            aiCredits: data.aiCredits || 0,
             referralEarnings: data.referralEarnings || 0,
             loyaltyPoints: data.loyaltyPoints || 0,
             subscriptionTier: actualRole === 'admin' ? 'Elite' : 'Free',
@@ -498,10 +500,14 @@ export default function App() {
             email: user.email,
             name: user.displayName,
             role: 'customer',
-            aiCredits: 10,
+            aiCredits: 100,
+            creditType: 'WELCOME_BONUS',
+            creditedAt: serverTimestamp(),
             walletBalance: 0,
             createdAt: serverTimestamp()
-          }, { merge: true });
+          }, { merge: true }).then(() => {
+            setShowWelcomeBonus(true);
+          });
         }
       }, (error) => {
         console.error("Profile listen failed:", error);
@@ -3179,6 +3185,51 @@ export default function App() {
           triggerToast={triggerToast} 
         />
       )}
+
+      {/* Welcome Bonus Modal */}
+      <AnimatePresence>
+        {showWelcomeBonus && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-zinc-950/80 backdrop-blur-sm" />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-md bg-white rounded-[32px] p-8 shadow-2xl overflow-hidden text-center"
+            >
+              <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-[#FF4D00] to-orange-400" />
+              <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-6 text-4xl shadow-inner">
+                🎉
+              </div>
+              
+              <h2 className="text-2xl font-black uppercase text-zinc-900 tracking-tight mb-2">Welcome to PrintBazaar</h2>
+              <p className="text-sm font-medium text-zinc-500 mb-6 font-mono">You received a special gift!</p>
+              
+              <div className="bg-zinc-50 rounded-2xl p-6 mb-8 border border-zinc-100">
+                <div className="text-4xl font-black text-[#FF4D00] mb-2 tracking-tighter">100</div>
+                <div className="text-xs font-black uppercase tracking-widest text-zinc-800">FREE AI Credits</div>
+              </div>
+              
+              <div className="space-y-3 mb-8 text-left max-w-[260px] mx-auto">
+                <p className="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-4 pb-2 border-b border-zinc-100">Use them for:</p>
+                <div className="flex items-center gap-3"><span className="text-[#FF4D00]">✓</span> <span className="text-sm font-medium text-zinc-700">AI Background Removal</span></div>
+                <div className="flex items-center gap-3"><span className="text-[#FF4D00]">✓</span> <span className="text-sm font-medium text-zinc-700">AI Upscaling</span></div>
+                <div className="flex items-center gap-3"><span className="text-[#FF4D00]">✓</span> <span className="text-sm font-medium text-zinc-700">AI Poster Generator</span></div>
+                <div className="flex items-center gap-3"><span className="text-[#FF4D00]">✓</span> <span className="text-sm font-medium text-zinc-700">AI Logo Generator</span></div>
+                <div className="flex items-center gap-3"><span className="text-[#FF4D00]">✓</span> <span className="text-sm font-medium text-zinc-700">AI Wedding Card Generator</span></div>
+              </div>
+              
+              <button
+                type="button"
+                onClick={() => setShowWelcomeBonus(false)}
+                className="w-full py-4 bg-zinc-950 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-[#FF4D00] transition-colors cursor-pointer"
+              >
+                Start Creating
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Design Showcase Modal / Buying from Post */}
       <AnimatePresence>

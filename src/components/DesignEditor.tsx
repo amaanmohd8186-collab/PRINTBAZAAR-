@@ -61,7 +61,8 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
   userEmail, 
   userId, 
   onSave, 
-  userStats 
+  userStats,
+  onClose
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvas = useRef<fabric.Canvas | null>(null);
@@ -452,72 +453,77 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
   };
 
   return (
-    <div className="flex flex-col lg:flex-row h-[750px] bg-[#111827] rounded-3xl overflow-hidden shadow-2xl border border-zinc-805 select-none text-white">
+    <div className="flex flex-col lg:flex-row h-full w-full bg-[#111827] overflow-hidden select-none text-white relative">
       
-      {/* SIDEBAR NAVIGATION - TOOL RAILS */}
-      <div className="w-full lg:w-20 bg-zinc-950 border-b lg:border-b-0 lg:border-r border-zinc-850 flex lg:flex-col items-center justify-between lg:justify-start py-4 lg:py-6 px-4 lg:px-0 gap-6 shrink-0 z-10">
-        <div className="flex lg:flex-col gap-4">
+      {/* MOBILE HEADER / TITLE BAR */}
+      <div className="lg:hidden flex items-center justify-between px-4 py-3 bg-zinc-950 border-b border-zinc-850 z-20">
+        <h3 className="text-xs font-black uppercase text-white tracking-widest flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-[#FF4D00]" /> PrintBazaar Studio
+        </h3>
+        {onClose && (
+          <button onClick={onClose} className="p-2 bg-zinc-900 rounded-full text-zinc-400 hover:text-white">
+            <X size={16} />
+          </button>
+        )}
+      </div>
+
+      {/* SIDEBAR NAVIGATION - TOOL RAILS (Desktop: Left Sidebar, Mobile: Bottom/Floating Floating Toolbar) */}
+      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 lg:translate-x-0 lg:static lg:h-full lg:w-20 bg-zinc-950/90 lg:bg-zinc-950 backdrop-blur-xl lg:backdrop-blur-none border border-zinc-800 lg:border-t-0 lg:border-b-0 lg:border-l-0 lg:border-r lg:border-zinc-850 flex lg:flex-col items-center justify-between lg:justify-start py-2 lg:py-6 px-4 lg:px-0 gap-2 lg:gap-6 shrink-0 z-50 rounded-full lg:rounded-none shadow-2xl lg:shadow-none min-w-[320px] lg:min-w-0">
+        <div className="flex lg:flex-col gap-2 lg:gap-4 items-center w-full lg:w-auto overflow-x-auto no-scrollbar justify-center">
           <button 
             onClick={() => setActiveTool('select')}
             title="Layer Inspector"
-            className={`p-3 rounded-xl transition ${activeTool === 'select' ? 'bg-[#FF4D00] text-white shadow-lg' : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'}`}
+            className={`p-2.5 lg:p-3 rounded-full lg:rounded-xl transition shrink-0 ${activeTool === 'select' ? 'bg-[#FF4D00] text-white shadow-lg' : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'}`}
           >
-            <Layers size={22} />
+            <Layers size={20} className="lg:w-[22px] lg:h-[22px]" />
           </button>
           
           <button 
             onClick={addText}
             title="Add Text Layer"
-            className="p-3 rounded-xl text-zinc-400 hover:bg-zinc-900 hover:text-white transition"
+            className="p-2.5 lg:p-3 rounded-full lg:rounded-xl text-zinc-400 hover:bg-zinc-900 hover:text-white transition shrink-0"
           >
-            <Type size={22} />
+            <Type size={20} className="lg:w-[22px] lg:h-[22px]" />
           </button>
           
           <button 
             onClick={addRect}
             title="Add Substrate Rectangle"
-            className="p-3 rounded-xl text-zinc-400 hover:bg-zinc-900 hover:text-white transition"
+            className="p-2.5 lg:p-3 rounded-full lg:rounded-xl text-zinc-400 hover:bg-zinc-900 hover:text-white transition shrink-0"
           >
-            <Square size={22} />
+            <Square size={20} className="lg:w-[22px] lg:h-[22px]" />
           </button>
           
-          <label className="p-3 rounded-xl text-zinc-400 hover:bg-zinc-900 hover:text-white transition cursor-pointer flex items-center justify-center">
-            <ImageIcon size={22} />
+          <label className="p-2.5 lg:p-3 rounded-full lg:rounded-xl text-zinc-400 hover:bg-zinc-900 hover:text-white transition cursor-pointer flex items-center justify-center shrink-0">
+            <ImageIcon size={20} className="lg:w-[22px] lg:h-[22px]" />
             <input type="file" hidden accept="image/*" onChange={handleImageUpload} />
           </label>
         </div>
 
         <div className="hidden lg:block h-px w-10 bg-zinc-800 my-2" />
+        <div className="lg:hidden w-px h-6 bg-zinc-800 mx-1 shrink-0" />
 
-        <div className="flex lg:flex-col gap-4">
+        <div className="flex lg:flex-col gap-2 lg:gap-4 items-center shrink-0">
           <button 
             onClick={() => setActiveTool('ai')}
             title="Generative Studio"
-            className={`p-3 rounded-xl transition ${activeTool === 'ai' ? 'bg-purple-600 text-white shadow-lg' : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'}`}
+            className={`p-2.5 lg:p-3 rounded-full lg:rounded-xl transition shrink-0 ${activeTool === 'ai' ? 'bg-purple-600 text-white shadow-lg' : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'}`}
           >
-            <Sparkles size={22} />
-          </button>
-
-          <button 
-            onClick={() => setActiveTool('photopea')}
-            title="Pro Editor (CorelDraw/Photoshop Mode)"
-            className={`p-3 rounded-xl transition ${activeTool === 'photopea' ? 'bg-[#00e5ff] text-zinc-900 shadow-lg' : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'}`}
-          >
-            <PenTool size={22} />
+            <Sparkles size={20} className="lg:w-[22px] lg:h-[22px]" />
           </button>
 
           <button 
             onClick={() => setShowHistory(true)}
             title="Load Design History"
-            className="p-3 rounded-xl text-zinc-400 hover:bg-zinc-900 hover:text-white transition"
+            className="p-2.5 lg:p-3 rounded-full lg:rounded-xl text-zinc-400 hover:bg-zinc-900 hover:text-white transition shrink-0"
           >
-            <History size={22} />
+            <History size={20} className="lg:w-[22px] lg:h-[22px]" />
           </button>
         </div>
       </div>
 
       {/* CORE WORKSPACE PANEL */}
-      <div className="flex-1 flex flex-col min-w-0 bg-zinc-900">
+      <div className="flex-1 flex flex-col min-w-0 bg-zinc-900 h-full relative">
         
         {/* UPPER TOOLBAR STATUS BLOCK */}
         <div className="h-20 bg-zinc-950 border-b border-zinc-850 px-6 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
@@ -628,10 +634,10 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
         {activeTool === 'ai' && (
           <motion.div 
             key="ai-hub"
-            initial={{ width: 0, opacity: 0 }}
-            animate={{ width: 320, opacity: 1 }}
-            exit={{ width: 0, opacity: 0 }}
-            className="w-80 bg-zinc-950 border-l border-zinc-850 p-6 overflow-y-auto shrink-0 flex flex-col gap-6"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="w-full lg:w-80 bg-zinc-950 border-t lg:border-t-0 lg:border-l border-zinc-850 p-6 overflow-y-auto shrink-0 flex flex-col gap-6 pb-24 lg:pb-6"
           >
             <div className="flex items-center justify-between border-b border-zinc-850 pb-4">
               <span className="text-xs font-black uppercase tracking-wider text-[#FF4D00] flex items-center gap-1.5 font-mono">
@@ -708,10 +714,10 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
           /* STANDARD EDITOR CONTROL PANEL (SLIDERS, PALETTE, LAYER MODIFIERS) */
           <motion.div 
             key="standard-editor"
-            initial={{ width: 0, opacity: 0 }}
-            animate={{ width: 320, opacity: 1 }}
-            exit={{ width: 0, opacity: 0 }}
-            className="w-80 bg-zinc-950 border-l border-zinc-850 p-6 overflow-y-auto shrink-0 flex flex-col gap-6"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="w-full lg:w-80 bg-zinc-950 border-t lg:border-t-0 lg:border-l border-zinc-850 p-6 overflow-y-auto shrink-0 flex flex-col gap-6 pb-24 lg:pb-6"
           >
             <div className="flex items-center justify-between border-b border-zinc-850 pb-4">
               <span className="text-xs font-black uppercase tracking-wider text-[#FF4D00] flex items-center gap-1.5 font-mono">

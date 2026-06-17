@@ -115,7 +115,7 @@ export default function CashfreeGateway({
       }
       
       if (!res.ok || !data.success) {
-        throw new Error(data.error || `Failed to initialize Cashfree order session (${res.status})`);
+        throw new Error(data.message || data.error || `Failed to initialize Cashfree order session (${res.status})`);
       }
 
       if (!data.payment_session_id) {
