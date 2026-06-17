@@ -1,0 +1,21 @@
+{
+	"appId": "com.printbazaar.app",
+	"appName": "PrintBazaar AI",
+	"webDir": "dist",
+	"server": {
+		"androidScheme": "https"
+	},
+	"plugins": {
+		"SplashScreen": {
+			"launchShowDuration": 2000,
+			"launchAutoHide": true,
+			"backgroundColor": "#070402",
+			"androidSplashResourceName": "splash",
+			"androidScaleType": "CENTER_CROP"
+		},
+		"StatusBar": {
+			"style": "DARK",
+			"backgroundColor": "#070402"
+		}
+	}
+}

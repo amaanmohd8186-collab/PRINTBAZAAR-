@@ -1,0 +1,18 @@
+<html>
+<head></head>
+<body>
+<script src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
+<script>
+  setTimeout(() => {
+    try {
+      const cf = Cashfree({ mode: "production" });
+      cf.checkout({ paymentSessionId: "session_nlcsf_BGjKQhf15dwkXzrTZUR3sel_vVHuWmax2qnxyl-_qTd0qaEgqhydKvIsHdLqH3Jb8c3PGJQs_cTIxQcp0s41VHeYVrkU2YJBP3pkqEzaeG0JH3v0z1_BiI" })
+        .then(res => console.log("Result:", res))
+        .catch(err => console.log("Error:", err));
+    } catch(e) {
+      console.log("Exception:", e.message);
+    }
+  }, 2000);
+</script>
+</body>
+</html>
