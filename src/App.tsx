@@ -282,6 +282,9 @@ import { AuthModal } from './components/AuthModal';
 export default function App() {
   const { theme, setTheme } = useTheme();
   const [showSplash, setShowSplash] = useState(true);
+  const [isAppReady, setIsAppReady] = useState(false);
+  const [startupLogs, setStartupLogs] = useState<string[]>(['INITIALIZING SECURE ENVIRONMENT...']);
+  
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   // 1. Core State shifted to Firestore only
@@ -296,8 +299,8 @@ export default function App() {
   // 'customer' mode lets you browse and order. 'admin' mode lets you manage pipeline stages.
   const [roleMode, setRoleMode] = useState<'customer' | 'admin'>('customer');
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
-  const [customerActiveTab, setCustomerActiveTab] = useState<'home' | 'explore' | 'aistudio' | 'community' | 'status' | 'profile'>(() =>
-    getLocalStorageData<'home' | 'explore' | 'aistudio' | 'community' | 'status' | 'profile'>('pb_active_tab', 'home')
+  const [customerActiveTab, setCustomerActiveTab] = useState<'home' | 'explore' | 'aistudio' | 'community' | 'status' | 'profile' | 'cart' | 'wishlist' | 'shop'>(() =>
+    getLocalStorageData<'home' | 'explore' | 'aistudio' | 'community' | 'status' | 'profile' | 'cart' | 'wishlist' | 'shop'>('pb_active_tab', 'home')
   );
   const [viewingCreatorId, setViewingCreatorId] = useState<string | null>(null);
   const [viewingPost, setViewingPost] = useState<SocialPost | null>(null);
@@ -411,7 +414,13 @@ export default function App() {
     aiCredits: 10,
     referralEarnings: 0,
     loyaltyPoints: 0,
-    subscriptionTier: 'Free'
+    subscriptionTier: 'Free',
+    followersCount: 0,
+    followingCount: 0,
+    totalDesignsCount: 0,
+    likesReceived: 0,
+    badges: [],
+    achievements: []
   });
 
   // Fetch real-time stats from server (Firestore Realtime)
@@ -439,7 +448,13 @@ export default function App() {
             aiCredits: data.aiCredits || 10,
             referralEarnings: data.referralEarnings || 0,
             loyaltyPoints: data.loyaltyPoints || 0,
-            subscriptionTier: actualRole === 'admin' ? 'Elite' : 'Free'
+            subscriptionTier: actualRole === 'admin' ? 'Elite' : 'Free',
+            followersCount: data.followersCount || 0,
+            followingCount: data.followingCount || 0,
+            totalDesignsCount: data.totalDesignsCount || 0,
+            likesReceived: data.likesReceived || 0,
+            badges: data.badges || [],
+            achievements: data.achievements || []
           });
 
           // Sync session role to ground truth + whitelist
@@ -792,9 +807,14 @@ export default function App() {
   useEffect(() => {
     async function testConnection() {
       try {
+        setStartupLogs(prev => [...prev, 'ESTABLISHING FIREBASE CONNECTION...']);
         console.log("✓ Firebase instance active");
+        setTimeout(() => {
+          setStartupLogs(prev => [...prev, 'CLOUD BACKEND SYNCHRONIZATION COMPLETE.']);
+        }, 300);
       } catch (error) {
         console.warn("Firebase connectivity notice:", error instanceof Error ? error.message : "Client not configured");
+        setStartupLogs(prev => [...prev, 'WARNING: RUNNING IN LOCAL MODE']);
       }
     }
     testConnection();
@@ -870,8 +890,14 @@ export default function App() {
           setRecoveryDaysLeft(remainingDays);
           setShowRecoveryModal(true);
         } else {
-          triggerToast(`Signed in as ${userEmail}`, 'success');
+          // triggerToast(`Signed in as ${userEmail}`, 'success'); // disable noisy toast on boot
         }
+        
+        setStartupLogs(prev => [...prev, 'AUTHENTICATING USER IDENTITY...']);
+        setTimeout(() => {
+          setStartupLogs(prev => [...prev, 'USER IDENTITY VERIFIED.', 'PREPARING PREMIER INTERFACE...']);
+          setIsAppReady(true);
+        }, 800);
       } else {
         setUser(null);
         setSession({
@@ -880,11 +906,29 @@ export default function App() {
           email: 'amaanmohd8186@gmail.com',
           role: 'customer'
         });
+        
+        setStartupLogs(prev => [...prev, 'ESTABLISHING GUEST SESSION...']);
+        setTimeout(() => {
+          setStartupLogs(prev => [...prev, 'PREPARING PREMIER INTERFACE...']);
+          setIsAppReady(true);
+        }, 800);
       }
     });
 
     return () => unsubscribe();
   }, []);
+
+  // Guarantee that app becomes ready even if Auth State Listener hangs due to slow connection
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!isAppReady) {
+        console.warn("Failsafe: Setting isAppReady to true due to slow/missing connection");
+        setStartupLogs(prev => [...prev, 'ESTABLISHING OFFLINE FALLBACK...', 'PREPARING PREMIER INTERFACE...']);
+        setIsAppReady(true);
+      }
+    }, 6000);
+    return () => clearTimeout(timer);
+  }, [isAppReady]);
 
   // Monitor Window Pathnames and Hash Hooks for Public Compliance URLs
   useEffect(() => {
@@ -1250,11 +1294,21 @@ export default function App() {
     <>
       <AnimatePresence mode="wait">
         {showSplash && (
-          <SplashPreview key="splash" onFinish={() => setShowSplash(false)} />
+          <SplashPreview 
+            key="splash" 
+            onFinish={() => setShowSplash(false)} 
+            isAppReady={isAppReady}
+            startupLogs={startupLogs}
+          />
         )}
       </AnimatePresence>
 
-      <div className="min-h-screen bg-zinc-50 flex flex-col font-sans w-full max-w-full overflow-x-hidden">
+      <motion.div 
+        initial={{ scale: 0.96, opacity: 0, filter: 'blur(15px)' }}
+        animate={!showSplash ? { scale: 1, opacity: 1, filter: 'blur(0px)' } : { scale: 0.96, opacity: 0, filter: 'blur(15px)' }}
+        transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }} 
+        className={`min-h-screen ${theme === 'dark' ? 'bg-[#0B1120]' : 'bg-zinc-50'} flex flex-col font-sans w-full max-w-full overflow-x-hidden`}
+      >
       
       {/* 1. SECURE TOP NAVIGATION SLABS */}
       <nav className="bg-white border-b border-zinc-200 sticky top-0 z-30 shadow-xs w-full">
@@ -1263,15 +1317,15 @@ export default function App() {
             
             {/* Logo */}
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-black text-[#FF4D00] flex items-center justify-center font-heavy border border-zinc-800">
-                <Printer className="w-5 h-5" />
-              </div>
-              <div>
+              <motion.div layoutId="app-logo-icon-morph" transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }} className="w-10 h-10 rounded-2xl bg-[#0a0a0a] text-[#FF4D00] flex items-center justify-center font-heavy border border-[#FF4D00]/20 shadow-[0_0_10px_rgba(255,77,0,0.1)] relative overflow-hidden z-50">
+                <Printer className="w-5 h-5 relative z-10 drop-shadow-[0_0_8px_#FF4D00]" />
+              </motion.div>
+              <motion.div layoutId="app-logo-text-morph" transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }} className="hidden sm:block origin-left z-50">
                 <h1 className="text-2xl font-heavy tracking-tight text-[#0F172A] leading-none uppercase">
                   PRINT<span className="text-[#FF4D00]">BAZAAR</span>
                 </h1>
                 <p className="font-micro text-gray-400 mt-1">Premium Press Hub</p>
-              </div>
+              </motion.div>
             </div>
 
             {/* Sandbox Switching elements */}
@@ -1808,7 +1862,7 @@ export default function App() {
 
                 {enterprisePortal === 'seller' && (
                   <div className="w-full">
-                    <SellerVerificationSystem isAdminMode={roleMode === 'admin'} />
+                    <SellerVerificationSystem isAdminMode={(roleMode as string) === 'admin'} />
                   </div>
                 )}
 
@@ -3145,7 +3199,7 @@ export default function App() {
         )}
       </AnimatePresence>
 
-    </div>
+    </motion.div>
     </>
   );
 }

@@ -40,6 +40,7 @@ export type OrderStatus =
 export interface Size {
   name: string;
   priceMultiplier: number;
+  dimensions?: string;
 }
 
 export interface Material {
@@ -65,11 +66,14 @@ export interface Product {
   sizes: Size[];
   materials: Material[];
   quantitySlabs: QuantitySlab[];
+  slabs?: QuantitySlab[]; // Alias for quantitySlabs
   estimatedProductionTime?: string;
   dispatchLeadTime?: string;
   published: boolean;
   sellerId?: string;
   commissionPercent?: number; // Override for specific products
+  isNew?: boolean;
+  isBestseller?: boolean;
 }
 
 export interface DesignFile {
@@ -130,6 +134,7 @@ export interface UserSession {
   name: string;
   email: string;
   role: 'customer' | 'admin' | 'seller';
+  subscriptionTier?: string;
 }
 
 export interface Address {
@@ -162,7 +167,7 @@ export interface UserStatsBase {
   rewardPoints?: number;
   lifetimePoints?: number;
   redeemedPoints?: number;
-  subscriptionTier: 'Free' | 'Starter' | 'Pro' | 'Business' | 'Enterprise' | 'none';
+  subscriptionTier: 'Free' | 'Starter' | 'Pro' | 'Business' | 'Enterprise' | 'Elite' | 'none';
   subscriptionExpiry?: string;
   premiumStatus?: string;
   premiumExpiry?: string | null;
@@ -176,8 +181,11 @@ export interface SavedDesign {
   id: string;
   name: string;
   preview: string;
+  imageUrl?: string;
+  type?: string;
   data: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface Design {
@@ -212,26 +220,33 @@ export interface VerificationAudit {
 // REVENUE ENGINE TYPES
 export interface SellerProfile {
   id: string;
-  storeName: string;
-  ownerName: string;
+  storeName?: string;
+  ownerName?: string;
   name?: string; // Legacy support
   dob?: string; // Legacy support
   email: string;
   mobile: string;
   gstin?: string;
   pan?: string;
-  bankDetails: {
+  bankDetails?: {
     accountNumber: string;
     ifsc: string;
     bankName: string;
     holderName: string;
   };
-  commissionRate: number; // Percentage defined by admin
-  withdrawableBalance: number;
-  pendingBalance: number;
-  totalEarnings: number;
-  status: 'pending' | 'verified' | 'rejected' | 'suspended';
+  commissionRate?: number; // Percentage defined by admin
+  withdrawableBalance?: number;
+  pendingBalance?: number;
+  totalEarnings?: number;
+  status: 'pending' | 'verified' | 'rejected' | 'suspended' | 'Draft' | 'Pending Verification' | 'Verified' | 'Rejected';
   verificationStep?: number;
+  level?: string;
+  aiRiskScore?: number;
+  trustScore?: number;
+  aiFraudFlags?: string[];
+  ocrExtractedName?: string;
+  ocrExtractedDob?: string;
+  auditLogs?: any[];
   documents?: {
     aadhaarFront?: string | null;
     aadhaarBack?: string | null;
@@ -266,6 +281,7 @@ export interface SellerProfile {
 export interface SizeOption {
   name: string;
   priceMultiplier: number;
+  dimensions?: string;
 }
 
 export interface MaterialOption {
@@ -278,6 +294,8 @@ export interface CustomFile {
   size: number;
   type: string;
   data?: string;
+  fileData?: string;
+  variations?: CustomFile[];
 }
 
 export interface WalletTransaction {
@@ -287,6 +305,7 @@ export interface WalletTransaction {
   amount: number;
   purpose: 'order_payment' | 'refund' | 'payout' | 'referral' | 'bonus' | 'credit_purchase';
   status: 'completed' | 'pending' | 'failed';
+  txId?: string;
   timestamp: any;
   metadata?: any;
 }
@@ -338,6 +357,7 @@ export interface PostMedia {
   type: PostContentType;
   url: string;
   previewUrl?: string;
+  thumbnail?: string;
 }
 
 export interface CreatorBadge {

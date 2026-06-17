@@ -219,7 +219,7 @@ export default function BannerManager() {
                 <img 
                   src={activeBanner.imageUrl} 
                   alt={activeBanner.name} 
-                  style={{ referrerPolicy: 'no-referrer' }}
+                  referrerPolicy="no-referrer"
                   className="w-full h-full object-cover rounded-[20px] opacity-85 hover:opacity-100 transition duration-300"
                 />
 
@@ -312,7 +312,7 @@ export default function BannerManager() {
                   <img 
                     src={b.imageUrl} 
                     alt={b.name} 
-                    style={{ referrerPolicy: 'no-referrer' }}
+                    referrerPolicy="no-referrer"
                     className="w-10 h-10 rounded-xl object-cover border border-zinc-200"
                   />
                   <div>

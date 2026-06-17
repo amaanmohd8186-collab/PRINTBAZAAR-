@@ -48,6 +48,7 @@ interface DesignEditorProps {
   userId: string;
   onSave?: (design: Design) => void;
   userStats: UserStats;
+  onClose?: () => void;
 }
 
 const PREMIUM_FONTS = ['Inter', 'Space Grotesk', 'JetBrains Mono', 'Playfair Display', 'Oswald'];
@@ -233,10 +234,10 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
     if (!activeObj) return;
 
     if (action === 'front') {
-      activeObj.bringToFront();
+      fabricCanvas.current?.bringObjectToFront(activeObj);
       showStatus('success', 'Moved object to the topmost front layer.');
     } else if (action === 'back') {
-      activeObj.sendToBack();
+      fabricCanvas.current?.sendObjectToBack(activeObj);
       showStatus('success', 'Moved object to the back layer substrate.');
     } else if (action === 'delete') {
       fabricCanvas.current?.remove(activeObj);
@@ -289,10 +290,10 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
     try {
       let imageData = '';
       if (activeObject && activeObject instanceof fabric.Image) {
-        imageData = activeObject.toDataURL({ format: 'png' });
+        imageData = activeObject.toDataURL({ format: 'png', multiplier: 1 });
       } else if (fabricCanvas.current) {
         // Fallback to sending snapshot of entire canvas
-        imageData = fabricCanvas.current.toDataURL({ format: 'png', quality: 0.8 });
+        imageData = fabricCanvas.current.toDataURL({ format: 'png', quality: 0.8, multiplier: 1 });
       }
 
       console.log(`[AI Studio Dispatch] Tool: ${tool}, Cost: ${toolCost}`);
@@ -408,7 +409,7 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
     if (!fabricCanvas.current) return;
     setIsSaving(true);
     const canvasData = JSON.stringify(fabricCanvas.current.toJSON());
-    const preview = fabricCanvas.current.toDataURL({ format: 'png', quality: 0.5 });
+    const preview = fabricCanvas.current.toDataURL({ format: 'png', quality: 0.5, multiplier: 1 });
 
     try {
       const result = await safeFetch<any>('/api/designs/save', {
@@ -434,7 +435,7 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
   };
 
   const exportAsPDF = () => {
-    const dataUrl = fabricCanvas.current?.toDataURL({ format: 'png' });
+    const dataUrl = fabricCanvas.current?.toDataURL({ format: 'png', multiplier: 1 });
     if (!dataUrl) return;
     const pdf = new jsPDF({
       orientation: 'landscape',

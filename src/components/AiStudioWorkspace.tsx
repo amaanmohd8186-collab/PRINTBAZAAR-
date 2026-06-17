@@ -1994,7 +1994,7 @@ function ToolButton({
       <div
         className={`w-5 h-5 shrink-0 flex items-center justify-center ${active ? "text-indigo-600" : "text-zinc-400"}`}
       >
-        {React.cloneElement(icon as React.ReactElement, {
+        {React.isValidElement(icon) && React.cloneElement(icon as React.ReactElement<any>, {
           className: "w-4 h-4",
         })}
       </div>

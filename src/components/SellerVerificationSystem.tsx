@@ -146,6 +146,7 @@ export default function SellerVerificationSystem({ isAdminMode: propIsAdminMode,
         setEmail(sellerData.email || '');
         setMobile(sellerData.mobile || '');
         setDob(sellerData.dob || '');
+        setBiometricScore(sellerData.trustScore ?? null);
         if (sellerData.documents) {
           setIdType(sellerData.documents.governmentIdType || 'Aadhaar Card');
           setIdNumber(sellerData.documents.governmentIdNumber || '');
@@ -222,7 +223,7 @@ export default function SellerVerificationSystem({ isAdminMode: propIsAdminMode,
     e.preventDefault();
     if (!name || !email || !dob) return alert('Fill all mandatory fields (Name, Email, DOB).');
     
-    const nextProfile: SellerProfile = {
+    const nextProfile: Partial<SellerProfile> = {
       ...(currentSeller || {}),
       id: currentUid,
       name,
@@ -232,7 +233,7 @@ export default function SellerVerificationSystem({ isAdminMode: propIsAdminMode,
       verificationStep: 2,
       status: 'Draft',
       level: 'Candidate',
-    } as SellerProfile;
+    };
 
     setIsSyncing(true);
     try {
@@ -466,19 +467,28 @@ export default function SellerVerificationSystem({ isAdminMode: propIsAdminMode,
       setBiometricScore(match.matchScore);
 
       const flagSelfie = match.matchScore < 75 ? ['Low biometric likeness face match warning issued'] : [];
-      const updated = {
-        ...currentSeller,
+      
+      // CROSS DOCUMENT LOGIC: Check Name consistency between OCR and profile
+      const nameConsistency = (currentSeller.ocrExtractedName || '').toLowerCase() === (currentSeller.name || '').toLowerCase();
+      const crossDocumentFlags = !nameConsistency ? ['Cross-document name mismatch: OCR name doesn\'t match profile registration'] : [];
+
+      const updatedFields = {
         trustScore: match.matchScore,
-        aiFraudFlags: [...(currentSeller.aiFraudFlags || []), ...flagSelfie, ...(match.biometricFlags || [])],
+        aiFraudFlags: [...(currentSeller.aiFraudFlags || []), ...flagSelfie, ...crossDocumentFlags, ...(match.biometricFlags || [])],
         documents: {
-          ...currentSeller.documents,
+          ...(currentSeller.documents || {}),
           liveVerificationVideo: 'LIVE_BIOMETRIC_CHECKED',
           liveVerificationPromptPassed: match.matchScore >= 75
         }
       };
-      setCurrentSeller(updated);
+
+      setCurrentSeller((prev) => prev ? {
+        ...prev,
+        ...updatedFields
+      } : prev);
+      
       await setDoc(doc(db, 'sellers', currentUid), {
-        ...updated,
+        ...updatedFields,
         updatedAt: serverTimestamp()
       }, { merge: true });
       
@@ -1175,6 +1185,22 @@ export default function SellerVerificationSystem({ isAdminMode: propIsAdminMode,
                                 updatedAt: serverTimestamp() 
                               };
                               await setDoc(doc(db, 'sellers', currentUid), updatedProfile, { merge: true });
+                              setCurrentSeller((prev) => prev ? {
+                                ...prev,
+                                name,
+                                dob,
+                                mobile: mobile || '',
+                                verificationStep: 2
+                              } : {
+                                id: currentUid,
+                                name,
+                                dob,
+                                mobile: mobile || '',
+                                email: currentSeller?.email || '',
+                                verificationStep: 2,
+                                status: 'Draft',
+                                level: 'Candidate'
+                              });
                               setStep(2);
                             } catch (e: any) {
                               alert("Sync Error: " + e.message);
@@ -1238,6 +1264,14 @@ export default function SellerVerificationSystem({ isAdminMode: propIsAdminMode,
                            updatedAt: serverTimestamp()
                          };
                          await setDoc(doc(db, 'sellers', currentUid), updated, { merge: true });
+                         setCurrentSeller((prev) => prev ? {
+                           ...prev,
+                           verificationStep: 3,
+                           documents: {
+                             ...(prev.documents || {}),
+                             emailOtpVerified: true
+                           }
+                         } : prev);
                          setStep(3);
                       }}
                       className="py-4 px-10 bg-zinc-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-3 hover:bg-black transition-all hover:translate-x-1"
@@ -1420,6 +1454,10 @@ export default function SellerVerificationSystem({ isAdminMode: propIsAdminMode,
                                updatedAt: serverTimestamp()
                              };
                              await setDoc(doc(db, 'sellers', currentUid), updated, { merge: true });
+                             setCurrentSeller((prev) => prev ? {
+                               ...prev,
+                               verificationStep: 5
+                             } : prev);
                              setStep(5);
                           }}
                           className="py-4 px-10 bg-zinc-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-3 hover:bg-black transition-all hover:translate-x-1"
@@ -1503,6 +1541,10 @@ export default function SellerVerificationSystem({ isAdminMode: propIsAdminMode,
                            updatedAt: serverTimestamp()
                          };
                          await setDoc(doc(db, 'sellers', currentUid), updated, { merge: true });
+                         setCurrentSeller((prev) => prev ? {
+                           ...prev,
+                           verificationStep: 6
+                         } : prev);
                          setStep(6);
                       }}
                       className="py-4 px-10 bg-zinc-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-3 hover:bg-black transition-all hover:translate-x-1 disabled:opacity-40"
@@ -1574,6 +1616,12 @@ export default function SellerVerificationSystem({ isAdminMode: propIsAdminMode,
                            updatedAt: serverTimestamp()
                          };
                          await setDoc(doc(db, 'sellers', currentUid), updated, { merge: true });
+                         setCurrentSeller((prev) => prev ? {
+                           ...prev,
+                           name,
+                           dob,
+                           verificationStep: 7
+                         } : prev);
                          setStep(7);
                       }}
                       className="py-4 px-10 bg-zinc-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-3 hover:bg-black transition-all hover:translate-x-1"
@@ -1649,6 +1697,10 @@ export default function SellerVerificationSystem({ isAdminMode: propIsAdminMode,
                                updatedAt: serverTimestamp()
                              };
                              await setDoc(doc(db, 'sellers', currentUid), updated, { merge: true });
+                             setCurrentSeller((prev) => prev ? {
+                               ...prev,
+                               verificationStep: 8
+                             } : prev);
                              setStep(8);
                           }}
                           className="py-4 px-10 bg-zinc-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-3 hover:bg-black transition-all hover:translate-x-1"
@@ -1665,15 +1717,46 @@ export default function SellerVerificationSystem({ isAdminMode: propIsAdminMode,
               {step === 8 && (
                 <div className="space-y-6" id="wizard-step-8">
                   <div className="bg-zinc-50 border border-zinc-200/80 p-6 rounded-[32px]">
-                    <div className="flex items-center gap-3 mb-6">
-                      <div className="w-10 h-10 rounded-full bg-[#FF4D00]/10 flex items-center justify-center">
-                        <Activity className="w-5 h-5 text-[#FF4D00]" />
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="w-10 h-10 rounded-full bg-[#FF4D00]/10 flex items-center justify-center">
+                          <Activity className="w-5 h-5 text-[#FF4D00]" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-black uppercase tracking-tight text-zinc-900 leading-tight">Step 8: Biometric Liveness Match</h4>
+                          <p className="text-[10px] font-mono text-zinc-400 font-bold uppercase">Multi-vector authenticity check</p>
+                        </div>
                       </div>
-                      <div>
-                        <h4 className="text-sm font-black uppercase tracking-tight text-zinc-900 leading-tight">Step 8: Biometric Liveness Match</h4>
-                        <p className="text-[10px] font-mono text-zinc-400 font-bold uppercase">Cross-document verification</p>
+
+                      <div className="bg-white border border-zinc-200 rounded-3xl p-6 mb-6">
+                         <div className="flex items-center justify-between mb-4">
+                            <h5 className="text-[10px] font-black uppercase text-zinc-400">Cross-Document Validation</h5>
+                            <div className="flex items-center gap-1.5">
+                               <ShieldCheck className="w-3 h-3 text-emerald-500" />
+                               <span className="text-[9px] font-bold text-emerald-600 uppercase">Neural Analysis</span>
+                            </div>
+                         </div>
+                         
+                         <div className="space-y-4">
+                            <div className="flex items-center justify-between py-2 border-b border-zinc-50">
+                               <span className="text-[10px] font-bold text-zinc-500 uppercase">Selfie Likeness</span>
+                               <span className={`text-[10px] font-black uppercase ${biometricScore && biometricScore >= 75 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                  {biometricScore ? `${biometricScore}% Match` : 'Pending'}
+                               </span>
+                            </div>
+                            <div className="flex items-center justify-between py-2 border-b border-zinc-50">
+                               <span className="text-[10px] font-bold text-zinc-500 uppercase">Name Consistency</span>
+                               <span className={`text-[10px] font-black uppercase ${currentSeller?.ocrExtractedName?.toLowerCase() === currentSeller?.name?.toLowerCase() ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                  {currentSeller?.ocrExtractedName?.toLowerCase() === currentSeller?.name?.toLowerCase() ? 'Verified Match' : 'Visual Mismatch'}
+                               </span>
+                            </div>
+                            <div className="flex items-center justify-between py-2">
+                               <span className="text-[10px] font-bold text-zinc-500 uppercase">DOB Alignment</span>
+                               <span className={`text-[10px] font-black uppercase ${currentSeller?.ocrExtractedDob === currentSeller?.dob ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                  {currentSeller?.ocrExtractedDob === currentSeller?.dob ? 'Verified Match' : 'Disparity Flag'}
+                               </span>
+                            </div>
+                         </div>
                       </div>
-                    </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
                        <div className="space-y-2 text-center">
@@ -1718,6 +1801,10 @@ export default function SellerVerificationSystem({ isAdminMode: propIsAdminMode,
                                updatedAt: serverTimestamp()
                              };
                              await setDoc(doc(db, 'sellers', currentUid), updated, { merge: true });
+                             setCurrentSeller((prev) => prev ? {
+                               ...prev,
+                               verificationStep: 9
+                             } : prev);
                              setStep(9);
                           }}
                           className="py-4 px-10 bg-zinc-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-3 hover:bg-black transition-all hover:translate-x-1"
@@ -1813,6 +1900,10 @@ export default function SellerVerificationSystem({ isAdminMode: propIsAdminMode,
                                updatedAt: serverTimestamp()
                              };
                              await setDoc(doc(db, 'sellers', currentUid), updated, { merge: true });
+                             setCurrentSeller((prev) => prev ? {
+                               ...prev,
+                               verificationStep: 10
+                             } : prev);
                              setStep(10);
                           }}
                           className="py-4 px-10 bg-zinc-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-3 hover:bg-black transition-all hover:translate-x-1"
@@ -1883,6 +1974,11 @@ export default function SellerVerificationSystem({ isAdminMode: propIsAdminMode,
                                updatedAt: serverTimestamp()
                              };
                              await setDoc(doc(db, 'sellers', currentUid), updated, { merge: true });
+                             setCurrentSeller((prev) => prev ? {
+                               ...prev,
+                               status: 'Submitted' as any,
+                               verificationStep: 11
+                             } : prev);
                              setStep(11);
                           }}
                           className="py-4 px-10 bg-[#FF4D00] text-white rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-3 hover:bg-black transition-all hover:translate-x-1"

@@ -13,7 +13,7 @@ export default function WhatsAppFloatingButton({ product, cartItems }: WhatsAppF
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const dragRef = useRef<{ startX: number, startY: number, initialX: number, initialY: number }>({ startX: 0, startY: 0, initialX: 0, initialY: 0 });
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   
   useEffect(() => {
     let lastScrollY = window.scrollY;

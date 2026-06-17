@@ -155,7 +155,7 @@ function FilterChip({ active, onClick, icon, label }: { active: boolean, onClick
           : 'bg-zinc-50 text-zinc-400 border-zinc-100 hover:border-zinc-200'
       }`}
     >
-      {React.cloneElement(icon as React.ReactElement, { className: 'w-4 h-4' })}
+      {React.isValidElement(icon) && React.cloneElement(icon as React.ReactElement<any>, { className: 'w-4 h-4' })}
       <span className="text-[10px] font-black uppercase tracking-widest">{label}</span>
     </button>
   );
