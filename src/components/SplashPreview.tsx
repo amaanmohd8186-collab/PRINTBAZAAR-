@@ -1,5 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { 
+  Sparkles, 
+  Layers, 
+  CreditCard,
+  Image as ImageIcon,
+  Box,
+  Ticket,
+  Mail
+} from 'lucide-react';
 
 interface SplashPreviewProps {
   onFinish: () => void;
@@ -7,243 +16,301 @@ interface SplashPreviewProps {
 }
 
 export default function SplashPreview({ onFinish }: SplashPreviewProps) {
-  const [particles, setParticles] = useState<{ id: number; x: number; y: number; size: number; color: string; delay: number; duration: number }[]>([]);
+  const [phase, setPhase] = useState<number>(0);
+  const [transformIndex, setTransformIndex] = useState(0);
+
+  const transformationSequence = [
+    { text: 'WEDDING CARDS', icon: Mail },
+    { text: 'BUSINESS CARDS', icon: CreditCard },
+    { text: 'POSTERS', icon: ImageIcon },
+    { text: 'PACKAGING BOXES', icon: Box },
+    { text: 'BANNERS', icon: Ticket },
+    { text: 'PRINTBAZAAR', icon: Layers }, // Final back to logo
+  ];
 
   useEffect(() => {
-    // Generate subtle, premium, high-fidelity floating CMYK print dots & paper sheet particles
-    const colors = [
-      '#FF6A00', // PrintBazaar Brand Orange
-      '#00E5FF', // Cyan
-      '#FF007F', // Magenta
-      '#FFD600', // Yellow
-      '#1A1A1A', // Dark Charcoal
-    ];
+    // Cinematic Timeline
+    // 0ms - 800ms: Phase 0 - Energy Beam & Portal Opening
+    // 800ms - 1800ms: Phase 1 - 3D Logo Emerges & Neural Network
+    // 1800ms - 3200ms: Phase 2 - Transformation Sequence
+    // 3200ms - 4200ms: Phase 3 - Final Zoom & "Powered by AI"
+    // 4200ms+: Phase 4 - Smooth Egress to App
+    
+    let isMounted = true;
 
-    const generated = Array.from({ length: 18 }).map((_, i) => ({
-      id: i,
-      x: 10 + Math.random() * 80, // keep within safe bounds
-      y: 20 + Math.random() * 60,
-      size: Math.random() * 5 + 3,
-      color: colors[i % colors.length],
-      delay: 1.0 + Math.random() * 0.5,
-      duration: 1.5 + Math.random() * 1.5,
-    }));
-    setParticles(generated);
+    setTimeout(() => { if(isMounted) setPhase(1) }, 800);
+    
+    // Start rapid transformations
+    setTimeout(() => { 
+      if(!isMounted) return;
+      setPhase(2);
+      
+      // Cycle through transformations rapidly
+      let step = 0;
+      const interval = setInterval(() => {
+        step++;
+        if(step >= transformationSequence.length) {
+          clearInterval(interval);
+          if (isMounted) setPhase(3);
+        } else {
+          if (isMounted) setTransformIndex(step);
+        }
+      }, 250); // 250ms per transform
+    }, 1800);
 
-    // Precise timed trigger matching the specified Android animation timeline
-    // 0ms - 500ms: Background & glow appear
-    // 500ms - 1200ms: Logo scales 80% to 100% and fades in
-    // 1200ms - 1800ms: Thin progress line animates, particles appear
-    // 1800ms - 2200ms: Brand tagline fades in
-    // 2200ms - 2500ms: Logo gently lifts, segue transitions seamlessly
-    const fallbackTimer = setTimeout(() => {
-      onFinish();
-    }, 2600); // 2.5s with a tiny 100ms grace period for ultimate smooth egress
+    setTimeout(() => {
+      if (isMounted) onFinish();
+    }, 4500);
 
-    return () => clearTimeout(fallbackTimer);
+    return () => { isMounted = false; };
   }, [onFinish]);
+
+  // Generate 3D Space Particles
+  const particles = Array.from({ length: 40 }).map((_, i) => ({
+    id: i,
+    x: Math.random() * 100,
+    y: Math.random() * 100,
+    z: Math.random() * 500 - 250,
+    size: Math.random() * 3 + 1,
+    color: Math.random() > 0.5 ? '#FF6A00' : '#FFD700',
+    delay: Math.random() * 2,
+    duration: 2 + Math.random() * 3
+  }));
+
+  // Generate Neural Network Nodes
+  const nodes = Array.from({ length: 15 }).map((_, i) => ({
+    id: i,
+    x: 20 + Math.random() * 60,
+    y: 20 + Math.random() * 60,
+  }));
+
+  const CurrentIcon = transformationSequence[transformIndex].icon;
 
   return (
     <motion.div 
-      className="fixed inset-0 bg-[#FFFFFF] z-[9999] flex flex-col items-center justify-between py-12 px-6 overflow-hidden select-none"
+      className="fixed inset-0 z-[9999] bg-[#050505] flex flex-col items-center justify-center overflow-hidden select-none"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ 
         opacity: 0, 
-        y: -30,
-        scale: 0.98,
-        transition: { duration: 0.45, ease: [0.16, 1, 0.3, 1] } 
+        scale: 1.1, // cinematic forward push out
+        transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] } 
       }}
+      style={{ perspective: '1000px' }}
     >
-      {/* Soft, premium radial brand orange glow in center (0 - 500ms fade-in) */}
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.6, ease: "easeOut" }}
-        className="absolute inset-0 pointer-events-none flex items-center justify-center"
-        style={{
-          background: 'radial-gradient(circle, rgba(255, 106, 0, 0.04) 0%, rgba(255, 255, 255, 0) 65%)'
-        }}
-      />
+      {/* 3D Background Space Particles */}
+      <div className="absolute inset-0 pointer-events-none transform-style-3d">
+        {particles.map((p) => (
+          <motion.div
+            key={p.id}
+            className="absolute rounded-full"
+            style={{
+              left: `${p.x}%`,
+              top: `${p.y}%`,
+              width: `${p.size}px`,
+              height: `${p.size}px`,
+              backgroundColor: p.color,
+              boxShadow: `0 0 ${p.size * 3}px ${p.color}`,
+              z: p.z
+            }}
+            initial={{ opacity: 0, z: p.z - 500 }}
+            animate={{ 
+              opacity: [0, 0.8, 0], 
+              z: p.z + 500
+            }}
+            transition={{
+              duration: p.duration,
+              delay: p.delay,
+              repeat: Infinity,
+              ease: "linear"
+            }}
+          />
+        ))}
+      </div>
 
-      {/* Subtle background paper texture or layout lines for high-end print look */}
-      <div 
-        className="absolute inset-0 pointer-events-none opacity-[0.015]"
-        style={{
-          backgroundImage: `radial-gradient(#1A1A1A 1px, transparent 1px)`,
-          backgroundSize: '24px 24px',
-        }}
-      />
-
-      {/* Spacer to push content to middle */}
-      <div className="flex-1" />
-
-      {/* Central Brand Frame Wrapper */}
-      <div className="relative flex flex-col items-center justify-center text-center">
-        
-        {/* Floating print dot/paper particles (Subtly appearing between 1200ms - 1800ms) */}
-        <div className="absolute inset-0 w-[320px] h-[320px] -translate-x-12 -translate-y-20 pointer-events-none overflow-visible">
-          <AnimatePresence>
-            {particles.map((p) => (
-              <motion.div
-                key={p.id}
-                className="absolute rounded-full"
-                style={{
-                  left: `${p.x}%`,
-                  top: `${p.y}%`,
-                  width: `${p.size}px`,
-                  height: `${p.size}px`,
-                  backgroundColor: p.color,
-                  boxShadow: `0 2px 6px ${p.color}33`,
-                }}
-                initial={{ opacity: 0, scale: 0, y: 15 }}
-                animate={{ 
-                  opacity: [0, 0.6, 0.6, 0], 
-                  scale: [0.5, 1, 1.2, 0.8], 
-                  y: [15, -40],
-                  x: [0, Math.sin(p.id) * 15]
-                }}
-                transition={{
-                  duration: p.duration,
-                  delay: p.delay,
-                  times: [0, 0.2, 0.8, 1],
-                  ease: "easeInOut",
-                  repeat: Infinity,
-                  repeatDelay: 0.5
-                }}
+      {/* Futuristic AI Neural Network (Appears in Phase 1+) */}
+      <AnimatePresence>
+        {phase >= 1 && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 0.3, scale: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 1.5, ease: "easeOut" }}
+            className="absolute inset-0 flex items-center justify-center"
+          >
+            <svg width="100%" height="100%" className="absolute inset-0">
+               {nodes.map((n1, i) => 
+                 nodes.slice(i + 1, i + 4).map((n2, j) => (
+                   <motion.line 
+                     key={`${i}-${j}`}
+                     x1={`${n1.x}%`} y1={`${n1.y}%`}
+                     x2={`${n2.x}%`} y2={`${n2.y}%`}
+                     stroke="url(#aiGradient)" 
+                     strokeWidth="0.5"
+                     initial={{ pathLength: 0, opacity: 0 }}
+                     animate={{ pathLength: 1, opacity: 0.5 }}
+                     transition={{ duration: 2, delay: Math.random(), repeat: Infinity, repeatType: 'reverse' }}
+                   />
+                 ))
+               )}
+               <defs>
+                 <linearGradient id="aiGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                   <stop offset="0%" stopColor="#FF6A00" />
+                   <stop offset="100%" stopColor="#FFD700" />
+                 </linearGradient>
+               </defs>
+            </svg>
+            {nodes.map(n => (
+              <motion.div 
+                key={`node-${n.id}`}
+                className="absolute w-1.5 h-1.5 bg-[#FFD700] rounded-full shadow-[0_0_10px_#FFD700]"
+                style={{ left: `${n.x}%`, top: `${n.y}%`, transform: 'translate(-50%, -50%)' }}
+                initial={{ scale: 0 }}
+                animate={{ scale: [0, 1.5, 1] }}
+                transition={{ duration: 1, delay: Math.random() * 1 }}
               />
             ))}
-          </AnimatePresence>
-        </div>
-
-        {/* Brand Logo & Text Group */}
-        <motion.div
-          className="relative flex flex-col items-center justify-center"
-          // Timeline 2200-2500ms: Logo gently lifts upward
-          animate={{
-            y: [0, 0, -22],
-            transition: {
-              times: [0, 0.88, 1],
-              duration: 2.5,
-              ease: [0.25, 1, 0.5, 1]
-            }
-          }}
-        >
-          {/* Vector Insignia (CMYK precision register mark with customized PB ligature) */}
-          <motion.div
-            // Timeline 500-1200ms: Scales from 80% to 100% with ease-out, slight fade in
-            initial={{ scale: 0.78, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{
-              delay: 0.45,
-              duration: 0.75,
-              ease: [0.16, 1, 0.3, 1] // premium bezier curve
-            }}
-            className="relative w-24 h-24 mb-6 flex items-center justify-center"
-          >
-            {/* outer offset mechanical press calibration crosshair graphic */}
-            <motion.div 
-              className="absolute inset-0 border border-dashed border-[#FF6A00]/25 rounded-full"
-              animate={{ rotate: 360 }}
-              transition={{ duration: 35, repeat: Infinity, ease: "linear" }}
-            />
-            
-            {/* Outer brand circle shadow frame */}
-            <div className="absolute inset-2 bg-gradient-to-[#1A1A1A] from-[#2d2d2d] to-[#121212] rounded-3xl shadow-[0_16px_36px_rgba(26,26,26,0.18)]" />
-
-            {/* Glowing neon orange target dots inside */}
-            <div className="absolute top-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-[#FF6A00]" />
-            <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-[#00E5FF]" />
-            <div className="absolute left-1 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-[#FF007F]" />
-            <div className="absolute right-1 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-[#FFD600]" />
-
-            {/* Elegant vector paper stack with embedded printer head cutouts */}
-            <svg 
-              className="relative w-11 h-11 text-white filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)]" 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="2.5" 
-              strokeLinecap="round" 
-              strokeLinejoin="round"
-            >
-              {/* Layer 1 back paper sheet */}
-              <path d="M4 18H18" stroke="#FF6A00" strokeWidth="1.5" />
-              {/* Layer 2 primary offset machine bed */}
-              <polyline points="6 9 6 2 18 2 18 9" />
-              <path d="M6 18H18c1.1 0 2-.9 2-2v-5c0-1.1-.9-2-2-2H6c-1.1 0-2 .9-2 2v5c0 1.1.9 2 2 2z" />
-              {/* Live paper output strip */}
-              <rect x="9" y="14" width="6" height="4" fill="#FF6A00" stroke="#FF6A00" strokeWidth="1.2" />
-            </svg>
           </motion.div>
+        )}
+      </AnimatePresence>
 
-          {/* PRINTBAZAAR Typography */}
-          <motion.h1
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.65, duration: 0.6, ease: "easeOut" }}
-            className="text-3xl font-black tracking-[0.14em] text-[#1A1A1A] font-sans uppercase flex items-center justify-center gap-0.5"
-          >
-            PRINT<span className="text-[#FF6A00]">BAZAAR</span>
-          </motion.h1>
-
-          {/* Expert brand subtitle ("Powered by AI Printing Technology") */}
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 0.65 }}
-            transition={{ delay: 0.85, duration: 0.6 }}
-            className="text-[10px] text-[#1A1A1A] font-mono uppercase tracking-[0.2em] font-extrabold mt-2.5"
-          >
-            Powered by AI Printing Technology
-          </motion.p>
-
-          {/* Live Tagline (Fading in between 1800ms - 2200ms) */}
-          <div className="h-6 mt-6 overflow-hidden">
-            <AnimatePresence>
-              <motion.p
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ 
-                  delay: 1.75, // perfectly matches the 1800ms mark
-                  duration: 0.55, 
-                  ease: [0.16, 1, 0.3, 1] 
-                }}
-                className="text-xs font-bold font-sans text-zinc-500 tracking-[0.28em] uppercase whitespace-nowrap bg-zinc-50 border border-zinc-100 rounded-full px-5 py-1.5 shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
-              >
-                Print • Design • Deliver
-              </motion.p>
-            </AnimatePresence>
-          </div>
-
-        </motion.div>
-      </div>
-
-      {/* Lower loading progress experience */}
-      <div className="w-full max-w-[220px] flex flex-col items-center gap-3">
-        {/* Progress Line Track (Animates from left-to-right between 1200ms - 1800ms) */}
-        <div className="relative w-full h-[3px] bg-zinc-100 rounded-full overflow-hidden shadow-[inset_0_1px_1px_rgba(0,0,0,0.05)]">
+      {/* Phase 0: Energy Beam / Portal Opening */}
+      <AnimatePresence>
+        {phase === 0 && (
           <motion.div
-            initial={{ left: "-100%", width: "100%" }}
-            animate={{ left: "100%" }}
-            transition={{ 
-              delay: 1.15, // triggered exactly around 1200ms
-              duration: 1.1, // sweeps smoothly ending near 2200ms
-              ease: "easeInOut" 
+            className="absolute w-1 h-0 bg-[#FF6A00] shadow-[0_0_40px_20px_#FF6A00] rounded-full"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ 
+              height: '100vh', 
+              opacity: [0, 1, 1],
+              scaleX: [1, 1, 150] 
             }}
-            className="absolute top-0 bottom-0 bg-[#FF6A00] rounded-full shadow-[0_0_8px_rgba(255,106,0,0.5)]"
+            transition={{
+              duration: 0.8,
+              times: [0, 0.4, 1],
+              ease: "circIn"
+            }}
           />
-        </div>
-        
-        {/* Subtle, reassuring status caption */}
-        <motion.span
-          initial={{ opacity: 0 }}
-          animate={{ opacity: [0.35, 0.65, 0.35] }}
-          transition={{ duration: 1.8, repeat: Infinity, ease: "linear" }}
-          className="text-[9px] text-zinc-450 font-mono tracking-widest font-bold uppercase"
-        >
-          Initializing Digital Press...
-        </motion.span>
-      </div>
+        )}
+      </AnimatePresence>
+
+      {/* Main Container - Depth & Transformations */}
+      <AnimatePresence>
+        {phase >= 1 && (
+          <motion.div
+            className="relative z-20 flex flex-col items-center justify-center"
+            initial={{ scale: 0, rotateX: 60, z: -1000, opacity: 0 }}
+            animate={{ 
+              scale: phase === 3 ? 1.2 : 1, 
+              rotateX: 0, 
+              z: phase === 3 ? 200 : 0,
+              opacity: 1 
+            }}
+            transition={{ 
+              type: 'spring', 
+              stiffness: phase === 3 ? 50 : 80, 
+              damping: 20 
+            }}
+            style={{ transformStyle: 'preserve-3d' }}
+          >
+            {/* AI Energy Ring Rotating Background */}
+            <motion.div
+              className="absolute w-64 h-64 border-2 border-dashed border-[#FFD700]/30 rounded-full shadow-[0_0_60px_#FF6A00_inset]"
+              animate={{ rotateZ: 360, scale: [1, 1.1, 1] }}
+              transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+            />
+            <motion.div
+              className="absolute w-80 h-80 border border-[#FF6A00]/20 rounded-full"
+              animate={{ rotateZ: -360, scale: [1.1, 1, 1.1] }}
+              transition={{ duration: 6, repeat: Infinity, ease: "linear" }}
+            />
+
+            {/* Central Holographic Object */}
+            <motion.div
+              key={transformIndex}
+              initial={{ scale: 0.5, rotateY: -90, opacity: 0, filter: 'blur(10px)' }}
+              animate={{ scale: 1, rotateY: 0, opacity: 1, filter: 'blur(0px)' }}
+              exit={{ scale: 1.5, rotateY: 90, opacity: 0, filter: 'blur(10px)', position: 'absolute' }}
+              transition={{ duration: 0.25, type: 'spring', stiffness: 300, damping: 20 }}
+              className="relative w-40 h-40 flex items-center justify-center mb-8"
+              style={{ transformStyle: 'preserve-3d' }}
+            >
+              {phase === 2 ? (
+                // Floating Transformation Card
+                <div className="w-full h-full bg-white/5 backdrop-blur-xl border border-white/20 rounded-2xl flex items-center justify-center shadow-[0_0_40px_rgba(255,106,0,0.3)] relative overflow-hidden group">
+                  <div className="absolute inset-0 bg-gradient-to-tr from-[#FF6A00]/20 to-[#FFD700]/20 opacity-50" />
+                  <div className="absolute inset-0 bg-black/40 z-0" />
+                  <CurrentIcon className="w-16 h-16 text-[#FFD700] drop-shadow-[0_0_15px_#FFD700] z-10" />
+                </div>
+              ) : (
+                // 3D Chrome Metal Logo
+                <div className="relative flex items-center justify-center transform-style-3d group">
+                  {/* Neon Glow Behind */}
+                  <div className="absolute w-32 h-32 bg-[#FF6A00] rounded-full blur-[60px] opacity-80 animate-pulse" />
+                  
+                  {/* Layered Glass/Chrome Base */}
+                  <div className="w-32 h-32 bg-gradient-to-b from-white/20 to-black/80 backdrop-blur-3xl rounded-[32px] border border-white/30 shadow-[0_20px_50px_rgba(0,0,0,0.8),inset_0_2px_20px_rgba(255,255,255,0.5)] flex items-center justify-center relative overflow-hidden">
+                    <div className="absolute inset-0 opacity-40 bg-[url('https://transparenttextures.com/patterns/brushed-alum.png')]" />
+                    <Layers className="relative w-14 h-14 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] filter transition-all" />
+                    
+                    {/* Metal Sheen Sweep */}
+                    <motion.div 
+                      className="absolute inset-0 w-[200%] h-full bg-gradient-to-r from-transparent via-white/40 to-transparent -skew-x-45"
+                      initial={{ left: '-200%' }}
+                      animate={{ left: '100%' }}
+                      transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+                    />
+                  </div>
+                </div>
+              )}
+            </motion.div>
+
+            {/* Cinematic Typography */}
+            <div className="text-center relative">
+               <motion.div
+                 className="absolute inset-0 bg-[#FF6A00] blur-xl opacity-30 w-full h-full scale-150"
+                 animate={{ opacity: [0.2, 0.5, 0.2] }}
+                 transition={{ duration: 2, repeat: Infinity }}
+               />
+               <h1 className="relative text-4xl md:text-5xl font-black tracking-[0.2em] uppercase text-transparent bg-clip-text bg-gradient-to-b from-white via-zinc-200 to-zinc-500 drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)] mb-2" style={{ WebkitTextStroke: '1px rgba(255,255,255,0.1)'}}>
+                  PRINT<span className="text-transparent bg-clip-text bg-gradient-to-b from-[#FFD700] to-[#FF6A00]">BAZAAR</span>
+               </h1>
+               
+               {/* Word transformation below the logo */}
+               <div className="h-6 overflow-hidden relative flex justify-center mt-2">
+                 <AnimatePresence mode="wait">
+                   <motion.p
+                     key={transformationSequence[transformIndex].text}
+                     initial={{ y: 20, opacity: 0, filter: 'blur(4px)' }}
+                     animate={{ y: 0, opacity: 1, filter: 'blur(0px)' }}
+                     exit={{ y: -20, opacity: 0, filter: 'blur(4px)' }}
+                     transition={{ duration: 0.2 }}
+                     className="absolute text-[10px] md:text-xs font-mono font-bold tracking-[0.4em] text-[#FFD700] uppercase shadow-[#FF6A00]"
+                   >
+                     {phase === 2 ? transformationSequence[transformIndex].text : 'THE FUTURE OF PRINTING'}
+                   </motion.p>
+                 </AnimatePresence>
+               </div>
+            </div>
+
+            {/* "POWERED BY AI" final reveal */}
+            <AnimatePresence>
+              {phase >= 3 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 30, scale: 0.8 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ duration: 0.8, ease: "easeOut" }}
+                  className="mt-12 flex items-center justify-center gap-3 bg-white/5 backdrop-blur-md px-6 py-3 rounded-full border border-white/10 shadow-[0_0_30px_rgba(255,106,0,0.15)]"
+                >
+                   <Sparkles className="w-4 h-4 text-[#FFD700] animate-pulse" />
+                   <span className="text-xs font-black uppercase tracking-[0.3em] text-white">Powered By AI</span>
+                   <Sparkles className="w-4 h-4 text-[#FFD700] animate-pulse" />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

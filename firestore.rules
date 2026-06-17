@@ -65,9 +65,10 @@ service cloud.firestore {
       allow update: if isAdmin();
     }
 
-    // 9. Audit Logs (Backend Only - No client access)
+    // 9. Audit Logs (Create only for clients, Admin full access)
     match /audit_logs/{id} {
-      allow read, write: if false;
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
     }
 
     // 10. Wallet Transactions (Owner Read - Admin Write)
@@ -76,7 +77,25 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // 11. Diagnostics & Internal (Admin Only)
+    // 11. Social Posts (Public Read, Signed In Write)
+    match /posts/{postId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // 12. Follows (Public Read, Signed In Write)
+    match /follows/{followId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // 13. Challenges (Public Read, Signed In Write)
+    match /challenges/{challengeId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // 14. Diagnostics & Internal (Admin Only)
     match /_diagnostics/{id} {
       allow read, write: if isAdmin();
     }

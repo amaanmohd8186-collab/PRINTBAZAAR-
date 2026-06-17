@@ -106,3 +106,19 @@ html.dark .bg-\[\#0F172A\] {
   }
 }
 
+.no-scrollbar::-webkit-scrollbar,
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar,
+.hide-scrollbar {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+
+/* 3D Utilities for Splash Screen */
+.transform-style-3d {
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
+}

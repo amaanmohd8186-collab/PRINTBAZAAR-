@@ -41,6 +41,7 @@ interface CartViewProps {
   onRemoveItem: (id: string) => void;
   onCheckoutSuccess: (placedOrder: Order) => void;
   onClearCart: () => void;
+  onBulkAddItems?: (items: CartItem[]) => void;
 }
 
 export default function CartView({
@@ -49,7 +50,8 @@ export default function CartView({
   customerEmail,
   onRemoveItem,
   onCheckoutSuccess,
-  onClearCart
+  onClearCart,
+  onBulkAddItems
 }: CartViewProps) {
   const [showPayment, setShowPayment] = useState(false);
   const [notes, setNotes] = useState('');
@@ -364,6 +366,36 @@ export default function CartView({
                         </div>
                       );
                     })()}
+
+                    {/* Bulk File Upload */}
+                    <div className="mt-3 text-left">
+                      <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-200 hover:border-zinc-300 bg-zinc-50 hover:bg-zinc-100 transition-colors">
+                        <FileCode className="w-3.5 h-3.5 text-zinc-500" />
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-600">Add Bulk Files for this Config</span>
+                        <input
+                          type="file"
+                          multiple
+                          className="hidden"
+                          onChange={(e) => {
+                            if (!e.target.files?.length || !onBulkAddItems) return;
+                            const newItems: CartItem[] = [];
+                            Array.from(e.target.files).forEach((file: File) => {
+                              newItems.push({
+                                ...item,
+                                id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                                designFile: {
+                                  name: file.name,
+                                  size: file.size,
+                                  type: file.type,
+                                }
+                              });
+                            });
+                            onBulkAddItems(newItems);
+                            e.target.value = '';
+                          }}
+                        />
+                      </label>
+                    </div>
                   </div>
 
                   {/* Remove button */}

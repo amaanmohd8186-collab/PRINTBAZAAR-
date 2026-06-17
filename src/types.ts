@@ -146,7 +146,7 @@ export interface Address {
   isDefault: boolean;
 }
 
-export interface UserStats {
+export interface UserStatsBase {
   totalSpent: number;
   ordersCount: number;
   wishlistCount: number;
@@ -329,4 +329,137 @@ export interface DesignTemplate {
   canvasData: string;
   salesCount: number;
   rating: number;
+}
+
+// SOCIAL COMMERCE TYPES
+export type PostContentType = 'image' | 'video' | 'design_preview';
+
+export interface PostMedia {
+  type: PostContentType;
+  url: string;
+  previewUrl?: string;
+}
+
+export interface CreatorBadge {
+  id: string;
+  label: string;
+  icon: string; // lucide icon name
+  color: string;
+  description: string;
+}
+
+export interface SocialPost {
+  id: string;
+  creatorId: string;
+  creatorName: string;
+  creatorAvatar?: string;
+  creatorBadges: string[]; // Badge IDs
+  caption: string;
+  media: PostMedia[];
+  tags: string[];
+  productCategory?: ProductCategory;
+  linkedProductId?: string;
+  linkedDesignId?: string;
+  likesCount: number;
+  commentCount: number;
+  shareCount: number;
+  saveCount: number;
+  isAiGenerated: boolean;
+  isVerified: boolean;
+  createdAt: any;
+  updatedAt: any;
+}
+
+export interface SocialComment {
+  id: string;
+  postId: string;
+  userId: string;
+  userName: string;
+  userAvatar?: string;
+  content: string;
+  replies?: SocialComment[];
+  likesCount: number;
+  isPinned: boolean;
+  createdAt: any;
+}
+
+export interface CreatorFollow {
+  id: string;
+  followerId: string;
+  followingId: string;
+  createdAt: any;
+}
+
+export interface DesignCollection {
+  id: string;
+  userId: string;
+  name: string;
+  isPublic: boolean;
+  itemIds: string[]; // Design IDs or Post IDs
+  coverImage?: string;
+  createdAt: any;
+}
+
+export interface DesignChallenge {
+  id: string;
+  title: string;
+  description: string;
+  theme: string;
+  prizePool: string;
+  startDate: any;
+  endDate: any;
+  status: 'upcoming' | 'active' | 'judging' | 'completed';
+  participantsCount: number;
+  winnerIds?: string[];
+  bannerImage: string;
+}
+
+export interface SocialNotification {
+  id: string;
+  recipientId: string;
+  type: 'like' | 'comment' | 'follow' | 'mention' | 'challenge' | 'product_launch';
+  actorId: string;
+  actorName: string;
+  actorAvatar?: string;
+  targetId?: string; // Post ID or Design ID
+  content: string;
+  isRead: boolean;
+  createdAt: any;
+}
+
+export interface DirectMessage {
+  id: string;
+  senderId: string;
+  receiverId: string;
+  content: string;
+  type: 'text' | 'image' | 'file';
+  fileUrl?: string;
+  status: 'sent' | 'delivered' | 'read';
+  createdAt: any;
+}
+
+export interface UserStats extends UserStatsBase {
+  // Social extensions
+  bio?: string;
+  userName?: string;
+  coverBanner?: string;
+  followersCount: number;
+  followingCount: number;
+  totalDesignsCount: number;
+  likesReceived: number;
+  badges: string[];
+  achievements: Achievement[];
+  socialLinks?: {
+    instagram?: string;
+    behanace?: string;
+    dribbble?: string;
+  };
+}
+
+export interface Achievement {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  unlockedAt: any;
 }

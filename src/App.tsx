@@ -33,7 +33,18 @@ import {
   Trash2
 } from 'lucide-react';
 import { SmartShareSystem } from './components/SmartShareSystem';
-import { Product, ProductCategory, Order, CartItem, OrderStatus, PaymentDetails, UserSession, UserStats, Address } from './types';
+import { 
+  Product, 
+  ProductCategory, 
+  Order, 
+  CartItem, 
+  OrderStatus, 
+  PaymentDetails, 
+  UserSession, 
+  UserStats, 
+  Address,
+  SocialPost
+} from './types';
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
 import { useTheme } from 'next-themes';
@@ -43,6 +54,7 @@ import {
   CATEGORY_DEFAULT_IMAGES,
   INITIAL_PRODUCTS, 
   INITIAL_ORDERS, 
+  INITIAL_SOCIAL_POSTS,
   getLocalStorageData, 
   setLocalStorageData 
 } from './data';
@@ -98,6 +110,10 @@ import TermsOfService from './components/TermsOfService';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import { PrivacySecurity } from './components/PrivacySecurity';
 import PushNotificationManager from './components/PushNotificationManager';
+import CommunityFeed from './components/CommunityFeed';
+import CreatorProfileView from './components/CreatorProfileView';
+import TrendingExplorer from './components/TrendingExplorer';
+import DesignShowcaseModal from './components/DesignShowcaseModal';
 import { AnimatePresence, motion } from 'motion/react';
 
 // Helper to recursively remove undefined fields so Firestore doesn't reject writes
@@ -280,9 +296,11 @@ export default function App() {
   // 'customer' mode lets you browse and order. 'admin' mode lets you manage pipeline stages.
   const [roleMode, setRoleMode] = useState<'customer' | 'admin'>('customer');
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
-  const [customerActiveTab, setCustomerActiveTab] = useState<'shop' | 'cart' | 'status' | 'wishlist' | 'profile' | 'aistudio'>(() =>
-    getLocalStorageData<'shop' | 'cart' | 'status' | 'wishlist' | 'profile'>('pb_active_tab', 'shop')
+  const [customerActiveTab, setCustomerActiveTab] = useState<'home' | 'explore' | 'aistudio' | 'community' | 'status' | 'profile'>(() =>
+    getLocalStorageData<'home' | 'explore' | 'aistudio' | 'community' | 'status' | 'profile'>('pb_active_tab', 'home')
   );
+  const [viewingCreatorId, setViewingCreatorId] = useState<string | null>(null);
+  const [viewingPost, setViewingPost] = useState<SocialPost | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<ProductCategory | 'All'>('All');
   const [catalogSearchQuery, setCatalogSearchQuery] = useState('');
   const [catalogSortOrder, setCatalogSortOrder] = useState<'price-low' | 'price-high' | 'newest'>('newest');
@@ -538,8 +556,18 @@ export default function App() {
         window.history.pushState({ step: 'home_active' }, '');
         return true;
       }
-      if (customerActiveTab !== 'shop') {
-        setCustomerActiveTab('shop');
+      if (viewingCreatorId) {
+        setViewingCreatorId(null);
+        window.history.pushState({ step: 'home_active' }, '');
+        return true;
+      }
+      if (viewingPost) {
+        setViewingPost(null);
+        window.history.pushState({ step: 'home_active' }, '');
+        return true;
+      }
+      if (customerActiveTab !== 'home') {
+        setCustomerActiveTab('home');
         window.history.pushState({ step: 'home_active' }, '');
         return true;
       }
@@ -588,6 +616,27 @@ export default function App() {
 
   // Automatically correct dummy placeholder images to category-specific real images
   useEffect(() => {
+    // Seed social data if collection is empty
+    const seedSocial = async () => {
+      try {
+        const postsSnap = await getDocs(query(collection(db, 'posts'), limit(1)));
+        // Only attempt to seed if signed in as admin (to avoid random users seeding posts)
+        if (postsSnap.empty && user && session.role === 'admin') {
+          for (const post of INITIAL_SOCIAL_POSTS) {
+            await addDoc(collection(db, 'posts'), {
+              ...post,
+              createdAt: serverTimestamp()
+            });
+          }
+        }
+      } catch (e) {
+        console.warn("Failed to seed social posts:", e);
+      }
+    };
+    if (user) {
+      seedSocial();
+    }
+
     setProducts(prevProducts => {
       let changed = false;
       const updated = prevProducts.map(p => {
@@ -1397,15 +1446,72 @@ export default function App() {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setCustomerActiveTab('shop')}
+                onClick={() => setCustomerActiveTab('home')}
                 className={`py-2 px-4.5 rounded-2xl text-xs font-heavy uppercase tracking-wider transition flex items-center gap-1.5 border border-transparent cursor-pointer ${
-                  customerActiveTab === 'shop'
+                  customerActiveTab === 'home'
                     ? 'bg-black text-white shadow-md'
                     : 'text-zinc-500 hover:text-neutral-900 bg-zinc-50 hover:bg-zinc-100 border-zinc-200'
                 }`}
               >
                 <Grid className="w-4 h-4" />
-                <span>Browse Catalog</span>
+                <span>Home</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCustomerActiveTab('explore')}
+                className={`py-2 px-4.5 rounded-2xl text-xs font-heavy uppercase tracking-wider transition flex items-center gap-1.5 border border-transparent cursor-pointer ${
+                  customerActiveTab === 'explore'
+                    ? 'bg-black text-white shadow-md'
+                    : 'text-zinc-500 hover:text-neutral-900 bg-zinc-50 hover:bg-zinc-100 border-zinc-200'
+                }`}
+              >
+                <Search className="w-4 h-4" />
+                <span>Explore</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCustomerActiveTab('community')}
+                className={`py-2 px-4.5 rounded-2xl text-xs font-heavy uppercase tracking-wider transition flex items-center gap-1.5 border border-transparent cursor-pointer ${
+                  customerActiveTab === 'community'
+                    ? 'bg-[#FF4D00] text-white shadow-md'
+                    : 'text-zinc-500 hover:text-neutral-900 bg-zinc-50 hover:bg-zinc-100 border-zinc-200'
+                }`}
+              >
+                <Share2 className="w-4 h-4" />
+                <span>Community</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCustomerActiveTab('aistudio')}
+                className={`py-2 px-4.5 rounded-2xl text-xs font-heavy uppercase tracking-wider transition flex items-center gap-1.5 border border-transparent cursor-pointer ${
+                  customerActiveTab === 'aistudio'
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'text-zinc-500 hover:text-neutral-900 bg-zinc-50 hover:bg-zinc-100 border-zinc-200'
+                }`}
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>AI Editor</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCustomerActiveTab('status')}
+                className={`py-2 px-4.5 rounded-2xl text-xs font-heavy uppercase tracking-wider transition flex items-center gap-1.5 border border-transparent cursor-pointer relative ${
+                  customerActiveTab === 'status'
+                    ? 'bg-black text-white shadow-md'
+                    : 'text-zinc-500 hover:text-neutral-900 bg-zinc-50 hover:bg-zinc-100 border-zinc-200'
+                }`}
+              >
+                <Clock className="w-4 h-4" />
+                <span>Orders</span>
+                {currentCustomerOrders.length > 0 && (
+                  <span className="bg-[#FF4D00] text-black font-mono text-[9px] px-1.5 py-0.5 rounded-full absolute -top-1.5 -right-1 font-black">
+                    {currentCustomerOrders.length}
+                  </span>
+                )}
               </button>
 
               <motion.button
@@ -1733,16 +1839,64 @@ export default function App() {
                        userId={session.id}
                        onSave={(d) => triggerToast('Design saved to cloud.')} 
                        userStats={userStats}
-                       onClose={() => setCustomerActiveTab('shop')}
+                       onClose={() => setCustomerActiveTab('home')}
                      />
                   </div>
                 )}
 
+                {/* SOCIAL COMMUNITY FEED */}
+                {customerActiveTab === 'community' && (
+                  <CommunityFeed 
+                    session={session} 
+                    isAdmin={session.role === 'admin'} 
+                    onCreatorClick={setViewingCreatorId}
+                    onBuyClick={(id) => {
+                      const p = products.find(prod => prod.id === id);
+                      if (p) {
+                        setFocusConfigProduct(p);
+                      }
+                    }}
+                    triggerToast={triggerToast}
+                  />
+                )}
+
+                {/* TRENDING EXPLORE VIEW */}
+                {customerActiveTab === 'explore' && (
+                  <TrendingExplorer 
+                    onPostClick={setViewingPost}
+                    onHashtagClick={(tag) => triggerToast(`Browsing trend: #${tag}`)}
+                    onCategoryClick={(cat) => {
+                      setCustomerActiveTab('home');
+                    }}
+                  />
+                )}
+
+                {/* CREATOR PROFILE VIEW OVERLAY */}
+                {viewingCreatorId && (
+                  <div className="fixed inset-0 z-[70] bg-white overflow-y-auto">
+                    <CreatorProfileView 
+                      stats={{ ...userStats, userName: viewingCreatorId }} 
+                      session={session}
+                      isOwnProfile={viewingCreatorId === session.id}
+                      onBack={() => setViewingCreatorId(null)}
+                      onFollow={() => triggerToast(`Following ${viewingCreatorId}!`)}
+                      onMessage={() => triggerToast(`Direct Messaging is being initialized...`)}
+                      triggerToast={triggerToast}
+                    />
+                    <button 
+                      onClick={() => setViewingCreatorId(null)}
+                      className="fixed top-6 left-6 z-80 p-3 bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-zinc-100 hover:scale-110 active:scale-90 transition-all"
+                    >
+                      <ArrowLeft className="w-5 h-5 text-zinc-900" />
+                    </button>
+                  </div>
+                )}
+
                 {/* SHOP AND WISHLIST TAB VIEW */}
-                {(customerActiveTab === 'shop' || customerActiveTab === 'wishlist') && (
+                {(customerActiveTab === 'home' || customerActiveTab === 'wishlist') && (
                   <div className="w-full max-w-full px-4 sm:px-6 lg:px-8 py-8 space-y-12">
                 {/* Promo Billboard Accent */}
-                {customerActiveTab === 'shop' && (
+                {customerActiveTab === 'home' && (
                   <div className="relative bg-[#090b11] text-white p-8 md:p-12 rounded-[32px] border-[3px] border-black shadow-[12px_12px_0px_#000] flex flex-col md:flex-row items-center justify-between gap-8 overflow-hidden group">
                     {/* 3D dynamic gradient fluid orbs */}
                     <div className="absolute -top-[120px] -left-[120px] w-[350px] h-[350px] bg-[#FF4D00]/10 rounded-full blur-[140px] pointer-events-none" />
@@ -1802,7 +1956,7 @@ export default function App() {
                 )}
 
                 {/* Categories & Search Filter Block */}
-                {customerActiveTab === 'shop' && (
+                {customerActiveTab === 'home' && (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end bg-white p-6 rounded-[32px] border border-zinc-200/60 shadow-xs">
                     <div className="md:col-span-2 space-y-3">
                       <span className="font-micro text-gray-500 block">Select Media Category</span>
@@ -1898,7 +2052,7 @@ export default function App() {
                 )}
 
                 {/* Quality comparison tool */}
-                {customerActiveTab === 'shop' && <PrintQualitySlider />}
+                {customerActiveTab === 'home' && <PrintQualitySlider />}
 
                 {/* Products Grid */}
                 {customerActiveTab === 'wishlist' && wishlistProducts.length === 0 ? (
@@ -2108,6 +2262,7 @@ export default function App() {
                 onRemoveItem={handleRemoveFromCart}
                 onCheckoutSuccess={handleCheckoutSuccess}
                 onClearCart={() => setCartItems([])}
+                onBulkAddItems={(items) => setCartItems(prev => [...prev, ...items])}
               />
             )}
 
@@ -2391,7 +2546,7 @@ export default function App() {
       </main>
 
       {/* FAQ Guide Footer Section - ONLY ON HOME (SHOP) TAB */}
-      {roleMode === 'customer' && customerActiveTab === 'shop' && activePolicyView === 'none' && enterprisePortal === 'none' && (
+      {roleMode === 'customer' && customerActiveTab === 'home' && activePolicyView === 'none' && enterprisePortal === 'none' && (
         <section className="bg-zinc-100 border-t border-zinc-200 py-12 px-4 sm:px-6 lg:px-8 mt-10 rounded-t-[40px] border w-full">
           <div className="w-full max-w-7xl mx-auto">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
@@ -2731,7 +2886,7 @@ export default function App() {
       )}
 
       {/* 5. METICULOUS FOOTER ACCENTS - ONLY ON HOME (SHOP) TAB */}
-      {roleMode === 'customer' && customerActiveTab === 'shop' && (
+      {roleMode === 'customer' && customerActiveTab === 'home' && (
         <footer className="bg-white border-t border-zinc-200 py-12 shrink-0 w-full">
           <div className="w-full px-4 flex flex-col items-center text-center space-y-8">
           
@@ -2880,48 +3035,49 @@ export default function App() {
           {/* Spacer to allow scrolling past the fixed nav bar on mobile */}
           <div className="h-20 md:hidden" />
           
-          <div className="fixed bottom-0 left-0 right-0 z-40 bg-zinc-950 text-white border-t border-zinc-800/80 px-4 pt-2.5 pb-[calc(10px+env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(0,0,0,0.15)] md:hidden flex justify-around items-center rounded-t-[24px]">
+          <div className="fixed bottom-0 left-0 right-0 z-40 bg-zinc-950 text-white border-t border-zinc-800/80 px-2 pt-2.5 pb-[calc(10px+env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(0,0,0,0.15)] md:hidden flex justify-around items-center rounded-t-[24px]">
             <button
               type="button"
-              onClick={() => setCustomerActiveTab('shop')}
+              onClick={() => setCustomerActiveTab('home')}
               className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition cursor-pointer ${
-                customerActiveTab === 'shop' ? 'text-[#FF4D00]' : 'text-zinc-400 hover:text-white'
+                customerActiveTab === 'home' ? 'text-[#FF4D00]' : 'text-zinc-400 hover:text-white'
               }`}
             >
               <Grid className="w-5 h-5" />
-              <span className="text-[9px] font-bold uppercase tracking-wider">Browse</span>
+              <span className="text-[9px] font-bold uppercase tracking-wider">Home</span>
             </button>
 
             <button
               type="button"
-              onClick={() => setCustomerActiveTab('wishlist')}
+              onClick={() => setCustomerActiveTab('explore')}
               className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition relative cursor-pointer ${
-                customerActiveTab === 'wishlist' ? 'text-[#FF4D00]' : 'text-zinc-400 hover:text-white'
+                customerActiveTab === 'explore' ? 'text-[#FF4D00]' : 'text-zinc-400 hover:text-white'
               }`}
             >
-              <Heart className={`w-5 h-5 ${customerActiveTab === 'wishlist' ? 'fill-[#FF4D00]' : ''}`} />
-              {wishlistProducts.length > 0 && (
-                <span className="absolute top-0 right-2 bg-rose-500 text-white rounded-full text-[8px] font-bold px-1 min-w-[14px] text-center border border-zinc-950">
-                  {wishlistProducts.length}
-                </span>
-              )}
-              <span className="text-[9px] font-bold uppercase tracking-wider">Wishlist</span>
+              <Search className="w-5 h-5" />
+              <span className="text-[9px] font-bold uppercase tracking-wider">Explore</span>
             </button>
 
             <button
               type="button"
-              onClick={() => setCustomerActiveTab('cart')}
-              className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition relative cursor-pointer ${
-                customerActiveTab === 'cart' ? 'text-[#FF4D00]' : 'text-zinc-400 hover:text-white'
+              onClick={() => setCustomerActiveTab('aistudio')}
+              className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition cursor-pointer ${
+                customerActiveTab === 'aistudio' ? 'text-indigo-400' : 'text-zinc-400 hover:text-white'
               }`}
             >
-              <ShoppingBag className="w-5 h-5" />
-              {cartItems.length > 0 && (
-                <span className="absolute top-0 right-1 bg-[#FF4D00] text-black rounded-full text-[8px] font-black px-1 min-w-[14px] text-center border border-zinc-950">
-                  {cartItems.length}
-                </span>
-              )}
-              <span className="text-[9px] font-bold uppercase tracking-wider">Cart</span>
+              <Sparkles className="w-5 h-5" />
+              <span className="text-[9px] font-bold uppercase tracking-wider">AI Studio</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setCustomerActiveTab('community')}
+              className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition relative cursor-pointer ${
+                customerActiveTab === 'community' ? 'text-[#FF4D00]' : 'text-zinc-400 hover:text-white'
+              }`}
+            >
+              <Share2 className="w-5 h-5" />
+              <span className="text-[9px] font-bold uppercase tracking-wider">Community</span>
             </button>
 
             <button
@@ -2950,17 +3106,6 @@ export default function App() {
               <User className="w-5 h-5" />
               <span className="text-[9px] font-bold uppercase tracking-wider">Profile</span>
             </button>
-
-            <button
-              type="button"
-              onClick={() => setCustomerActiveTab('aistudio')}
-              className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition cursor-pointer ${
-                customerActiveTab === 'aistudio' ? 'text-indigo-400' : 'text-zinc-400 hover:text-white'
-              }`}
-            >
-              <Wand2 className="w-5 h-5" />
-              <span className="text-[9px] font-bold uppercase tracking-wider">AI Edit</span>
-            </button>
           </div>
         </>
       )}
@@ -2980,6 +3125,25 @@ export default function App() {
           triggerToast={triggerToast} 
         />
       )}
+
+      {/* Design Showcase Modal / Buying from Post */}
+      <AnimatePresence>
+        {viewingPost && (
+          <DesignShowcaseModal 
+            post={viewingPost}
+            product={products.find(p => p.id === viewingPost.linkedProductId)}
+            onClose={() => setViewingPost(null)}
+            onBuy={(id) => {
+              const p = products.find(prod => prod.id === id);
+              if (p) {
+                setViewingPost(null);
+                setFocusConfigProduct(p);
+              }
+            }}
+            triggerToast={triggerToast}
+          />
+        )}
+      </AnimatePresence>
 
     </div>
     </>

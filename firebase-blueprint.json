@@ -99,6 +99,37 @@
       },
       "required": ["id", "amount", "status"]
     },
+    "SocialPost": {
+      "title": "Social Post",
+      "description": "A social media post in the community feed.",
+      "properties": {
+        "id": { "type": "string" },
+        "creatorId": { "type": "string" },
+        "caption": { "type": "string" },
+        "media": { "type": "array", "items": { "type": "object" } },
+        "likesCount": { "type": "integer" },
+        "commentCount": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Follow": {
+      "title": "Follow",
+      "description": "Social graph connection.",
+      "properties": {
+        "followerId": { "type": "string" },
+        "followingId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Challenge": {
+      "title": "Challenge",
+      "description": "Community design challenge.",
+      "properties": {
+        "title": { "type": "string" },
+        "status": { "type": "string" },
+        "winnerIds": { "type": "array" }
+      }
+    },
     "AuditLog": {
       "title": "Audit Log",
       "description": "System audit logs for tracking actions.",
@@ -136,6 +167,18 @@
     "/audit_logs/{logId}": {
       "schema": "AuditLog",
       "description": "Security and activity audit trails."
+    },
+    "/posts/{postId}": {
+      "schema": "SocialPost",
+      "description": "Community social posts."
+    },
+    "/follows/{followId}": {
+      "schema": "Follow",
+      "description": "User follow relationships."
+    },
+    "/challenges/{challengeId}": {
+      "schema": "Challenge",
+      "description": "Design challenges."
     }
   }
 }

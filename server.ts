@@ -1614,6 +1614,7 @@ Customer's custom requirements or idea prompt: "${prompt}"`;
           break;
 
         case "upscale":
+          model = "gemini-3.1-flash-image";
           systemInstruction = "You are an advanced digital photo scaler and detail synthesizer model.";
           taskPrompt = `Upscale this image to represent high-resolution HD offset printing standards. Denoise and interpolate pixel patterns to enhance sharp structural lines and vivid color rendering. Multiplier factor is ${options?.upscaleFactor || "4x"}. Output ONLY the resulting upscaled high-resolution image.`;
           break;
@@ -1673,9 +1674,15 @@ Customer's custom requirements or idea prompt: "${prompt}"`;
           ]
         } : { parts: [{ text: `${systemInstruction}\n\nTask prompt: ${taskPrompt}` }] };
 
+        const config: any = {};
+        if (tool === 'upscale' && model === 'gemini-3.1-flash-image') {
+          config.imageConfig = { imageSize: "4K" };
+        }
+
         const response = await ai.models.generateContent({
-          model: "gemini-2.5-flash-image",
+          model: model,
           contents,
+          config
         });
 
         if (response && response.candidates?.[0]?.content?.parts) {
