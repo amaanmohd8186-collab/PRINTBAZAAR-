@@ -7,13 +7,9 @@ try {
   validateEnvironment();
   console.log("✅ [VERCEL SERVERLESS] Environment validation successful.");
 } catch (err: any) {
-  console.error("🔥 [VERCEL SERVERLESS] ENVIRONMENT VALIDATION FAILED:");
-  console.error(err.message);
-  // We don't throw here to allow the app to boot, but handlers will fail gracefully
-  // Or actually, the user said "throw an immediate server-side error if any are missing"
-  // However, throwing at module level in Vercel might crash the entire instance.
-  // I will throw to satisfy the "immediate server-side error" requirement.
-  throw err;
+  console.warn("⚠️ [VERCEL SERVERLESS] ENVIRONMENT VALIDATION WARNING:");
+  console.warn(err.message);
+  console.warn("The server will start successfully, but payment endpoints will fail until credentials are set.");
 }
 
 const app = createExpressApp();
