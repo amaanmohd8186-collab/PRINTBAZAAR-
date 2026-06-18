@@ -4,6 +4,38 @@ import { Terminal, Smartphone, Monitor, Compass, X, Shield, Activity, Layers } f
 
 export default function MobileDebugPanel() {
   const [isOpen, setIsOpen] = useState(false);
+  
+  const getBrowserAndWebView = (ua: string) => {
+    let browser = 'Unknown Browser';
+    let isWebView = false;
+    
+    if (/instagram/i.test(ua)) {
+      browser = 'Instagram Browser';
+      isWebView = true;
+    } else if (/fbav/i.test(ua)) {
+      browser = 'Facebook Browser';
+      isWebView = true;
+    } else if (/samsungbrowser/i.test(ua)) {
+      browser = 'Samsung Internet';
+    } else if (/chrome|crios/i.test(ua)) {
+      browser = 'Google Chrome';
+    } else if (/safari/i.test(ua) && !/chrome|crios/i.test(ua)) {
+      browser = 'Apple Safari';
+    } else if (/firefox|fxios/i.test(ua)) {
+      browser = 'Mozilla Firefox';
+    } else if (/opr\/|opera/i.test(ua)) {
+      browser = 'Opera';
+    }
+
+    if (/wv|android.*version\/[0-9.]+/i.test(ua) && !/samsungbrowser/i.test(ua)) {
+      isWebView = true;
+    } else if (/ipad|iphone|ipod/i.test(ua) && !/safari/i.test(ua) && !/chrome/i.test(ua) && !/fxios/i.test(ua)) {
+      isWebView = true;
+    }
+
+    return { browser, isWebView };
+  };
+
   const [metrics, setMetrics] = useState({
     width: typeof window !== 'undefined' ? window.innerWidth : 320,
     height: typeof window !== 'undefined' ? window.innerHeight : 568,
@@ -11,6 +43,8 @@ export default function MobileDebugPanel() {
     deviceType: 'Desktop',
     userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'Unknown',
     touchSupported: typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0),
+    browser: 'Detection Pending',
+    isWebView: false,
   });
 
   const [canvasStatus, setCanvasStatus] = useState('Checking...');
@@ -61,6 +95,7 @@ export default function MobileDebugPanel() {
       if (w < 768) device = 'Mobile';
       else if (w < 1024) device = 'Tablet';
 
+      const parsed = getBrowserAndWebView(navigator.userAgent);
       setMetrics({
         width: w,
         height: h,
@@ -68,6 +103,8 @@ export default function MobileDebugPanel() {
         deviceType: device,
         userAgent: navigator.userAgent,
         touchSupported: 'ontouchstart' in window || navigator.maxTouchPoints > 0,
+        browser: parsed.browser,
+        isWebView: parsed.isWebView,
       });
     };
 
@@ -141,6 +178,30 @@ export default function MobileDebugPanel() {
                   <span className="text-zinc-500 block text-[9px] uppercase tracking-wider">Current Height</span>
                   <span className="text-white font-bold text-xs" id="debug-metric-height">{metrics.height}px</span>
                 </div>
+              </div>
+
+              {/* Device Type */}
+              <div className="flex justify-between items-center bg-zinc-900/50 p-2 rounded-xl border border-zinc-800/30">
+                <span className="text-zinc-500">Device Type:</span>
+                <span className="font-bold text-white uppercase text-xs" id="debug-metric-device">
+                  {metrics.deviceType}
+                </span>
+              </div>
+
+              {/* Parser Browser */}
+              <div className="flex justify-between items-center bg-zinc-900/50 p-2 rounded-xl border border-zinc-800/30">
+                <span className="text-zinc-500">Browser:</span>
+                <span className="font-bold text-indigo-400 text-xs" id="debug-metric-browser">
+                  {metrics.browser}
+                </span>
+              </div>
+
+              {/* WebView status */}
+              <div className="flex justify-between items-center bg-zinc-900/50 p-2 rounded-xl border border-zinc-800/30">
+                <span className="text-zinc-500">WebView Status:</span>
+                <span className={`font-bold text-xs ${metrics.isWebView ? 'text-amber-400' : 'text-zinc-400'}`} id="debug-metric-webview">
+                  {metrics.isWebView ? 'YES (In-App WebView)' : 'NO (Native Browser)'}
+                </span>
               </div>
 
               {/* Touch Capability */}

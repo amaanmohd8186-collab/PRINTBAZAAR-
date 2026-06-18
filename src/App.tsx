@@ -93,6 +93,7 @@ import PrintQualitySlider from './components/PrintQualitySlider';
 import SplashPreview from './components/SplashPreview';
 import MobileDebugPanel from './components/MobileDebugPanel';
 import SellerVerificationSystem from './components/SellerVerificationSystem';
+import SellerDashboard from './components/SellerDashboard';
 import { FirebaseDiagnosticsPanel } from './components/FirebaseDiagnostics';
 import BannerManager from './components/BannerManager';
 import BulkQuoteGenerator from './components/BulkQuoteGenerator';
@@ -329,7 +330,13 @@ export default function App() {
   const [focusConfigProduct, setFocusConfigProduct] = useState<Product | null>(null);
   const [showFaqModal, setShowFaqModal] = useState(false);
   const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'warn'; text: string } | null>(null);
-  const [enterprisePortal, setEnterprisePortal] = useState<'none' | 'seller' | 'banners' | 'quotes' | 'franchise' | 'audit'>('none');
+  const [enterprisePortal, setEnterprisePortal] = useState<'none' | 'seller' | 'seller-dashboard' | 'banners' | 'quotes' | 'franchise' | 'audit'>('none');
+  const [dbUserRole, setDbUserRole] = useState<string>('customer');
+  const [dbSellerStatus, setDbSellerStatus] = useState<string>('none');
+  const [dbMerchantStatus, setDbMerchantStatus] = useState<string>('none');
+  const [dbIsVerified, setDbIsVerified] = useState<boolean>(false);
+  const [dbIsSeller, setDbIsSeller] = useState<boolean>(false);
+  const [dbOnboardingCompleted, setDbOnboardingCompleted] = useState<boolean>(false);
   const [profilePortal, setProfilePortal] = useState<'none' | 'wallet' | 'credits' | 'profile_addresses' | 'rewards' | 'saved_designs' | 'premium' | 'editor' | 'history' | 'privacy_security'>('none');
   const [activePolicyView, setActivePolicyView] = useState<'none' | 'terms' | 'privacy' | 'refund' | 'shipping' | 'delete-account' | 'contact'>('none');
   const [showQrModal, setShowQrModal] = useState<boolean>(false);
@@ -442,6 +449,13 @@ export default function App() {
           ].includes(userEmail);
 
           const actualRole = isWhitelisted ? (data.role || 'admin') : (data.role === 'admin' ? 'customer' : (data.role || 'customer'));
+
+          setDbUserRole(data.role || 'customer');
+          setDbSellerStatus(data.sellerStatus || 'none');
+          setDbMerchantStatus(data.merchantStatus || 'none');
+          setDbIsVerified(data.isVerified === true);
+          setDbIsSeller(data.isSeller === true || data.role === 'seller');
+          setDbOnboardingCompleted(data.onboardingCompleted === true);
 
           setUserStats({
             totalSpent: data.totalSpent || 0,
@@ -2027,12 +2041,24 @@ export default function App() {
                   </button>
                 </div>
 
-                {enterprisePortal === 'seller' && (
+                {(enterprisePortal === 'seller' || enterprisePortal === 'seller-dashboard') && (
                   <div className="w-full">
-                    <SellerVerificationSystem 
-                      isAdminMode={(roleMode as string) === 'admin'} 
-                      triggerToast={triggerToast}
-                    />
+                    {(dbIsSeller || dbOnboardingCompleted || enterprisePortal === 'seller-dashboard') ? (
+                      <SellerDashboard
+                        userId={user?.uid || 'cust-current'}
+                        userEmail={session.email}
+                        triggerToast={triggerToast}
+                        onExit={() => setEnterprisePortal('none')}
+                      />
+                    ) : (
+                      <SellerVerificationSystem 
+                        isAdminMode={(roleMode as string) === 'admin'} 
+                        triggerToast={triggerToast}
+                        onVerificationComplete={(profile) => {
+                          setEnterprisePortal('seller-dashboard');
+                        }}
+                      />
+                    )}
                   </div>
                 )}
 
@@ -2596,12 +2622,12 @@ export default function App() {
                   
                   <button
                     type="button"
-                    onClick={() => setEnterprisePortal('seller')}
-                    className="w-full py-3.5 px-4 text-left text-xs font-bold uppercase tracking-wider text-slate-900 bg-zinc-50 hover:bg-zinc-100 flex items-center justify-between rounded-xl transition border border-zinc-200 cursor-pointer"
+                    onClick={() => setEnterprisePortal(dbIsSeller || dbOnboardingCompleted ? 'seller-dashboard' : 'seller')}
+                    className="w-full py-3.5 px-4 text-left text-xs font-bold uppercase tracking-wider text-zinc-950 bg-zinc-50 hover:bg-zinc-100 flex items-center justify-between rounded-xl transition border border-zinc-200 cursor-pointer"
                   >
                     <div className="flex items-center gap-2">
-                      <span className="text-amber-500">🔐</span>
-                      <span>Seller Onboarding & KYC</span>
+                      <span className="text-amber-500">{dbIsSeller || dbOnboardingCompleted ? '💼' : '🔐'}</span>
+                      <span>{dbIsSeller || dbOnboardingCompleted ? 'Seller Studio & Dashboard' : 'Seller Onboarding & KYC'}</span>
                     </div>
                     <ChevronRight className="w-4 h-4 text-zinc-400" />
                   </button>
@@ -3268,7 +3294,7 @@ export default function App() {
     )}
 
       {/* 6. MOBILE FIXED BOTTOM NAVIGATION BAR */}
-      {roleMode === 'customer' && !showSplash && (
+      {roleMode === 'customer' && !showSplash && customerActiveTab !== 'aistudio' && (
         <>
           {/* Spacer to allow scrolling past the fixed nav bar on mobile */}
           <div className="h-20 md:hidden" />
@@ -3300,7 +3326,7 @@ export default function App() {
               type="button"
               onClick={() => setCustomerActiveTab('aistudio')}
               className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition cursor-pointer ${
-                customerActiveTab === 'aistudio' ? 'text-indigo-400' : 'text-zinc-400 hover:text-white'
+                (customerActiveTab as string) === 'aistudio' ? 'text-indigo-400' : 'text-zinc-400 hover:text-white'
               }`}
             >
               <Sparkles className="w-5 h-5" />

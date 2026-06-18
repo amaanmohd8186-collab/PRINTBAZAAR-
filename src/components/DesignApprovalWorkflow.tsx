@@ -345,7 +345,6 @@ export const DesignApprovalWorkflow: React.FC<DesignApprovalWorkflowProps> = ({
               ref={imageContainerRef}
               onClick={handleImageClick}
               onTouchStart={(e) => {
-                e.preventDefault();
                 handleImageClick(e);
               }}
               className={`w-full relative transition ${dbStatus === 'Customer Approval' ? 'cursor-not-allowed' : 'cursor-crosshair'}`}

@@ -46,34 +46,69 @@ export const createOrderHandler = async (req: Request, res: Response) => {
     console.log(`[CASHFREE-SERVERLESS] Handling order creation: ₹${amount} for ${customerEmail}`);
 
     try {
-      // 1. Validation
+      // 1. Validation & Defensive Sanitization
       if (!amount || Number(amount) <= 0) {
         return res.status(400).json({ success: false, error: "INVALID_AMOUNT", message: "Valid amount greater than 0 is required" });
       }
       if (!customerId) return res.status(400).json({ success: false, error: "MISSING_CUSTOMER_ID", message: "Customer ID is required" });
       if (!customerPhone) return res.status(400).json({ success: false, error: "MISSING_PHONE", message: "Customer Phone is required" });
       if (!customerEmail) return res.status(400).json({ success: false, error: "MISSING_EMAIL", message: "Customer Email is required" });
-      
+
+      // Clean & sanitize inputs defensively for Cashfree PG strict requirements
+      let cleanedPhone = String(customerPhone || "").replace(/\D/g, "");
+      if (cleanedPhone.length > 10) {
+        if (cleanedPhone.startsWith("91") && cleanedPhone.length === 12) {
+          cleanedPhone = cleanedPhone.substring(2);
+        } else {
+          cleanedPhone = cleanedPhone.slice(-10);
+        }
+      }
+      if (cleanedPhone.length < 10) {
+        cleanedPhone = cleanedPhone.padEnd(10, '9');
+      }
+
+      let cleanedEmail = String(customerEmail || "").trim();
+      if (!cleanedEmail.includes('@') || cleanedEmail.length < 5) {
+        cleanedEmail = "guest@example.com";
+      }
+
+      let cleanedCustomerId = String(customerId || "cust_guest").trim().replace(/[^a-zA-Z0-9_.-]/g, "_");
+      if (cleanedCustomerId.length < 3) {
+        cleanedCustomerId = "cust_" + Date.now();
+      } else if (cleanedCustomerId.length > 100) {
+        cleanedCustomerId = cleanedCustomerId.slice(0, 100);
+      }
+
+      let cleanedName = String(customerName || "Guest User").trim().replace(/[^a-zA-Z\s.-]/g, "");
+      if (cleanedName.length < 2) {
+        cleanedName = "Guest User";
+      } else if (cleanedName.length > 100) {
+        cleanedName = cleanedName.slice(0, 100);
+      }
+
+      const validAmount = Number(Number(amount).toFixed(2));
+      const finalAmount = validAmount >= 1.00 ? validAmount : 1.00;
+
       // 2. Gateway Init
       const cf = getCashfree();
 
       const orderId = "order_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
       
       const appUrl = process.env.NODE_ENV === 'production' || process.env.CASHFREE_ENVIRONMENT === 'PRODUCTION' 
-        ? 'https://printbazaar.vercel.app' 
-        : (getCleanEnv("APP_URL") || process.env.APP_URL || 'https://printbazaar.vercel.app');
-        
+         ? 'https://printbazaar.vercel.app' 
+         : (getCleanEnv("APP_URL") || process.env.APP_URL || 'https://printbazaar.vercel.app');
+         
       const returnUrl = `${appUrl}/order-status?order_id={order_id}`;
 
       const request = {
-        order_amount: Number(amount),
+        order_amount: finalAmount,
         order_currency: "INR",
         order_id: orderId,
         customer_details: {
-          customer_id: String(customerId),
-          customer_name: String(customerName || "Guest User"),
-          customer_phone: String(customerPhone),
-          customer_email: String(customerEmail)
+          customer_id: cleanedCustomerId,
+          customer_name: cleanedName,
+          customer_phone: cleanedPhone,
+          customer_email: cleanedEmail
         },
         order_meta: {
           return_url: returnUrl

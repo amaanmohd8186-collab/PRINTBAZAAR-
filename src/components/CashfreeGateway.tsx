@@ -19,6 +19,18 @@ interface CashfreeGatewayProps {
 
 declare const Cashfree: any;
 
+function safeJsonParse(str: string | null | undefined, fallback: any = {}): any {
+  if (!str) return fallback;
+  const cleaned = str.trim();
+  if (cleaned === 'undefined' || cleaned === '') return fallback;
+  try {
+    return JSON.parse(cleaned);
+  } catch (e) {
+    console.error("[CASHFREE] JSON parsing exception captured safely for text:", cleaned, e);
+    return fallback;
+  }
+}
+
 export default function CashfreeGateway({
   amount,
   paymentTypeLabel,
@@ -41,16 +53,7 @@ export default function CashfreeGateway({
       try {
         const response = await fetch('/api/cashfree/config');
         const text = await response.text();
-        let data: any = {};
-        
-        if (text) {
-          try {
-            data = JSON.parse(text);
-          } catch (parseErr) {
-            console.error(`Non-JSON response from /api/cashfree/config (Status: ${response.status}):`, text.substring(0, 50));
-            // Non-blocking for config check
-          }
-        }
+        const data = safeJsonParse(text, { success: false });
         
         if (response.ok && data.success) {
           setHasKeys(data.hasKeys);
@@ -86,6 +89,10 @@ export default function CashfreeGateway({
     setStep('Connecting to Cashfree Payments Node...');
 
     try {
+      const cleanName = (customerName || "").trim() || "Guest User";
+      const cleanPhone = (customerPhone || "").trim() || "9999999999";
+      const cleanEmail = (customerEmail || "").trim() || "guest@example.com";
+
       // 1. Create order on backend
       const res = await fetch('/api/cashfree/create-order', {
         method: 'POST',
@@ -93,26 +100,14 @@ export default function CashfreeGateway({
         body: JSON.stringify({ 
           amount, 
           customerId: 'cust_' + Date.now(),
-          customerName,
-          customerPhone,
-          customerEmail
+          customerName: cleanName,
+          customerPhone: cleanPhone,
+          customerEmail: cleanEmail
         })
       });
       
       const text = await res.text();
-      let data: any = {};
-      
-      if (text) {
-        try {
-          data = JSON.parse(text);
-        } catch (parseErr) {
-          console.error("Non-JSON response from /api/cashfree/create-order:", text);
-          if (res.status === 404) {
-            throw new Error(`Backend API is entirely missing (404). This usually happens when the app is deployed on static hosting (like Vercel) without Serverless Functions configured for the Express backend.`);
-          }
-          throw new Error(`Order creation failed: Server returned non-JSON response (${res.status})`);
-        }
-      }
+      const data = safeJsonParse(text, { success: false, error: "Order session parser returned empty payload state." });
       
       if (!res.ok || !data.success) {
         throw new Error(data.message || data.error || `Failed to initialize Cashfree order session (${res.status})`);
@@ -188,16 +183,7 @@ export default function CashfreeGateway({
           });
           
           const verifyText = await verifyRes.text();
-          let verifyData: any = {};
-          
-          if (verifyText) {
-            try {
-              verifyData = JSON.parse(verifyText);
-            } catch (e) {
-              console.error("Non-JSON response from /api/cashfree/verify-payment:", verifyText);
-              throw new Error(`Payment verification failed: Server returned non-JSON response (${verifyRes.status})`);
-            }
-          }
+          const verifyData = safeJsonParse(verifyText, { success: false, error: "Payment verification returned empty payload." });
           
           if (verifyRes.ok && verifyData.success && verifyData.verified) {
             const paymentResult: PaymentDetails = {

@@ -1383,6 +1383,37 @@ Customer's custom requirements or idea prompt: "${prompt}"`;
     }
   });
 
+  app.post("/api/premium/upgrade", async (req, res) => {
+    try {
+      const { userId, plan, amount, txId } = req.body;
+      const db = adminDb();
+      const userRef = db.collection('users').doc(userId);
+      const expiryDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+      await db.runTransaction(async (transaction) => {
+        transaction.set(userRef, { 
+          premiumStatus: plan,
+          premiumExpiry: expiryDate,
+          updatedAt: FieldValue.serverTimestamp()
+        }, { merge: true });
+
+        const logRef = db.collection('audit_logs').doc();
+        transaction.set(logRef, {
+          userId,
+          action: 'PREMIUM_UPGRADE',
+          entityType: 'MEMBERSHIP',
+          entityId: txId,
+          details: { plan, amount, txId },
+          createdAt: FieldValue.serverTimestamp()
+        });
+      });
+
+      return res.json({ success: true, message: "Successfully upgraded to premium!", premiumStatus: plan, premiumExpiry: expiryDate });
+    } catch (err: any) {
+      res.status(500).json({ error: "Premium upgrade failed: " + err.message });
+    }
+  });
+
   // Automated Email & SMS for Order Status Updates
   app.post("/api/emails/order-status", async (req, res) => {
     try {

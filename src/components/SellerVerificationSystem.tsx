@@ -391,7 +391,16 @@ export default function SellerVerificationSystem({ isAdminMode, onVerificationCo
                 <p className="text-xs font-bold text-zinc-400 max-w-md mx-auto leading-relaxed uppercase tracking-widest">Elite access credentials provisioned. Your merchant engine is fully synced with the PrintBazaar supply chain network.</p>
               </div>
               <div className="pt-4">
-                 <button className="bg-white text-zinc-900 text-[10px] font-black uppercase px-12 py-4 rounded-2xl shadow-2xl hover:scale-105 transition-all">Launch Merchant Studio</button>
+                 <button 
+                   onClick={() => {
+                     if (onVerificationComplete && currentSeller) {
+                       onVerificationComplete(currentSeller);
+                     }
+                   }}
+                   className="bg-white text-[#FF4D00] text-[10px] font-black uppercase px-12 py-4 rounded-2xl shadow-2xl hover:scale-105 transition-all"
+                 >
+                   Launch Merchant Studio
+                 </button>
               </div>
             </div>
           ) : (
@@ -745,13 +754,52 @@ export default function SellerVerificationSystem({ isAdminMode, onVerificationCo
                   </div>
 
                   <button 
-                    onClick={() => {
-                        syncProfile({ status: 'Pending Verification', verificationStep: 7 });
-                        triggerToast?.('Node submitted for audit', 'success');
+                    onClick={async () => {
+                      if (!db) return;
+                      try {
+                        const { doc, setDoc } = await import('firebase/firestore');
+                        // 1. Auto Seller Activation
+                        const userRef = doc(db, 'users', currentUid);
+                        await setDoc(userRef, {
+                          role: 'seller',
+                          sellerStatus: 'approved',
+                          merchantStatus: 'active',
+                          isSeller: true,
+                          isVerified: true,
+                          onboardingCompleted: true
+                        }, { merge: true });
+
+                        // 2. Sync profile fields
+                        await syncProfile({ 
+                          status: 'Verified', 
+                          verificationStep: 7, 
+                          isSeller: true, 
+                          onboardingCompleted: true 
+                        });
+                        
+                        triggerToast?.('✓ Onboarding 100% Complete! Seller Dashboard is now unlocked.', 'success');
+
+                        // 3. Automatic Redirect
+                        if (onVerificationComplete) {
+                          onVerificationComplete({
+                            id: currentUid,
+                            ownerName: name || 'Amaan Mohd',
+                            storeName: businessName || 'My PrintBazaar Studio',
+                            email: email || 'seller@printbazaar.com',
+                            mobile: mobile || '9876543210',
+                            status: 'Verified',
+                            level: 'Verified Seller',
+                            verificationStep: 7
+                          });
+                        }
+                      } catch (err: any) {
+                        console.error("Auto seller activation failed:", err);
+                        triggerToast?.('Activation error: ' + err.message, 'warn');
+                      }
                     }}
-                    className="bg-black text-white text-[11px] font-black uppercase py-5 rounded-[24px] w-full shadow-2xl hover:-translate-y-1 transition-all active:translate-y-0"
+                    className="bg-[#FF4D00] text-white text-[11px] font-black uppercase py-5 rounded-[24px] w-full shadow-2xl hover:-translate-y-1 transition-all active:translate-y-0"
                   >
-                    Authorize Final Deployment
+                    Authorize Final Deployment & Activate Seller Account
                   </button>
                 </div>
               )}

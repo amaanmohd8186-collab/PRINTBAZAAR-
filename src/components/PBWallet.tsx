@@ -27,7 +27,7 @@ export default function PBWallet({ stats, userId, onUpdateStats, onBack }: PBWal
     
     try {
       const amt = parseFloat(addAmount);
-      const res = await fetch('/api/wallet/add', {
+      const res = await fetch('/api/wallet/add-money', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
