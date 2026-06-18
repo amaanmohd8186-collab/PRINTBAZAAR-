@@ -127,6 +127,7 @@ export interface Order {
   shippingCharge?: number;
   taxAmount?: number;
   notifyOnDispatch?: boolean;
+  feedback?: any;
 }
 
 export interface UserSession {

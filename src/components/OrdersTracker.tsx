@@ -4,13 +4,80 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Package, Truck, Calendar, Wallet, CheckCircle, Clock, AlertTriangle, ChevronDown, ChevronUp, FileSpreadsheet, ShieldAlert, Loader2, Download, FileText, RefreshCcw, Bell, BellRing, Info, Phone, MessageCircle } from 'lucide-react';
+import { Package, Truck, Calendar, Wallet, CheckCircle, Clock, AlertTriangle, ChevronDown, ChevronUp, FileSpreadsheet, ShieldAlert, Loader2, Download, FileText, RefreshCcw, Bell, BellRing, Info, Phone, MessageCircle, Star } from 'lucide-react';
 import { motion } from 'motion/react';
 import { jsPDF } from 'jspdf';
 import { Order, OrderStatus, PaymentDetails } from '../types';
 import CashfreeGateway from './CashfreeGateway';
 import CustomerSpendingChart from './CustomerSpendingChart';
 import { DesignApprovalWorkflow } from './DesignApprovalWorkflow';
+
+function PostCompletionFeedback({ orderId, onFeedbackSubmit }: { orderId: string, onFeedbackSubmit: (data: any) => void }) {
+  const [rating, setRating] = useState(0);
+  const [hoverRating, setHoverRating] = useState(0);
+  const [comment, setComment] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+
+  if (submitted) {
+    return (
+      <div className="bg-emerald-50 border border-emerald-250 rounded-[24px] p-6 text-center shadow-2xs">
+        <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3">
+          <CheckCircle className="w-6 h-6" />
+        </div>
+        <h4 className="text-emerald-950 font-black uppercase text-sm tracking-tight">Feedback Received!</h4>
+        <p className="text-emerald-800 text-xs mt-1.5 leading-relaxed max-w-sm mx-auto">
+          Thank you for helping us improve our print quality and delivery experience.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-[24px] p-6 border border-zinc-200 shadow-sm mt-4">
+      <h4 className="text-sm font-black text-slate-900 uppercase tracking-tight mb-2">Rate Your Experience</h4>
+      <p className="text-xs text-zinc-500 mb-4">How was the print quality and delivery service for this order?</p>
+      
+      <div className="flex items-center gap-2 mb-4">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <button
+            key={star}
+            type="button"
+            className="focus:outline-none transition-transform hover:scale-110"
+            onMouseEnter={() => setHoverRating(star)}
+            onMouseLeave={() => setHoverRating(0)}
+            onClick={() => setRating(star)}
+          >
+            <Star 
+              className={`w-8 h-8 ${(hoverRating || rating) >= star ? 'text-yellow-400 fill-yellow-400' : 'text-zinc-300'}`} 
+            />
+          </button>
+        ))}
+      </div>
+
+      <textarea
+        value={comment}
+        onChange={(e) => setComment(e.target.value)}
+        placeholder="Any suggestions or comments about the print material, colors, or finishing?"
+        className="w-full h-24 rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4D00]/50 focus:border-[#FF4D00] resize-none mb-4"
+      />
+
+      <button
+        onClick={() => {
+          if (rating > 0) {
+            onFeedbackSubmit({ rating, comment });
+            setSubmitted(true);
+          }
+        }}
+        disabled={rating === 0}
+        className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-colors ${
+          rating > 0 ? 'bg-[#FF4D00] text-white hover:bg-[#d93d00]' : 'bg-zinc-200 text-zinc-400 cursor-not-allowed'
+        }`}
+      >
+        Submit Feedback
+      </button>
+    </div>
+  );
+}
 
 function SlaCountdownTimer({ createdAt, status }: { createdAt: string; status: OrderStatus }) {
   const [timeLeftStr, setTimeLeftStr] = useState('');
@@ -1219,6 +1286,18 @@ ${separator}
                         </div>
                       </div>
                     </div>
+                  )}
+
+                  {/* Rating / Feedback Section for Delivered Orders */}
+                  {order.status === 'Delivered' && (
+                    <PostCompletionFeedback 
+                      orderId={order.id} 
+                      onFeedbackSubmit={(feedbackData) => {
+                        if (onUpdateOrder) {
+                          onUpdateOrder(order.id, { feedback: feedbackData });
+                        }
+                      }}
+                    />
                   )}
 
                 </div>

@@ -406,6 +406,28 @@ export function createExpressApp() {
     }
   }));
 
+  // Environment Variable Check Middleware
+  app.use("/api", (req, res, next) => {
+    const requiredEnvVars = [
+      "FIREBASE_PROJECT_ID",
+      "FIREBASE_CLIENT_EMAIL",
+      "FIREBASE_PRIVATE_KEY",
+      "CASHFREE_CLIENT_ID",
+      "CASHFREE_CLIENT_SECRET"
+    ];
+
+    for (const envVar of requiredEnvVars) {
+      if (!process.env[envVar]) {
+        console.error(`Missing Environment Variable: ${envVar}`);
+        return res.status(500).json({
+          success: false,
+          error: "Missing environment variable"
+        });
+      }
+    }
+    next();
+  });
+
   // GLOBAL ERROR HANDLER FOR JSON RESPONSES
   app.use((err: any, req: any, res: any, next: any) => {
     console.error("🔥 [FATAL SERVER ERROR]:", err);
@@ -686,16 +708,16 @@ Customer's custom requirements or idea prompt: "${prompt}"`;
   app.get("/api/user/delete-confirm", async (req, res) => {
     try {
       const { token } = req.query;
-      if (!token || typeof token !== 'string') return res.status(400).send("Invalid token.");
+      if (!token || typeof token !== 'string') return res.status(400).json({ success: false, error: "Invalid token." });
 
       const db = adminDb();
       const tokenDoc = await db.collection('deletion_tokens').doc(token).get();
-      if (!tokenDoc.exists) return res.status(400).send("Invalid or expired token.");
+      if (!tokenDoc.exists) return res.status(400).json({ success: false, error: "Invalid or expired token." });
 
       const data = tokenDoc.data();
       if (Date.now() > (data?.expiry as Timestamp).toMillis()) {
         await db.collection('deletion_tokens').doc(token).delete();
-        return res.status(400).send("Token has expired. Please initiate deletion again.");
+        return res.status(400).json({ success: false, error: "Token has expired. Please initiate deletion again." });
       }
 
       const uid = data?.uid;
@@ -712,16 +734,16 @@ Customer's custom requirements or idea prompt: "${prompt}"`;
       // Clear token
       await db.collection('deletion_tokens').doc(token).delete();
 
-      return res.send(`
-        <div style="font-family: sans-serif; text-align: center; padding: 50px;">
-          <h1 style="color: #FF4D00;">Deletion Confirmed</h1>
-          <p>Your account has been scheduled for deletion in 30 days.</p>
-          <p>You have until <b>${deletionDate.toLocaleDateString()}</b> to log back in and cancel this request.</p>
-          <a href="/" style="color: #000; font-weight: bold;">Back to PrintBazaar</a>
-        </div>
-      `);
+      return res.json({
+        success: true,
+        data: {
+          message: "Deletion Confirmed",
+          details: "Your account has been scheduled for deletion in 30 days.",
+          deadline: deletionDate.toISOString()
+        }
+      });
     } catch (err: any) {
-      res.status(500).send("System error confirming deletion.");
+      res.status(500).json({ success: false, error: "System error confirming deletion." });
     }
   });
 
@@ -1892,7 +1914,7 @@ Customer's custom requirements or idea prompt: "${prompt}"`;
         cf.PGVerifyWebhookSignature(signature, rawBody, timestamp);
       } catch (err) {
         console.error("Cashfree Webhook Signature Mismatch or error", err);
-        return res.status(400).send("Signature mismatch");
+        return res.status(400).json({ success: false, error: "Signature mismatch" });
       }
 
       const { data, type } = req.body;
@@ -2132,16 +2154,12 @@ async function startServer() {
   app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
     console.error("GLOBAL SERVER ERROR:", err);
     
-    if (req.path.startsWith('/api/')) {
-        res.status(err.status || 500).json({
-          success: false,
-          error: err.code || "INTERNAL_SERVER_ERROR",
-          message: err.message || "An unexpected error occurred on the server.",
-          type: "SYSTEM_EXCEPTION"
-        });
-    } else {
-        res.status(err.status || 500).send("Internal Server Error: " + err.message);
-    }
+    // Always return JSON per requirements
+    res.status(err.status || 500).json({
+      success: false,
+      error: err.message || "An unexpected error occurred on the server.",
+      type: err.code || "SYSTEM_EXCEPTION"
+    });
   });
 
   app.listen(PORT, "0.0.0.0", () => {

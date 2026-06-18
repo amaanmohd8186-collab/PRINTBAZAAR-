@@ -198,24 +198,34 @@ export async function safeFetch<T = any>(url: string, options: RequestInit = {})
     const response = await fetch(url, config);
     const contentType = response.headers.get('content-type');
     
-    if (contentType && contentType.includes('application/json')) {
-      try {
-        const data = await response.json();
-        if (!response.ok) {
-          return { success: false, error: data.error || data.message || `API Error (${response.status})` } as unknown as T;
-        }
-        return data as T;
-      } catch (parserErr) {
-        return { success: false, error: "Invalid response" } as unknown as T;
-      }
-    } else {
-      if (!response.ok) {
-        return { success: false, error: "Invalid response" } as unknown as T;
-      }
-      return { success: true, status: response.status } as unknown as T;
+    // Strict Content-Type validation
+    if (!contentType || !contentType.includes('application/json')) {
+      return { 
+        success: false, 
+        error: `Server did not return valid JSON. Expected application/json but received ${contentType || 'unknown'}.`
+      } as unknown as T;
     }
+
+    // Since we verified content type, we can safely parse JSON
+    try {
+      const data = await response.json();
+      if (!response.ok) {
+        return { 
+          success: false, 
+          error: data.error || data.message || `API Error (${response.status})`,
+          status: response.status
+        } as unknown as T;
+      }
+      return data as T;
+    } catch (parserErr: any) {
+      return { 
+        success: false, 
+        error: `JSON Parser Error: ${parserErr.message}` 
+      } as unknown as T;
+    }
+
   } catch (err: any) {
     console.error(`[SafeFetch Failed] ${url}:`, err.message);
-    return { success: false, error: err.message || "Network error" } as unknown as T;
+    return { success: false, error: err.message || "Network request failed" } as unknown as T;
   }
 }
