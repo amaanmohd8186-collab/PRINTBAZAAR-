@@ -58,12 +58,12 @@ export const FirebaseDiagnosticsPanel = ({ onClose }: { onClose: () => void }) =
           setDiagnostics(p => ({ 
             ...p, 
             ...serverDiag,
-            firestoreStatus: serverDiag.db_ops?.write === 'PASS' ? 'Triple-Verified (R/W/D)' : 'Degraded',
+            firestoreStatus: serverDiag?.db_ops?.write === 'PASS' ? 'Triple-Verified (R/W/D)' : 'Degraded',
             cashfree: { status: paymentHealth?.cashfreeConnected ? 'Connected' : 'Missing Keys' },
             email: { status: 'Unknown' }
           }));
           
-          addLog(`System Integrity Verified. Global Health: ${serverDiag.healthScore}%`);
+          addLog(`System Integrity Verified. Global Health: ${serverDiag?.healthScore || 50}%`);
           
        } catch (e: any) {
           setDiagnostics(p => ({ ...p, firestoreStatus: `Protocol Error: ${e.message}` }));

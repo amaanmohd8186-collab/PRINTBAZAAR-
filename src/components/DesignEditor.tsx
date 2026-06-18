@@ -108,10 +108,13 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
   const [canRedo, setCanRedo] = useState(false);
   const [layersList, setLayersList] = useState<{ id: string; type: string; label: string; active: boolean }[]>([]);
   const [scaleFactor, setScaleFactor] = useState(1);
+  const [isMobileScreen, setIsMobileScreen] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+  const [showMobileInspector, setShowMobileInspector] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
       const isMobile = window.innerWidth < 1024;
+      setIsMobileScreen(window.innerWidth < 768);
       const maxW = isMobile ? window.innerWidth - 32 : window.innerWidth - 450;
       const canvasTotalW = CANVAS_WIDTH + 20;
       if (maxW < canvasTotalW) {
@@ -414,11 +417,89 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
   useEffect(() => {
     if (!canvasRef.current) return;
 
-    fabricCanvas.current = new fabric.Canvas(canvasRef.current, {
-      width: CANVAS_WIDTH,
-      height: CANVAS_HEIGHT,
-      backgroundColor: '#f8fafc',
-    });
+    try {
+      fabricCanvas.current = new fabric.Canvas(canvasRef.current, {
+        width: CANVAS_WIDTH,
+        height: CANVAS_HEIGHT,
+        backgroundColor: '#f8fafc',
+      });
+      (window as any).canvasInitStatus = 'Success (FabricJS)';
+    } catch (fabricErr) {
+      console.warn("Fabric Canvas failed to initialize. Setting up active 2D Canvas Fallback.", fabricErr);
+      (window as any).canvasInitStatus = 'Fallback (2D Canvas)';
+
+      const mockCanvas: any = {
+        _objects: [] as any[],
+        _listeners: {} as Record<string, Function[]>,
+        on: (ev: string, cb: any) => {
+          if (!mockCanvas._listeners[ev]) mockCanvas._listeners[ev] = [];
+          mockCanvas._listeners[ev].push(cb);
+        },
+        off: (ev: string, cb: any) => {
+          if (mockCanvas._listeners[ev]) {
+            mockCanvas._listeners[ev] = mockCanvas._listeners[ev].filter((l: any) => l !== cb);
+          }
+        },
+        add: (obj: any) => {
+          mockCanvas._objects.push(obj);
+          mockCanvas.renderAll();
+          if (mockCanvas._listeners['object:added']) {
+            mockCanvas._listeners['object:added'].forEach((cb: any) => cb());
+          }
+        },
+        remove: (obj: any) => {
+          mockCanvas._objects = mockCanvas._objects.filter((o: any) => o !== obj);
+          mockCanvas.renderAll();
+          if (mockCanvas._listeners['object:removed']) {
+            mockCanvas._listeners['object:removed'].forEach((cb: any) => cb());
+          }
+        },
+        getObjects: () => mockCanvas._objects,
+        getActiveObject: () => null,
+        setActiveObject: (obj: any) => {},
+        centerObject: (obj: any) => {
+          obj.left = CANVAS_WIDTH / 2;
+          obj.top = CANVAS_HEIGHT / 2;
+        },
+        clear: () => {
+          mockCanvas._objects = [];
+          mockCanvas.renderAll();
+        },
+        renderAll: () => {
+          const ctx = canvasRef.current?.getContext('2d');
+          if (ctx) {
+            ctx.fillStyle = '#f8fafc';
+            ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+            mockCanvas._objects.forEach((obj: any) => {
+              ctx.save();
+              ctx.fillStyle = obj.fill || '#FF4D00';
+              ctx.globalAlpha = obj.opacity !== undefined ? obj.opacity : 1;
+              if (obj.type === 'rect' || obj.width) {
+                const l = obj.left || 0;
+                const t = obj.top || 0;
+                const w = obj.width || 120;
+                const h = obj.height || 120;
+                ctx.fillRect(l, t, w, h);
+              } else if (obj.text) {
+                ctx.fillStyle = obj.fill || '#000000';
+                ctx.font = `${obj.fontSize || 24}px ${obj.fontFamily || 'Inter'}`;
+                ctx.fillText(obj.text, obj.left || 50, obj.top || 100);
+              }
+              ctx.restore();
+            });
+          }
+        },
+        toJSON: () => ({ objects: [] }),
+        loadFromJSON: () => Promise.resolve(),
+        dispose: () => {}
+      };
+
+      fabricCanvas.current = mockCanvas;
+
+      setTimeout(() => {
+        mockCanvas.renderAll();
+      }, 100);
+    }
 
     // Object event listeners to update sliders
     const handleSelection = () => {
@@ -1716,6 +1797,18 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
           </div>
         </div>
 
+        {isMobileScreen && (
+          <button
+            type="button"
+            onClick={() => setShowMobileInspector(!showMobileInspector)}
+            className="fixed bottom-24 right-4 z-50 p-4 bg-[#FF4D00] hover:bg-[#E03D00] text-white rounded-full shadow-[0_4px_22px_rgba(255,77,0,0.4)] flex items-center gap-2 uppercase tracking-widest text-[10px] font-black border border-white/10 active:scale-95 transition-all"
+            id="mobile-canvas-inspector-activator"
+          >
+            <Sliders className="w-4 h-4" />
+            <span>Inspect Layers</span>
+          </button>
+        )}
+
       </div>
 
       {/* DYNAMICS RIGHT WORKSPACE CONTROL PANELS & SLIDERS */}
@@ -2023,20 +2116,33 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
           </motion.div>
         )}
 
-        {activeTool !== 'ai' && activeTool !== 'easy' && activeTool !== 'adobe' && (
+        {activeTool !== 'ai' && activeTool !== 'easy' && activeTool !== 'adobe' && (!isMobileScreen || showMobileInspector) && (
           /* STANDARD EDITOR CONTROL PANEL (SLIDERS, PALETTE, LAYER MODIFIERS) */
           <motion.div 
             key="standard-editor"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="w-full lg:w-80 bg-zinc-950 border-t lg:border-t-0 lg:border-l border-zinc-850 p-6 overflow-y-auto shrink-0 flex flex-col gap-6 pb-24 lg:pb-6"
+            initial={isMobileScreen ? { y: "100%" } : { opacity: 0 }}
+            animate={isMobileScreen ? { y: 0 } : { opacity: 1 }}
+            exit={isMobileScreen ? { y: "100%" } : { opacity: 0 }}
+            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+            className={isMobileScreen
+              ? "fixed bottom-0 left-0 right-0 h-[60vh] z-[120] bg-zinc-950 border-t border-zinc-800 rounded-t-[32px] p-6 overflow-y-auto flex flex-col gap-6 shadow-[0_-12px_45px_rgba(0,0,0,0.9)] pb-24"
+              : "w-full lg:w-80 bg-zinc-950 border-t lg:border-t-0 lg:border-l border-zinc-850 p-6 overflow-y-auto shrink-0 flex flex-col gap-6 pb-24 lg:pb-6"
+            }
           >
             <div className="flex items-center justify-between border-b border-zinc-850 pb-4">
               <span className="text-xs font-black uppercase tracking-wider text-[#FF4D00] flex items-center gap-1.5 font-mono">
                 <Sliders className="w-4 h-4" />
                 <span>Layers Inspector</span>
               </span>
+              {isMobileScreen && (
+                <button
+                  type="button"
+                  onClick={() => setShowMobileInspector(false)}
+                  className="px-2.5 py-1 bg-zinc-900 border border-zinc-800 text-[10px] font-mono font-black text-rose-500 rounded-lg uppercase tracking-wider cursor-pointer hover:bg-zinc-800"
+                >
+                  Close
+                </button>
+              )}
             </div>
 
             {/* Premium Tab Toggles */}

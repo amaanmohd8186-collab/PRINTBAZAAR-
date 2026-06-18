@@ -113,13 +113,26 @@ export const DesignApprovalWorkflow: React.FC<DesignApprovalWorkflowProps> = ({
   }, [messages]);
 
   // Handle direct image click to drop annotation pins
-  const handleImageClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleImageClick = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
     if (dbStatus === 'Customer Approval') return; // Locked on final approval
     if (!imageContainerRef.current) return;
 
+    let clientX = 0;
+    let clientY = 0;
+
+    if ('touches' in e && e.touches.length > 0) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else if ('clientX' in e) {
+      clientX = (e as React.MouseEvent).clientX;
+      clientY = (e as React.MouseEvent).clientY;
+    } else {
+      return;
+    }
+
     const rect = imageContainerRef.current.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    const x = ((clientX - rect.left) / rect.width) * 100;
+    const y = ((clientY - rect.top) / rect.height) * 100;
 
     setSelectedPin({ x, y });
     setPinComment('');
@@ -331,6 +344,10 @@ export const DesignApprovalWorkflow: React.FC<DesignApprovalWorkflowProps> = ({
             <div 
               ref={imageContainerRef}
               onClick={handleImageClick}
+              onTouchStart={(e) => {
+                e.preventDefault();
+                handleImageClick(e);
+              }}
               className={`w-full relative transition ${dbStatus === 'Customer Approval' ? 'cursor-not-allowed' : 'cursor-crosshair'}`}
             >
               <img 

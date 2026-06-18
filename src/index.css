@@ -18,6 +18,9 @@ body {
   font-family: var(--font-sans);
   background-color: #050505;
   color: #0F172A;
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
 }
 
 /* Global Dark Mode Overrides */

@@ -106,6 +106,10 @@ if (initializedApp) {
   }
 }
 
+if (typeof window !== 'undefined') {
+  (window as any).firebaseInitStatus = firestoreDb ? 'Success (Firestore Connected)' : 'Disconnected (Credentials Unloaded)';
+}
+
 export const app = initializedApp as any;
 export const db = firestoreDb as any;
 export const auth = firebaseAuth as any;

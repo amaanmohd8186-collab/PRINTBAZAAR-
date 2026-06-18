@@ -87,6 +87,8 @@ import CustomizeModal from './components/CustomizeModal';
 import CartView from './components/CartView';
 import OrdersTracker from './components/OrdersTracker';
 const AdminWorkspace = React.lazy(() => import('./components/AdminWorkspace'));
+const DesignEditor = React.lazy(() => import('./components/DesignEditor').then(m => ({ default: m.DesignEditor })));
+const CommunityFeed = React.lazy(() => import('./components/CommunityFeed'));
 import PrintQualitySlider from './components/PrintQualitySlider';
 import SplashPreview from './components/SplashPreview';
 import MobileDebugPanel from './components/MobileDebugPanel';
@@ -105,13 +107,11 @@ import PremiumUpgrade from './components/PremiumUpgrade';
 import PaymentHistory from './components/PaymentHistory';
 import WhatsAppFloatingButton from './components/WhatsAppFloatingButton';
 import AiStudioWorkspace from './components/AiStudioWorkspace';
-import { DesignEditor } from './components/DesignEditor';
 import { VerificationAuditDashboard } from './components/VerificationAuditDashboard';
 import TermsOfService from './components/TermsOfService';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import { PrivacySecurity } from './components/PrivacySecurity';
 import PushNotificationManager from './components/PushNotificationManager';
-import CommunityFeed from './components/CommunityFeed';
 import CreatorProfileView from './components/CreatorProfileView';
 import TrendingExplorer from './components/TrendingExplorer';
 import DesignShowcaseModal from './components/DesignShowcaseModal';
@@ -2058,30 +2058,44 @@ export default function App() {
               <div className="flex-1 w-full flex flex-col">
                 {customerActiveTab === 'aistudio' && (
                   <div className="fixed inset-0 z-[60] bg-zinc-50 flex flex-col pt-0 pb-0">
-                     <DesignEditor 
-                       userEmail={session.email} 
-                       userId={session.id}
-                       onSave={(d) => triggerToast('Design saved to cloud.')} 
-                       userStats={userStats}
-                       onClose={() => setCustomerActiveTab('home')}
-                     />
+                     <React.Suspense fallback={
+                       <div className="flex-1 w-full h-full flex flex-col items-center justify-center p-12 bg-white">
+                         <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-3" />
+                         <p className="text-[10px] font-black uppercase text-zinc-400 tracking-widest font-mono">Loading Design Engine...</p>
+                       </div>
+                     }>
+                       <DesignEditor 
+                         userEmail={session.email} 
+                         userId={session.id}
+                         onSave={(d) => triggerToast('Design saved to cloud.')} 
+                         userStats={userStats}
+                         onClose={() => setCustomerActiveTab('home')}
+                       />
+                     </React.Suspense>
                   </div>
                 )}
 
                 {/* SOCIAL COMMUNITY FEED */}
                 {customerActiveTab === 'community' && (
-                  <CommunityFeed 
-                    session={session} 
-                    isAdmin={session.role === 'admin'} 
-                    onCreatorClick={setViewingCreatorId}
-                    onBuyClick={(id) => {
-                      const p = products.find(prod => prod.id === id);
-                      if (p) {
-                        setFocusConfigProduct(p);
-                      }
-                    }}
-                    triggerToast={triggerToast}
-                  />
+                  <React.Suspense fallback={
+                    <div className="flex-1 w-full min-h-[400px] flex flex-col items-center justify-center p-12 bg-white">
+                      <div className="w-10 h-10 border-4 border-[#FF4D00] border-t-transparent rounded-full animate-spin mb-3" />
+                      <p className="text-[10px] font-black uppercase text-zinc-400 tracking-widest font-mono">Loading Community Feed...</p>
+                    </div>
+                  }>
+                    <CommunityFeed 
+                      session={session} 
+                      isAdmin={session.role === 'admin'} 
+                      onCreatorClick={setViewingCreatorId}
+                      onBuyClick={(id) => {
+                        const p = products.find(prod => prod.id === id);
+                        if (p) {
+                          setFocusConfigProduct(p);
+                        }
+                      }}
+                      triggerToast={triggerToast}
+                    />
+                  </React.Suspense>
                 )}
 
                 {/* TRENDING EXPLORE VIEW */}
