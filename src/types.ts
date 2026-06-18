@@ -25,15 +25,12 @@ export type ProductCategory =
 
 export type OrderStatus = 
   | 'Pending Payment'
-  | 'Order Placed'
   | 'Order Received'
-  | 'Design Check'
   | 'Design Review'
-  | 'Approved'
-  | 'Printing In Progress'
-  | 'Quality Check'
-  | 'Ready for Dispatch'
-  | 'Dispatched'
+  | 'Customer Approval'
+  | 'Printing'
+  | 'Packing'
+  | 'Shipped'
   | 'Delivered'
   | 'Cancelled';
 
@@ -251,15 +248,14 @@ export interface SellerProfile {
   ocrExtractedName?: string;
   ocrExtractedDob?: string;
   auditLogs?: any[];
-  documents?: {
-    aadhaarFront?: string | null;
-    aadhaarBack?: string | null;
-    panCard?: string | null;
-    cancelledCheque?: string | null;
-    gstCert?: string | null;
-    tradeLicense?: string | null;
-    msmeCert?: string | null;
-    governmentIdType?: string;
+    documents?: {
+      aadhaarFront?: string | null;
+      aadhaarBack?: string | null;
+      panCard?: string | null;
+      cancelledCheque?: string | null;
+      gstCert?: string | null;
+      videoKycUrl?: string | null;
+      governmentIdType?: string;
     governmentIdNumber?: string;
     governmentIdFile?: string;
     businessGst?: string;
@@ -275,7 +271,10 @@ export interface SellerProfile {
     bankAccountNumber?: string;
     bankIfscCode?: string;
     bankName?: string;
+    upiId?: string;
     cancelledChequeFile?: string;
+    tradeLicense?: string | null;
+    msmeCert?: string | null;
     mobileOtpVerified?: boolean;
     emailOtpVerified?: boolean;
   };

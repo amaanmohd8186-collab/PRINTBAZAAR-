@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ShoppingBag, Trash2, FileCode, Landmark, ShieldCheck, ArrowRight, Wallet, CheckCircle2, AlertTriangle, AlertCircle, Truck, Sparkles, Loader2, Eye, Check, RotateCcw, FileText, Maximize2, X } from 'lucide-react';
 import { CartItem, PaymentDetails, Order } from '../types';
 import CashfreeGateway from './CashfreeGateway';
+import { lookupPincode, calculateShippingRates, ShippingRate, PincodeInfo } from '../lib/shipping';
 
 // Dynamic print validation audit rules
 export function getItemValidationWarnings(item: CartItem): string[] {
@@ -109,80 +110,47 @@ export default function CartView({
   }, 0);
 
   const [isCalculatingShipping, setIsCalculatingShipping] = useState(false);
-  const [shippingLogisticsMsg, setShippingLogisticsMsg] = useState('');
-  const [logisticsZone, setLogisticsZone] = useState('');
-  const [estimatedDistance, setEstimatedDistance] = useState<number>(0);
+  const [shippingRates, setShippingRates] = useState<ShippingRate[]>([]);
+  const [selectedRate, setSelectedRate] = useState<ShippingRate | null>(null);
+  const [destInfo, setDestInfo] = useState<PincodeInfo | null>(null);
 
   // Auto-calculated carrier lookups when 6-digit pincode is entered
   useEffect(() => {
     if (pincode.length === 6) {
-      setIsCalculatingShipping(true);
-      setShippingLogisticsMsg('Connecting to BlueDart & Delhivery dispatch grid...');
-      
-      const timer = setTimeout(() => {
-        setIsCalculatingShipping(false);
-        const firstDigit = pincode[0];
-        let zone = 'Zone C - South India Logistics Hub';
-        let distance = 650;
-        
-        switch (firstDigit) {
-          case '1':
-          case '2':
-            zone = 'Zone A - North India Hub (Delhi NCR Direct)';
-            distance = 280;
-            break;
-          case '3':
-          case '4':
-            zone = 'Zone B - West India Hub (Mumbai/Maharashtra)';
-            distance = 820;
-            break;
-          case '5':
-          case '6':
-            zone = 'Zone C - South India Hub (Karnataka/Tamil Nadu)';
-            distance = 740;
-            break;
-          case '7':
-          case '8':
-            zone = 'Zone D - East India Hub (Kolkata/West Bengal)';
-            distance = 1150;
-            break;
-          case '9':
-            zone = 'Zone E - Central & Northeast India Logistics Range';
-            distance = 1580;
-            break;
+      const fetchInfo = async () => {
+        setIsCalculatingShipping(true);
+        try {
+          const info = await lookupPincode(pincode);
+          if (info) {
+            setDestInfo(info);
+            setCity(info.city);
+            setState(info.state);
+            
+            const rates = calculateShippingRates(info, totalCartWeightKg);
+            setShippingRates(rates);
+            // Default to first carrier (usually Delhivery or lowest cost)
+            setSelectedRate(rates[0]);
+          } else {
+            setShippingError('Invalid PIN Code or location not found.');
+          }
+        } catch (e) {
+          console.error(e);
+          setShippingError('logistics node timed out. Please retry.');
+        } finally {
+          setIsCalculatingShipping(false);
         }
-
-        setLogisticsZone(zone);
-        setEstimatedDistance(distance);
-        setShippingLogisticsMsg(`Linked successfully! Carrier Route: NCR Production ➜ ${zone}. Approx Distance: ${distance} km.`);
-      }, 950);
-
-      return () => clearTimeout(timer);
+      };
+      fetchInfo();
     } else {
-      setShippingLogisticsMsg('');
-      setLogisticsZone('');
-      setEstimatedDistance(0);
+      setDestInfo(null);
+      setShippingRates([]);
+      setSelectedRate(null);
     }
-  }, [pincode]);
+  }, [pincode, totalCartWeightKg]);
 
   const cartSubtotal = cartItems.reduce((acc, item) => acc + item.itemTotal, 0);
   
-  // Custom live formulas integrating distance, total weight, and carrier options
-  const distanceMultiplier = estimatedDistance ? (estimatedDistance / 350) : 1;
-  const standardPincodeBaseRate = Math.round(95 + (totalCartWeightKg * 45 * distanceMultiplier));
-  const expressPincodeBaseRate = Math.round(290 + (totalCartWeightKg * 95 * distanceMultiplier));
-
-  // Maintain previous free premium logic over ₹5000 subtotal for standard courier dispatch
-  const isFreeStandard = cartSubtotal >= 5000;
-  
-  const shippingCharge = pincode.length === 6
-    ? (shippingMethod === 'standard'
-        ? (isFreeStandard ? 0 : standardPincodeBaseRate)
-        : expressPincodeBaseRate)
-    : (shippingMethod === 'standard'
-        ? (isFreeStandard ? 0 : 150)
-        : 450);
-
+  const shippingCharge = selectedRate ? selectedRate.total : 150;
   const grandTotal = cartSubtotal + shippingCharge;
 
   const validateCheckout = (): string | null => {
@@ -605,21 +573,18 @@ export default function CartView({
                       </span>
                     </div>
 
-                    {shippingLogisticsMsg ? (
-                      <p className="text-[9.5px] font-extrabold text-amber-500 uppercase font-mono tracking-wide leading-relaxed animate-pulse">
-                        {shippingLogisticsMsg}
-                      </p>
+                    {destInfo ? (
+                      <div className="space-y-1.5 pt-1">
+                        <p className="text-[9.5px] font-extrabold text-emerald-500 uppercase font-mono tracking-wide flex items-center gap-1">
+                          <Check className="w-3 h-3" />
+                          DETECTED Location: {destInfo.city}, {destInfo.state}
+                        </p>
+                        <p className="text-[8px] text-zinc-400 font-mono uppercase">Zone: {destInfo.district}</p>
+                      </div>
                     ) : (
                       <p className="text-[9px] text-zinc-550 leading-relaxed uppercase font-mono font-semibold">
-                        Enter 6-digit Pincode to evaluate live cargo distance & route tariffs.
+                        Enter 6-digit Pincode to detect city & calculate dynamic carrier tariffs.
                       </p>
-                    )}
-
-                    {logisticsZone && (
-                      <div className="text-[9px] text-emerald-400 font-bold uppercase font-mono mt-1 flex items-center gap-1 bg-emerald-500/10 p-1.5 rounded-lg border border-emerald-500/20">
-                        <span className="w-1.5 h-1.5 bg-emerald-405 rounded-full animate-ping shrink-0" />
-                        CARRIER ZONE: {logisticsZone}
-                      </div>
                     )}
                   </div>
                 </div>
@@ -630,52 +595,40 @@ export default function CartView({
               </div>
             </div>
 
-            {/* Interactive Shipping Method Selector and Pricing Breakdown */}
+            {/* Dynamic Carrier Selection */}
             <div className="space-y-4 pt-4 border-t border-white/10">
               <label className="block text-[10px] font-black text-slate-300 uppercase tracking-widest">
-                Choose Delivery Speed
+                Choose Courier Partner
               </label>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShippingMethod('standard')}
-                  className={`p-3.5 rounded-2xl border text-left transition duration-150 flex flex-col justify-between cursor-pointer select-none ${
-                    shippingMethod === 'standard'
-                      ? 'border-[#FF4D00] bg-[#FF4D00]/5 text-white'
-                      : 'border-white/10 bg-white/5 text-zinc-400 hover:border-white/25 hover:text-white'
-                  }`}
-                >
-                  <div className="flex items-center justify-between w-full">
-                    <span className={`text-[10px] font-mono font-black ${shippingMethod === 'standard' ? 'text-[#FF4D00]' : 'text-zinc-450'} uppercase`}>Standard Courier</span>
-                    <Truck className="w-3.5 h-3.5 text-[#FF4D00]" />
+                {shippingRates.length > 0 ? (
+                  shippingRates.map((rate) => (
+                    <button
+                      key={rate.carrier}
+                      type="button"
+                      onClick={() => setSelectedRate(rate)}
+                      className={`p-3.5 rounded-2xl border text-left transition duration-150 flex flex-col justify-between cursor-pointer select-none ${
+                        selectedRate?.carrier === rate.carrier
+                          ? 'border-[#FF4D00] bg-[#FF4D00]/5 text-white'
+                          : 'border-white/10 bg-white/5 text-zinc-400 hover:border-white/25 hover:text-white'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between w-full">
+                        <span className={`text-[10px] font-mono font-black ${selectedRate?.carrier === rate.carrier ? 'text-[#FF4D00]' : 'text-zinc-450'} uppercase`}>{rate.carrier}</span>
+                        <Truck className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="mt-2">
+                        <p className="text-[11px] font-bold text-zinc-200">Est. {rate.estimatedDays} Days</p>
+                        <p className="text-[10px] font-mono text-zinc-400 mt-0.5">₹{rate.total}</p>
+                      </div>
+                    </button>
+                  ))
+                ) : (
+                  <div className="col-span-2 p-6 border border-dashed border-white/10 rounded-2xl text-center">
+                    <p className="text-[10px] text-zinc-500 font-mono uppercase">Enter PIN to fetch carrier rates</p>
                   </div>
-                  <div className="mt-2">
-                    <p className="text-[11px] font-bold text-zinc-200">3-5 Business Days</p>
-                    <p className="text-[10px] font-mono text-zinc-400 mt-0.5">
-                      {isFreeStandard ? 'FREE Shipping' : '₹150 Flat Rate'}
-                    </p>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setShippingMethod('express')}
-                  className={`p-3.5 rounded-2xl border text-left transition duration-150 flex flex-col justify-between cursor-pointer select-none ${
-                    shippingMethod === 'express'
-                      ? 'border-[#FF4D00] bg-[#FF4D00]/5 text-white'
-                      : 'border-white/10 bg-white/5 text-zinc-400 hover:border-white/25 hover:text-white'
-                  }`}
-                >
-                  <div className="flex items-center justify-between w-full">
-                    <span className={`text-[10px] font-mono font-black ${shippingMethod === 'express' ? 'text-[#FF4D00]' : 'text-zinc-455'} uppercase`}>Express Delivery</span>
-                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                  </div>
-                  <div className="mt-2">
-                    <p className="text-[11px] font-bold text-zinc-200">1-2 Days Priority</p>
-                    <p className="text-[10px] font-mono text-zinc-400 mt-0.5">₹450 Air Cargo</p>
-                  </div>
-                </button>
+                )}
               </div>
 
               {/* Price Breakdown Ledger */}
@@ -685,19 +638,15 @@ export default function CartView({
                   <span className="font-mono text-zinc-200">₹{cartSubtotal.toLocaleString('en-IN')}</span>
                 </div>
                 <div className="flex justify-between text-[11px] font-bold text-zinc-400">
-                  <span>Courier Delivery Charges</span>
-                  <span className="font-mono text-zinc-250 font-bold">
-                    {shippingMethod === 'standard' && isFreeStandard ? (
-                      <span className="text-emerald-400 font-extrabold uppercase">FREE SHIPPING</span>
-                    ) : (
-                      `₹${shippingCharge}`
-                    )}
+                  <span>Delivery Charge</span>
+                  <span className="font-mono text-white font-bold">
+                    ₹{shippingCharge.toLocaleString('en-IN')}
                   </span>
                 </div>
                 
-                {shippingMethod === 'standard' && !isFreeStandard && (
-                  <div className="text-[9.5px] text-zinc-400 leading-normal font-semibold">
-                    💡 Spend <strong className="text-white">₹{(5000 - cartSubtotal).toLocaleString('en-IN')}</strong> extra to unlock <strong className="text-emerald-400 uppercase">FREE STANDARD SHIPPING</strong>!
+                {selectedRate && (
+                  <div className="text-[9px] text-emerald-400 leading-normal font-black uppercase tracking-wider font-mono">
+                    ✓ {selectedRate.type} Delivery Rate Applied
                   </div>
                 )}
 

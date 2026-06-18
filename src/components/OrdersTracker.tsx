@@ -559,33 +559,38 @@ ${separator}
   const STAGES: { status: OrderStatus; label: string; desc: string }[] = [
     {
       status: 'Order Received',
-      label: 'Order Placed & Received',
-      desc: '100% Upfront payment verified. Automated pre-flight checks initialized on design assets.'
+      label: 'Order Received',
+      desc: '100% Upfront payment verified. Handshake completed with print press node.'
     },
     {
-      status: 'Design Check',
-      label: 'Design & Pre-fight Check',
-      desc: 'Print press admin is auditing dimension safety, image resolutions, and bleed margins.'
+      status: 'Design Review',
+      label: 'Design & Pre-fight',
+      desc: 'Print press admin is auditing dimension safety, resolution, and bleed margins.'
     },
     {
-      status: 'Printing In Progress',
-      label: 'Printing & Lamination',
-      desc: 'Design assets sent to heavy-duty production presses. Media stocks are being printed.'
+      status: 'Customer Approval',
+      label: 'Customer Approval',
+      desc: 'Final design proof awaiting client seal. Production starts only after approval.'
     },
     {
-      status: 'Ready for Dispatch',
-      label: 'Ready for Dispatch',
-      desc: 'Bulk batch production successfully completed! Awaiting final courier collection.'
+      status: 'Printing',
+      label: 'Heavy Printing',
+      desc: 'Commercial press run initiated. Substrate is undergoing high-speed offset ink application.'
     },
     {
-      status: 'Dispatched',
-      label: 'Shipped with Courier',
-      desc: 'Goods handed over to delivery couriers with real-time waybill tracking registered.'
+      status: 'Packing',
+      label: 'Quality & Packing',
+      desc: 'Post-press finishing, cutting, and industrial logistics bubble wrapping.'
+    },
+    {
+      status: 'Shipped',
+      label: 'Shipped (In Transit)',
+      desc: 'Goods handed over to courier. Waybill telemetry active.'
     },
     {
       status: 'Delivered',
-      label: 'Delivered Safely',
-      desc: 'Consignment marked delivered safely.'
+      label: 'Consignment Delivered',
+      desc: 'Package successfully delivered and verified at destination.'
     }
   ];
 
@@ -596,17 +601,19 @@ ${separator}
   const getStatusColor = (status: OrderStatus) => {
     switch (status) {
       case 'Order Received':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'Design Check':
-        return 'bg-amber-100 text-amber-800 border-amber-200';
-      case 'Printing In Progress':
-        return 'bg-purple-100 text-purple-800 border-purple-200';
-      case 'Ready for Dispatch':
-        return 'bg-indigo-100 text-indigo-800 border-indigo-200';
-      case 'Dispatched':
-        return 'bg-sky-100 text-sky-800 border-sky-200';
+        return 'bg-blue-50 text-blue-700 border-blue-200';
+      case 'Design Review':
+        return 'bg-amber-50 text-amber-700 border-amber-200';
+      case 'Customer Approval':
+        return 'bg-purple-50 text-purple-700 border-purple-200';
+      case 'Printing':
+        return 'bg-orange-50 text-orange-700 border-orange-200';
+      case 'Packing':
+        return 'bg-indigo-50 text-indigo-700 border-indigo-200';
+      case 'Shipped':
+        return 'bg-emerald-50 text-emerald-800 border-emerald-200';
       case 'Delivered':
-        return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+        return 'bg-zinc-100 text-zinc-800 border-zinc-200';
       default:
         return 'bg-zinc-100 text-zinc-800 border-zinc-200';
     }
@@ -657,7 +664,7 @@ ${separator}
           const isExpanded = expandedOrderId === order.id;
           const currentStageIdx = getStageIndex(order.status);
           const completionPercentage = (currentStageIdx / (STAGES.length - 1)) * 100;
-          const needsPayment = order.status === 'Ready for Dispatch' && !order.balancePaid;
+          const needsPayment = order.status === 'Packing' && !order.balancePaid;
           const paymentsPaid = order.payments.reduce((sum, p) => sum + p.amount, 0);
 
           return (
@@ -968,7 +975,7 @@ ${separator}
                                   }}
                                   className="text-xs font-black uppercase tracking-tight leading-tight"
                                 >
-                                  {step.status === 'Printing In Progress' ? 'Printing' : step.status}
+                                  {step.status}
                                 </motion.p>
                                 <p className={`text-[9px] leading-tight font-bold uppercase tracking-wider font-mono ${
                                   isCurrent ? 'text-zinc-500' : 'text-zinc-400'
@@ -1193,7 +1200,7 @@ ${separator}
                   </div>
 
                   {/* SMS Dispatch Notification Toggle */}
-                  {['Order Received', 'Design Check', 'Printing In Progress'].includes(order.status) && (
+                  {['Order Received', 'Design Review', 'Customer Approval', 'Printing'].includes(order.status) && (
                     <div className="bg-zinc-900 rounded-[28px] p-6 border border-zinc-800 shadow-xl flex flex-col md:flex-row items-center justify-between gap-6 overflow-hidden relative">
                       <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-[#FF4D00] to-transparent" />
                       

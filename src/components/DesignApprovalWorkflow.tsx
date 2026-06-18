@@ -114,7 +114,7 @@ export const DesignApprovalWorkflow: React.FC<DesignApprovalWorkflowProps> = ({
 
   // Handle direct image click to drop annotation pins
   const handleImageClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (dbStatus === 'Approved') return; // Locked on final approval
+    if (dbStatus === 'Customer Approval') return; // Locked on final approval
     if (!imageContainerRef.current) return;
 
     const rect = imageContainerRef.current.getBoundingClientRect();
@@ -161,7 +161,7 @@ export const DesignApprovalWorkflow: React.FC<DesignApprovalWorkflowProps> = ({
   // Delete pin
   const deletePin = async (pinId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (dbStatus === 'Approved') return;
+    if (dbStatus === 'Customer Approval') return;
 
     const updatedPins = pins.filter(p => p.id !== pinId);
     setIsSyncing(true);
@@ -235,7 +235,7 @@ export const DesignApprovalWorkflow: React.FC<DesignApprovalWorkflowProps> = ({
 
   // Handle final customer Approval or Reject status change
   const setApprovalStatus = async (approved: boolean) => {
-    const finalStatus: OrderStatus = approved ? 'Approved' : 'Design Review';
+    const finalStatus: OrderStatus = approved ? 'Customer Approval' : 'Design Review';
     setIsSyncing(true);
 
     try {
@@ -247,7 +247,7 @@ export const DesignApprovalWorkflow: React.FC<DesignApprovalWorkflowProps> = ({
         authorName: 'SYSTEM ADVISORY',
         authorRole: 'admin',
         text: approved 
-          ? `✓ CLIENT DESIGN APPROVED. The blueprint has been officially matched & locked inside our offset factory catalog. Modifications are no longer possible.`
+          ? `✓ CLIENT DESIGN APPROVED. The blueprint has been officially matched & locked inside our offset factory catalog. Production starts now.`
           : `⚠️ CLIENT REQUESTED REVISIONS. Seller has been notified to edit the draft layout promptly.`,
         timestamp: Date.now(),
         attachment: null
@@ -291,11 +291,11 @@ export const DesignApprovalWorkflow: React.FC<DesignApprovalWorkflowProps> = ({
             </span>
           )}
           <span className={`text-[9px] font-black px-3 py-1.5 rounded-lg uppercase tracking-wider border font-mono ${
-            dbStatus === 'Approved' 
+            dbStatus === 'Customer Approval' 
               ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
               : 'bg-amber-50 text-amber-700 border-amber-200'
           }`}>
-            BLUEPRINT: {dbStatus === 'Approved' ? 'LOCKED & VERIFIED' : 'PENDING APPROVAL'}
+            BLUEPRINT: {dbStatus === 'Customer Approval' ? 'LOCKED & VERIFIED' : 'PENDING APPROVAL'}
           </span>
         </div>
       </div>
@@ -315,7 +315,7 @@ export const DesignApprovalWorkflow: React.FC<DesignApprovalWorkflowProps> = ({
         <div className="lg:col-span-7 flex flex-col gap-3">
           <div className="flex items-center justify-between bg-zinc-50 border border-zinc-150 p-3 rounded-2xl">
             <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest font-mono">
-              {dbStatus === 'Approved' 
+              {dbStatus === 'Customer Approval' 
                 ? '🔒 Canvas locked - Design approved' 
                 : '🎯 Click any target point on the proof image to pin annotations'}
             </p>
@@ -331,7 +331,7 @@ export const DesignApprovalWorkflow: React.FC<DesignApprovalWorkflowProps> = ({
             <div 
               ref={imageContainerRef}
               onClick={handleImageClick}
-              className={`w-full relative transition ${dbStatus === 'Approved' ? 'cursor-not-allowed' : 'cursor-crosshair'}`}
+              className={`w-full relative transition ${dbStatus === 'Customer Approval' ? 'cursor-not-allowed' : 'cursor-crosshair'}`}
             >
               <img 
                 src={activeImage} 
@@ -374,7 +374,7 @@ export const DesignApprovalWorkflow: React.FC<DesignApprovalWorkflowProps> = ({
                           <span className="text-[9px] font-black uppercase text-[#FF4D00] tracking-wider">
                             {pin.authorRole.toUpperCase()}: {pin.authorName}
                           </span>
-                          {dbStatus !== 'Approved' && (
+                          {dbStatus !== 'Customer Approval' && (
                             <button 
                               onClick={(e) => deletePin(pin.id, e)}
                               className="text-zinc-500 hover:text-rose-500 transition cursor-pointer"
@@ -547,7 +547,7 @@ export const DesignApprovalWorkflow: React.FC<DesignApprovalWorkflowProps> = ({
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={dbStatus === 'Approved'}
+                disabled={dbStatus === 'Customer Approval'}
                 className="p-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-500 rounded-xl transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Paperclip className="w-4 h-4" />
@@ -557,14 +557,14 @@ export const DesignApprovalWorkflow: React.FC<DesignApprovalWorkflowProps> = ({
                 type="text"
                 value={msgInput}
                 onChange={(e) => setMsgInput(e.target.value)}
-                disabled={dbStatus === 'Approved'}
-                placeholder={dbStatus === 'Approved' ? '🔓 Consultation locked on final approval' : 'Ask manager for changes, upload raw edit sheets...'}
+                disabled={dbStatus === 'Customer Approval'}
+                placeholder={dbStatus === 'Customer Approval' ? '🔓 Consultation locked on final approval' : 'Ask manager for changes, upload raw edit sheets...'}
                 className="flex-1 bg-zinc-50 border border-zinc-200 rounded-xl p-2.5 text-xs outline-none placeholder-zinc-400 text-zinc-800 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
               />
 
               <button 
                 type="submit"
-                disabled={dbStatus === 'Approved' || (!msgInput.trim() && !msgAttachment)}
+                disabled={dbStatus === 'Customer Approval' || (!msgInput.trim() && !msgAttachment)}
                 className="p-2.5 bg-[#FF4D00] hover:bg-[#d93d00] text-white rounded-xl transition cursor-pointer disabled:bg-zinc-200 disabled:text-zinc-400 disabled:cursor-not-allowed"
               >
                 <Send className="w-4 h-4" />
@@ -577,7 +577,7 @@ export const DesignApprovalWorkflow: React.FC<DesignApprovalWorkflowProps> = ({
       </div>
 
       {/* Dynamic client-seller authorization action bar */}
-      {userRole === 'customer' && dbStatus !== 'Approved' && (
+      {userRole === 'customer' && dbStatus !== 'Customer Approval' && (
         <div className="bg-[#fff5f0] border border-[#FF4D00]/20 rounded-[28px] p-5 flex flex-col sm:flex-row items-center justify-between gap-5 mt-4">
           <div className="space-y-1 text-center sm:text-left">
             <p className="text-[10px] text-[#FF4D00] font-black uppercase tracking-widest font-mono">Verify Design & Start Printing</p>
@@ -605,7 +605,7 @@ export const DesignApprovalWorkflow: React.FC<DesignApprovalWorkflowProps> = ({
         </div>
       )}
 
-      {userRole !== 'customer' && dbStatus === 'Approved' && (
+      {userRole !== 'customer' && dbStatus === 'Customer Approval' && (
         <div className="bg-emerald-50 border border-emerald-250 text-emerald-800 rounded-[28px] p-5 text-center mt-4">
           <p className="text-xs font-black uppercase tracking-tight leading-relaxed">
             ✓ Client has approved this blueprint layout. Proceed to offsets with confidence. No updates authorized.

@@ -14,7 +14,8 @@ import {
   MoreVertical,
   Flag,
   Play,
-  Award
+  Award,
+  RefreshCw
 } from 'lucide-react';
 import { SocialPost, SocialComment, UserSession } from '../types';
 import { db } from '../firebase';
@@ -29,7 +30,9 @@ import {
   serverTimestamp, 
   increment,
   updateDoc,
-  doc
+  doc,
+  getDocs,
+  writeBatch
 } from 'firebase/firestore';
 
 interface CommunityFeedProps {
@@ -151,7 +154,16 @@ export default function CommunityFeed({
               <p className="text-[10px] font-mono text-rose-800 break-words">{errorStatus}</p>
               <div className="text-[10px] text-rose-600 mt-2 p-2 bg-rose-100/50 rounded-xl flex items-center justify-between">
                  <span>Applying Fallback Demo Content...</span>
-                 <span className="font-bold">STATUS: OK</span>
+                 <div className="flex items-center gap-2">
+                   <button 
+                     onClick={() => window.location.reload()}
+                     className="px-2 py-1 bg-rose-200 hover:bg-rose-300 rounded-lg font-black uppercase flex items-center gap-1"
+                   >
+                     <RefreshCw className="w-2.5 h-2.5" />
+                     Retry
+                   </button>
+                   <span className="font-bold">STATUS: DEMO</span>
+                 </div>
               </div>
             </div>
           </motion.div>
@@ -308,6 +320,74 @@ function SocialPostCard({
     }).catch(e => console.error(e));
   };
 
+  const handleShare = async () => {
+    const url = window.location.origin + '#post-' + post.id;
+    try {
+      await navigator.clipboard.writeText(url);
+      triggerToast('Link copied to clipboard!', 'success');
+    } catch (e) {
+      triggerToast('Direct link: ' + url, 'success');
+    }
+  };
+
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [isFollowLoading, setIsFollowLoading] = useState(false);
+
+  useEffect(() => {
+    if (!currentUserId || !post.creatorId || currentUserId === 'anonymous') return;
+    // Check if following
+    const checkFollow = async () => {
+      const q = query(
+        collection(db, 'follows'),
+        where('followerId', '==', currentUserId),
+        where('followingId', '==', post.creatorId)
+      );
+      const snap = await getDocs(q);
+      setIsFollowing(!snap.empty);
+    };
+    checkFollow();
+  }, [currentUserId, post.creatorId]);
+
+  const handleFollow = async () => {
+    if (!currentUserId || currentUserId === 'anonymous') {
+      triggerToast('Please sign in to follow creators', 'warn');
+      return;
+    }
+    setIsFollowLoading(true);
+    try {
+      if (isFollowing) {
+        // Unfollow
+        const q = query(
+          collection(db, 'follows'),
+          where('followerId', '==', currentUserId),
+          where('followingId', '==', post.creatorId)
+        );
+        const snap = await getDocs(q);
+        const batch = writeBatch(db);
+        snap.docs.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+        setIsFollowing(false);
+        triggerToast('Unfollowed ' + post.creatorName, 'success');
+      } else {
+        // Follow
+        await addDoc(collection(db, 'follows'), {
+          followerId: currentUserId,
+          followingId: post.creatorId,
+          createdAt: serverTimestamp()
+        });
+        setIsFollowing(true);
+        triggerToast('Following ' + post.creatorName, 'success');
+      }
+    } catch (e) {
+      console.error(e);
+      triggerToast('Follow operation failed', 'warn');
+    } finally {
+      setIsFollowLoading(false);
+    }
+  };
+
+  if (!post) return null;
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
@@ -316,7 +396,7 @@ function SocialPostCard({
     >
       {/* Card Header */}
       <div className="p-4 flex items-center justify-between">
-        <div className="flex items-center gap-3 cursor-pointer" onClick={() => onCreatorClick?.(post.creatorId)}>
+        <div className="flex items-center gap-3 cursor-pointer" onClick={() => onCreatorClick?.(post.creatorId || '')}>
           <div className="w-10 h-10 rounded-full bg-zinc-100 border-2 border-white shadow-sm overflow-hidden flex items-center justify-center">
             {post.creatorAvatar ? (
               <img src={post.creatorAvatar} className="w-full h-full object-cover" alt="" />
@@ -326,7 +406,7 @@ function SocialPostCard({
           </div>
           <div>
             <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-black uppercase tracking-tight text-zinc-900">{post.creatorName}</span>
+              <span className="text-[11px] font-black uppercase tracking-tight text-zinc-900">{post.creatorName || 'Anonymous Creator'}</span>
               {post.isVerified && <CheckCircle2 className="w-3.5 h-3.5 text-blue-500 fill-blue-50" />}
               {post.isAiGenerated && (
                 <span className="px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-600 border border-purple-100 text-[7px] font-black uppercase tracking-widest">AI</span>
@@ -335,14 +415,25 @@ function SocialPostCard({
             <p className="text-[9px] font-mono text-zinc-400 font-bold uppercase">{post.createdAt?.toDate?.()?.toLocaleDateString() || 'Just now'}</p>
           </div>
         </div>
-        <button className="p-2 hover:bg-zinc-50 rounded-full transition text-zinc-400">
-          <MoreVertical className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-2">
+           {post.creatorId !== currentUserId && (
+             <button 
+               onClick={handleFollow}
+               disabled={isFollowLoading}
+               className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest transition-all ${isFollowing ? 'bg-zinc-100 text-zinc-400' : 'bg-black text-white'} disabled:opacity-50`}
+             >
+               {isFollowLoading ? '...' : (isFollowing ? 'Following' : 'Follow')}
+             </button>
+           )}
+           <button className="p-2 hover:bg-zinc-50 rounded-full transition text-zinc-400">
+             <MoreVertical className="w-4 h-4" />
+           </button>
+        </div>
       </div>
 
       {/* Card Media (Instagram style carousel) */}
       <div className="relative aspect-square bg-zinc-50 group overflow-hidden">
-        {post.media[0]?.type === 'video' ? (
+        {post.media && post.media[0]?.type === 'video' ? (
           <video 
             src={post.media[0]?.url} 
             poster={post.media[0]?.thumbnail}
@@ -355,7 +446,7 @@ function SocialPostCard({
           />
         ) : (
           <img 
-            src={post.media[0]?.url || 'https://images.unsplash.com/photo-1626785774573-4b799315345d?q=80&w=800&auto=format&fit=crop'} 
+            src={post.media?.[0]?.url || 'https://images.unsplash.com/photo-1626785774573-4b799315345d?q=80&w=800&auto=format&fit=crop'} 
             className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform duration-700"
             alt={post.caption}
             onClick={() => onPostClick?.(post)}
@@ -375,7 +466,7 @@ function SocialPostCard({
            )}
            <button 
              className="w-12 bg-white/90 backdrop-blur-md text-zinc-900 rounded-2xl flex items-center justify-center border border-white shadow-xl hover:bg-white transition-all active:scale-95"
-             onClick={() => triggerToast('Design shared to clipboard!', 'success')}
+             onClick={handleShare}
            >
              <Share2 className="w-4 h-4" />
            </button>
@@ -391,13 +482,16 @@ function SocialPostCard({
               className={`flex items-center gap-1.5 transition ${isLiked ? 'text-rose-500' : 'text-zinc-600 hover:text-rose-500'}`}
             >
               <Heart className={`w-5 h-5 ${isLiked ? 'fill-current' : ''}`} />
-              <span className="text-[10px] font-black font-mono">{post.likesCount + (isLiked ? 1 : 0)}</span>
+              <span className="text-[10px] font-black font-mono">{(post.likesCount || 0) + (isLiked ? 1 : 0)}</span>
             </button>
-            <button className="flex items-center gap-1.5 text-zinc-600 hover:text-[#FF4D00] transition">
+            <button 
+              onClick={() => setShowComments(!showComments)}
+              className="flex items-center gap-1.5 text-zinc-600 hover:text-[#FF4D00] transition"
+            >
               <MessageCircle className="w-5 h-5" />
-              <span className="text-[10px] font-black font-mono">{post.commentCount}</span>
+              <span className="text-[10px] font-black font-mono">{(post.commentCount || 0)}</span>
             </button>
-            <button className="text-zinc-600 hover:text-[#FF4D00] transition">
+            <button onClick={handleShare} className="text-zinc-600 hover:text-[#FF4D00] transition">
               <Share2 className="w-5 h-5" />
             </button>
           </div>
@@ -408,11 +502,11 @@ function SocialPostCard({
 
         <div>
           <p className="text-[11px] text-zinc-800 leading-relaxed">
-            <span className="font-black mr-2 uppercase tracking-tight">{post.creatorName}</span>
-            {post.caption}
+            <span className="font-black mr-2 uppercase tracking-tight">{post.creatorName || 'Creator'}</span>
+            {post.caption || ''}
           </p>
           <div className="flex flex-wrap gap-2 mt-2">
-            {post.tags.map(tag => (
+            {post.tags?.map(tag => (
               <span key={tag} className="text-[10px] font-mono font-bold text-[#FF4D00] hover:underline cursor-pointer">
                 #{tag}
               </span>
@@ -420,11 +514,45 @@ function SocialPostCard({
           </div>
         </div>
 
-        {post.commentCount > 0 && (
-          <button className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest hover:text-zinc-600 transition">
-            View all {post.commentCount} comments
+        {(post.commentCount || 0) > 0 && (
+          <button 
+            onClick={() => setShowComments(!showComments)}
+            className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest hover:text-zinc-600 transition"
+          >
+            {showComments ? 'Hide comments' : `View all ${post.commentCount} comments`}
           </button>
         )}
+
+        <AnimatePresence>
+          {showComments && (
+            <motion.div 
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="pt-4 space-y-4 border-t border-zinc-50 overflow-hidden"
+            >
+              <div className="space-y-3">
+                {[1, 2].map(i => (
+                  <div key={i} className="flex gap-3">
+                    <div className="w-6 h-6 rounded-full bg-zinc-100 shrink-0" />
+                    <div>
+                      <p className="text-[10px]"><span className="font-bold mr-2">user_{i}</span> Great design! Love the minimalist approach.</p>
+                      <p className="text-[8px] text-zinc-400 mt-1 uppercase font-bold">2h ago</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-3 pt-2">
+                 <input 
+                   type="text" 
+                   placeholder="Add a comment..." 
+                   className="flex-1 bg-zinc-50 border-none rounded-xl px-4 py-2 text-[11px] focus:ring-1 focus:ring-[#FF4D00] outline-none"
+                 />
+                 <button className="text-[10px] font-black uppercase text-[#FF4D00] pr-2">Post</button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </motion.div>
   );

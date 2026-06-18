@@ -53,6 +53,29 @@ export default function DiagnosticsPanel() {
     fetchDiagnostics();
   }, []);
 
+  if (error) {
+    return (
+      <div className="bg-rose-50 border border-rose-100 rounded-[32px] p-10 text-center space-y-4">
+        <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto shadow-xl">
+          <AlertCircle className="w-8 h-8" />
+        </div>
+        <div>
+          <h3 className="text-lg font-black uppercase text-rose-900 tracking-tight">Audit Connection Failed</h3>
+          <p className="text-xs font-bold text-rose-700 uppercase tracking-widest mt-1">THE DIAGNOSTIC NODE RETURNED AN UNEXPECTED ERROR</p>
+        </div>
+        <div className="bg-white/50 border border-rose-100 p-4 rounded-2xl max-w-lg mx-auto">
+          <p className="text-[10px] font-mono text-rose-800 break-words">{error}</p>
+        </div>
+        <button 
+          onClick={fetchDiagnostics}
+          className="px-8 py-3 bg-rose-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-700 transition shadow-lg active:scale-95"
+        >
+          Re-establish Connection
+        </button>
+      </div>
+    );
+  }
+
   if (loading && !data) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-4">
@@ -116,13 +139,19 @@ export default function DiagnosticsPanel() {
             highlight={data.firebase.status === 'Connected'}
           />
           <StatusItem 
-            label="Firestore R/W/D" 
+            label="Community Node" 
+            status={data.firestore.read === 'PASS' ? 'Ready' : 'FAIL'} 
+            icon={MessageSquare} 
+            details={data.firestore.read === 'PASS' ? 'Post stream synchronized' : 'Data lineage interrupted'}
+          />
+          <StatusItem 
+            label="Firestore Health" 
             status={`${data.firestore.read}/${data.firestore.write}/${data.firestore.delete}`} 
             icon={Database} 
             details={data.firestore.error || `Latency: ${data.firestore.latency}ms`}
           />
           <StatusItem 
-            label="Cashfree PG" 
+            label="Cashfree Engine" 
             status={data.cashfree.auth} 
             icon={Zap} 
             details={data.cashfree.details || data.cashfree.error}

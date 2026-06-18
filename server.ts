@@ -428,17 +428,6 @@ export function createExpressApp() {
     next();
   });
 
-  // GLOBAL ERROR HANDLER FOR JSON RESPONSES
-  app.use((err: any, req: any, res: any, next: any) => {
-    console.error("🔥 [FATAL SERVER ERROR]:", err);
-    res.status(500).json({
-      success: false,
-      error: "INTERNAL_SERVER_ERROR",
-      message: err.message || "An unexpected error occurred on the server.",
-      stack: process.env.NODE_ENV === 'production' ? undefined : err.stack
-    });
-  });
-
   // Startup / Diagnostics for Serverless environment
   console.log("====================================================");
   console.log("🚀 [SERVER BOOT] Initializing PrintBazaar Express App Node...");
@@ -840,6 +829,14 @@ Customer's custom requirements or idea prompt: "${prompt}"`;
           test_finished: FieldValue.serverTimestamp()
         });
         fUpdateStatus = "PASS";
+        
+        // Community Feed Check
+        try {
+          const postSnap = await db.collection('posts').limit(1).get();
+          console.log(`[Diagnostics] Community posts check: ${postSnap.size} posts found.`);
+        } catch (postErr) {
+          console.error("[Diagnostics] Community posts check failed", postErr);
+        }
 
         snap = await probeRef.get();
         if (snap.data()?.status !== "updated") {
@@ -898,46 +895,47 @@ Customer's custom requirements or idea prompt: "${prompt}"`;
     }
 
     const results: any = {
-      // 10. ADMIN DIAGNOSTICS REQUIRED FIELDS (non-object fields for direct rendering)
-      firebaseConnected: firebaseConnectedStatus,
-      serviceAccountValid: serviceAccountValidStatus,
-      firestoreRead: fReadStatus,
-      firestoreWrite: fWriteStatus,
-      firestoreUpdate: fUpdateStatus,
-      firestoreDelete: fDeleteStatus,
-      auth: authStatus,
-      storage: storageStatus,
-      envLoaded: envLoadedStatus,
-      iamPermissions: iamStatus,
-      healthScore: Math.max(0, healthScoreValue),
-
-      // Retain deep structure compatibility for downstream integrations
+      // Structure expected by DiagnosticsPanel.tsx
       firebase: { 
-        status: firebaseStatus, 
-        auth: authStatus, 
-        store: fWriteStatus === "PASS" ? "Active" : "FAIL", 
-        storage: storageStatus,
-        initialized: firebaseAdminChecked
+        status: firebaseConnectedStatus, 
+        details: serviceAccountValidStatus === "PASS" ? "Service account valid" : "Service account validation failed"
       },
-      db_ops: { 
+      firestore: { 
         read: fReadStatus, 
         write: fWriteStatus, 
-        update: fUpdateStatus,
         delete: fDeleteStatus, 
-        latency: Date.now() - start 
+        latency: Date.now() - start,
+        error: iamStatus.includes("FAIL") ? iamStatus : undefined
       },
-      cashfree: { status: cashfreeStatus, mode: getCleanEnv("CASHFREE_ENVIRONMENT") || "SANDBOX" },
-      gemini: { status: !!process.env.GEMINI_API_KEY ? "Active" : "Keys Missing", model: "gemini-3.5-flash" },
-      email: { status: !!getMailer() ? "Active" : "Bypass Mode", provider: "SMTP" },
-      googleAuth: { status: "Active", provider: "Identity Platform" },
-      recaptcha: { status: "Integration Verified", type: "v2-checkbox/invisible" },
+      cashfree: { 
+        auth: cashfreeStatus, 
+        details: `Env: ${getCleanEnv("CASHFREE_ENVIRONMENT") || "SANDBOX"}`
+      },
+      storage: { 
+        bucket: storageStatus === "Active" ? (process.env.FIREBASE_STORAGE_BUCKET || "Default Bucket") : "Missing" 
+      },
+      env: {
+        FIREBASE_PROJECT_ID: hasProjId,
+        FIREBASE_CLIENT_EMAIL: hasEmail,
+        FIREBASE_PRIVATE_KEY: hasKey,
+        CASHFREE_CLIENT_ID: !!process.env.CASHFREE_CLIENT_ID,
+        CASHFREE_CLIENT_SECRET: !!process.env.CASHFREE_CLIENT_SECRET,
+        GEMINI_API_KEY: !!process.env.GEMINI_API_KEY
+      },
+      system: { 
+        nodeVersion: process.version, 
+        timestamp: new Date().toISOString() 
+      },
+      apiVersion: "3.2.0-PROD",
+      
+      // Legacy support fields
+      healthScore: Math.max(0, healthScoreValue),
+      recommendedFixes,
       authorizedDomains: { 
         current: host,
         status: "Checking Browser Parity",
         validityHint: domainHint
-      },
-      recommendedFixes,
-      timestamp: new Date().toISOString()
+      }
     };
 
     return res.json(results);
@@ -1908,7 +1906,7 @@ Customer's custom requirements or idea prompt: "${prompt}"`;
       const rawBody = req.rawBody || JSON.stringify(req.body);
       const cf = getCashfree();
 
-      if (!cf) return res.sendStatus(500);
+      if (!cf) return res.status(500).json({ success: false, error: "Cashfree engine unavailable" });
 
       try {
         cf.PGVerifyWebhookSignature(signature, rawBody, timestamp);
@@ -1978,7 +1976,7 @@ Customer's custom requirements or idea prompt: "${prompt}"`;
       res.json({ status: "ok" });
     } catch (err) {
       console.error("Webhook processing error:", err);
-      res.sendStatus(500);
+      res.status(500).json({ success: false, error: "Webhook processing failure" });
     }
   });
 

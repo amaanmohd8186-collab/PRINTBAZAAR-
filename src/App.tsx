@@ -1103,7 +1103,7 @@ export default function App() {
         ordersList.forEach((newOrder) => {
           const oldOrder = prevOrdersRef.current.find(o => o.id === newOrder.id);
           if (oldOrder && oldOrder.status !== newOrder.status) {
-            if (['Printing In Progress', 'Ready for Dispatch'].includes(newOrder.status)) {
+            if (['Printing', 'Packing'].includes(newOrder.status)) {
               triggerServiceWorkerNotification(
                 `Order #${newOrder.id} - ${newOrder.status}`,
                 `Your blueprint order status is marked as: "${newOrder.status}".`
@@ -1370,7 +1370,7 @@ export default function App() {
       }
 
       // Trigger Automated Status Email
-      if (customerEmail && (status === 'Printing In Progress' || status === 'Ready for Dispatch')) {
+      if (customerEmail && (status === 'Printing' || status === 'Packing')) {
         safeFetch('/api/emails/order-status', {
           method: 'POST',
           body: JSON.stringify({ email: customerEmail, orderId, status })
@@ -2029,7 +2029,10 @@ export default function App() {
 
                 {enterprisePortal === 'seller' && (
                   <div className="w-full">
-                    <SellerVerificationSystem isAdminMode={(roleMode as string) === 'admin'} />
+                    <SellerVerificationSystem 
+                      isAdminMode={(roleMode as string) === 'admin'} 
+                      triggerToast={triggerToast}
+                    />
                   </div>
                 )}
 
@@ -2823,7 +2826,7 @@ export default function App() {
                     <div className="space-y-1">
                       <p className="text-xs font-bold text-zinc-850 font-mono">Trade Accounts (50-50 Cycle)</p>
                       <p className="text-[11px] text-zinc-500 leading-relaxed">
-                        Established corporate clients can register a 50% advance pledge to initialize plate rendering with the remaining 50% balance cleared dynamically once status flags &quot;Ready for Dispatch&quot;.
+                        Established corporate clients can register a 50% advance pledge to initialize plate rendering with the remaining 50% balance cleared dynamically once status flags &quot;Packing&quot;.
                       </p>
                     </div>
                   </div>
@@ -3071,8 +3074,8 @@ export default function App() {
                   </p>
                   <ul className="text-[11px] text-zinc-550 pl-4 list-decimal space-y-1">
                     <li>Launch checkouts utilizing 50% upfront commitments to initiate platemaking.</li>
-                    <li>Jobs advance through structural checks: 'Design Check' → 'Printing In Progress'.</li>
-                    <li>Upon transitioning status to 'Ready for Dispatch', final 50% settle screens active.</li>
+                    <li>Jobs advance through structural checks: 'Design Review' → 'Printing'.</li>
+                    <li>Upon transitioning status to 'Packing', final 50% settle screens active.</li>
                     <li>Settle balance invoice sum instantly releases shipping courier waybill details.</li>
                   </ul>
                 </div>

@@ -130,10 +130,10 @@ export default function AdminWorkspace({
     });
 
     const ordersReceivedCount = orders.filter(o => o.status === 'Order Received').length;
-    const designCheckCount = orders.filter(o => o.status === 'Design Check').length;
-    const inPrintingCount = orders.filter(o => o.status === 'Printing In Progress').length;
-    const readyToDispatchCount = orders.filter(o => o.status === 'Ready for Dispatch').length;
-    const dispatchedCount = orders.filter(o => o.status === 'Dispatched').length;
+    const designCheckCount = orders.filter(o => o.status === 'Design Review').length;
+    const inPrintingCount = orders.filter(o => o.status === 'Printing').length;
+    const readyToDispatchCount = orders.filter(o => o.status === 'Packing').length;
+    const dispatchedCount = orders.filter(o => o.status === 'Shipped').length;
 
     return {
       totalOrders: orders.length,
@@ -383,13 +383,13 @@ export default function AdminWorkspace({
     switch (status) {
       case 'Order Received':
         return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'Design Check':
+      case 'Design Review':
         return 'bg-amber-100 text-amber-800 border-amber-200';
-      case 'Printing In Progress':
+      case 'Printing':
         return 'bg-purple-100 text-purple-800 border-purple-200';
-      case 'Ready for Dispatch':
+      case 'Packing':
         return 'bg-indigo-100 text-indigo-800 border-indigo-200';
-      case 'Dispatched':
+      case 'Shipped':
         return 'bg-sky-100 text-sky-800 border-sky-200';
       case 'Delivered':
         return 'bg-emerald-100 text-emerald-800 border-emerald-200';
@@ -643,7 +643,7 @@ export default function AdminWorkspace({
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               
               <div className="bg-zinc-50 p-5 rounded-[24px] border border-zinc-150 text-center">
-                <p className="text-[10px] font-black uppercase text-zinc-400 tracking-wider">Design Check</p>
+                <p className="text-[10px] font-black uppercase text-zinc-400 tracking-wider">Design Review</p>
                 <p className="text-3xl font-heavy text-zinc-900 mt-1.5">{analytics.pendingActionSum}</p>
                 <div className="w-full bg-zinc-205 h-1.5 rounded-full mt-3 overflow-hidden mx-auto max-w-[80px]">
                   <div className="bg-amber-500 h-full" style={{ width: `${Math.min(100, (analytics.pendingActionSum / (analytics.totalOrders || 1)) * 100)}%` }} />
@@ -732,10 +732,10 @@ export default function AdminWorkspace({
                   >
                     <option value="All">All Statuses</option>
                     <option value="Order Received">Order Received</option>
-                    <option value="Design Check">Design Check</option>
-                    <option value="Printing In Progress">Printing In Progress</option>
-                    <option value="Ready for Dispatch">Ready to Dispatch</option>
-                    <option value="Dispatched">Dispatched</option>
+                    <option value="Design Review">Design Review</option>
+                    <option value="Printing">Printing</option>
+                    <option value="Packing">Packing</option>
+                    <option value="Shipped">Shipped</option>
                     <option value="Delivered">Delivered</option>
                   </select>
                   
@@ -935,7 +935,7 @@ export default function AdminWorkspace({
                       </p>
                       <button
                         type="button"
-                        onClick={() => onUpdateOrderStatus(selectedOrder.id, 'Design Check')}
+                        onClick={() => onUpdateOrderStatus(selectedOrder.id, 'Design Review')}
                         className="w-full py-4 bg-amber-500 hover:bg-white hover:text-black text-black font-heavy text-xs uppercase tracking-wider rounded-2xl transition flex items-center justify-center gap-2 cursor-pointer font-mono"
                       >
                         <span>Approve design & launch design checkpoint</span>
@@ -944,14 +944,14 @@ export default function AdminWorkspace({
                     </div>
                   )}
 
-                  {selectedOrder.status === 'Design Check' && (
+                  {selectedOrder.status === 'Design Review' && (
                     <div className="space-y-3">
                       <p className="text-[11px] text-zinc-400 leading-relaxed font-bold uppercase tracking-wide">
                         Bleeds, margins, vector overlays guidelines check out. Release items to factory presses.
                       </p>
                       <button
                         type="button"
-                        onClick={() => onUpdateOrderStatus(selectedOrder.id, 'Printing In Progress')}
+                        onClick={() => onUpdateOrderStatus(selectedOrder.id, 'Printing')}
                         className="w-full py-4 bg-purple-600 hover:bg-white hover:text-black text-white font-heavy text-xs uppercase tracking-wider rounded-2xl transition flex items-center justify-center gap-2 cursor-pointer font-mono"
                       >
                         <span>Commence Offset Press Printing Run</span>
@@ -960,14 +960,14 @@ export default function AdminWorkspace({
                     </div>
                   )}
 
-                  {selectedOrder.status === 'Printing In Progress' && (
+                  {selectedOrder.status === 'Printing' && (
                     <div className="space-y-3">
                       <p className="text-[11px] text-zinc-400 leading-relaxed font-bold uppercase tracking-wide">
                         Die cuts, stack slicing, velocity lamination runs completed. Deliver release notification.
                       </p>
                       <button
                         type="button"
-                        onClick={() => onUpdateOrderStatus(selectedOrder.id, 'Ready for Dispatch')}
+                        onClick={() => onUpdateOrderStatus(selectedOrder.id, 'Packing')}
                         className="w-full py-4 bg-[#FF4D00] hover:bg-white hover:text-black text-white font-heavy text-xs uppercase tracking-wider rounded-2xl transition flex items-center justify-center gap-2 cursor-pointer font-mono"
                       >
                         <span>Declare Production Completed</span>
@@ -976,7 +976,7 @@ export default function AdminWorkspace({
                     </div>
                   )}
 
-                  {selectedOrder.status === 'Ready for Dispatch' && (
+                  {selectedOrder.status === 'Packing' && (
                     <div className="space-y-4">
                       <div className="p-4 rounded-[20px] border bg-zinc-900 border-zinc-800 space-y-2.5">
                         <div className="flex justify-between items-baseline">
@@ -1017,7 +1017,7 @@ export default function AdminWorkspace({
                         <button
                           type="button"
                           disabled={!trackingIdInput}
-                          onClick={() => onUpdateOrderStatus(selectedOrder.id, 'Dispatched', trackingIdInput, courierNameInput)}
+                          onClick={() => onUpdateOrderStatus(selectedOrder.id, 'Shipped', trackingIdInput, courierNameInput)}
                           className={`w-full py-3.5 font-heavy text-xs uppercase tracking-wider rounded-xl transition flex items-center justify-center gap-2 ${
                             trackingIdInput
                               ? 'bg-[#FF4D00] hover:bg-white hover:text-black text-white cursor-pointer shadow-lg shadow-sky-600/10'
@@ -1031,7 +1031,7 @@ export default function AdminWorkspace({
                     </div>
                   )}
 
-                  {selectedOrder.status === 'Dispatched' && (
+                  {selectedOrder.status === 'Shipped' && (
                     <div className="space-y-3">
                       <p className="text-[11px] text-zinc-400 leading-relaxed font-bold uppercase tracking-wide">
                         Shipment logged under <strong className="text-white font-black">{selectedOrder.courierName}</strong> with docket tracing code: <strong className="text-[#FF4D00] font-mono">{selectedOrder.trackingNumber}</strong>.
@@ -1923,13 +1923,13 @@ const getStatusColor = (status: OrderStatus) => {
   switch (status) {
     case 'Order Received':
       return 'bg-blue-50 text-blue-800 border-blue-100';
-    case 'Design Check':
+    case 'Design Review':
       return 'bg-amber-50 text-amber-800 border-amber-100';
-    case 'Printing In Progress':
+    case 'Printing':
       return 'bg-purple-50 text-purple-800 border-purple-100';
-    case 'Ready for Dispatch':
+    case 'Packing':
       return 'bg-indigo-50 text-indigo-800 border-indigo-100';
-    case 'Dispatched':
+    case 'Shipped':
       return 'bg-sky-50 text-sky-800 border-sky-100';
     case 'Delivered':
       return 'bg-emerald-50 text-emerald-800 border-emerald-100';

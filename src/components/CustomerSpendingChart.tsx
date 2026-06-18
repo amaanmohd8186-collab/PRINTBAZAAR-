@@ -24,7 +24,7 @@ export default function CustomerSpendingChart({ orders }: CustomerSpendingChartP
   // Filter completed and sorted orders
   // Let's treat orders that are placed as valid completed print transactions
   const completedOrders = orders
-    .filter(o => o.status !== 'Design Check' || o.payments.length > 0)
+    .filter(o => o.status !== 'Design Review' || o.payments.length > 0)
     .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
   // Generate chart data chronologically

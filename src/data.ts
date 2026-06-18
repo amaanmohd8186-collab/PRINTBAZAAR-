@@ -308,7 +308,7 @@ export const INITIAL_ORDERS: Order[] = [
         timestamp: '2026-06-09T11:22:45Z'
       }
     ],
-    status: 'Printing In Progress',
+    status: 'Delivered',
     createdAt: '2026-06-09T11:20:10Z',
     updatedAt: '2026-06-09T14:45:00Z'
   },
@@ -348,7 +348,7 @@ export const INITIAL_ORDERS: Order[] = [
         timestamp: '2026-06-08T09:12:00Z'
       }
     ],
-    status: 'Dispatched',
+    status: 'Shipped',
     trackingNumber: 'DEL-IN-889274921',
     courierName: 'Delhivery',
     createdAt: '2026-06-08T09:05:00Z',
