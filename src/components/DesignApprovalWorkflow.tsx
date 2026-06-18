@@ -85,7 +85,7 @@ export const DesignApprovalWorkflow: React.FC<DesignApprovalWorkflowProps> = ({
 
   // Real-time listener for current order design annotations & chat messages
   useEffect(() => {
-    if (!order.id) return;
+    if (!order.id || !db) return;
     setIsSyncing(true);
     const orderDocRef = doc(db, 'orders', order.id);
 

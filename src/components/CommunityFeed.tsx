@@ -65,6 +65,12 @@ export default function CommunityFeed({
   useEffect(() => {
     setLoading(true);
     setErrorStatus(null);
+    if (!db) {
+      console.warn("Firestore not initialized. Using Community Feed demo items.");
+      setErrorStatus("Firestore offline");
+      setLoading(false);
+      return;
+    }
     let q = query(collection(db, 'posts'), orderBy('createdAt', 'desc'), limit(20));
     
     if (activeTab === 'trending') {

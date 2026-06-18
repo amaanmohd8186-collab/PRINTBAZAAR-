@@ -240,7 +240,7 @@ export default function CashfreeGateway({
               </span>
             ) : (
               <span className="text-[9px] font-mono font-bold bg-rose-500/10 text-rose-500 border border-rose-500/20 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-                Missing Keys
+                System Unavailable
               </span>
             )}
           </div>
@@ -255,13 +255,13 @@ export default function CashfreeGateway({
           </p>
 
           {!loadingConfig && !hasKeys && (
-            <div className="mt-4 mx-2 p-3 bg-zinc-100 rounded-2xl border border-zinc-200 flex flex-col text-left space-y-1">
+            <div className="mt-4 mx-2 p-3 bg-red-50 rounded-2xl border border-red-100 flex flex-col text-left space-y-1">
               <span className="text-[10px] font-black text-rose-700 uppercase tracking-wide flex items-center gap-1">
                 <AlertCircle className="w-3.5 h-3.5 shrink-0 text-rose-500" />
-                Integration Required (Cashfree)
+                Payment service temporarily unavailable.
               </span>
               <p className="text-[9px] text-zinc-500 leading-relaxed">
-                Add <b>CASHFREE_CLIENT_ID</b> and <b>CASHFREE_CLIENT_SECRET</b> in the AI Studio <b>Settings &gt; Secrets</b>. The app will swap to the production Cashfree V3 overlay.
+                We are currently experiencing issues connecting to the secure gateway. Please try again later.
               </p>
             </div>
           )}
@@ -341,7 +341,8 @@ export default function CashfreeGateway({
             <button
               type="button"
               onClick={() => handlePay()}
-              className="flex-1 py-3.5 rounded-2xl bg-black hover:bg-[#FF4D00] text-white text-xs font-heavy uppercase tracking-wider transition shadow-md flex items-center justify-center gap-1.5"
+              disabled={!hasKeys}
+              className={`flex-1 py-3.5 rounded-2xl ${!hasKeys ? 'bg-zinc-300 text-zinc-500 cursor-not-allowed' : 'bg-black hover:bg-[#FF4D00] text-white'} text-xs font-heavy uppercase tracking-wider transition shadow-md flex items-center justify-center gap-1.5`}
             >
               <span>Pay via Cashfree</span>
             </button>

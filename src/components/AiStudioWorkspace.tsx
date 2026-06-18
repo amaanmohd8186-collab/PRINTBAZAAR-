@@ -90,6 +90,13 @@ export default function AiStudioWorkspace() {
 
   // Real-time seller status synchronization hook
   useEffect(() => {
+    if (!auth || !db) {
+       console.warn("Auth or DB not initialized in AiStudioWorkspace. Simulating unverified state.");
+       setCheckingAuth(false);
+       setCurrentSellerStatus("Unregistered");
+       setIsVerified(false);
+       return;
+    }
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setCheckingAuth(true);
       if (firebaseUser) {
@@ -156,6 +163,7 @@ export default function AiStudioWorkspace() {
   const [bgReplaceType, setBgReplaceType] = useState<string>("transparent");
   const [upscaleFactor, setUpscaleFactor] = useState<number>(2);
   const [customPrompt, setCustomPrompt] = useState<string>("");
+  const [aiProvider, setAiProvider] = useState<"gemini" | "adobe">("gemini");
 
   const [brushSize, setBrushSize] = useState<number>(20);
   const [validationScore, setValidationScore] = useState<number | null>(null);
@@ -177,6 +185,45 @@ export default function AiStudioWorkspace() {
   const touchStartCenter = useRef<{ x: number; y: number } | null>(null);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const initialPanOffset = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  // Refs and handlers for desktop mouse dragging/panning and mouse wheel zooming
+  const isDraggingMouse = useRef<boolean>(false);
+  const mouseDragStart = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const mousePanStartOffset = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return; // Only drag on left-click
+    if (activeTool === "crop") {
+      const target = e.target as HTMLElement;
+      if (target.closest('.cursor-se-resize') || target.closest('.cursor-move') || target.closest('.crop-guide')) {
+        return;
+      }
+    }
+    isDraggingMouse.current = true;
+    mouseDragStart.current = { x: e.clientX, y: e.clientY };
+    mousePanStartOffset.current = { ...panOffset };
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isDraggingMouse.current) return;
+    const deltaX = e.clientX - mouseDragStart.current.x;
+    const deltaY = e.clientY - mouseDragStart.current.y;
+    setPanOffset({
+      x: mousePanStartOffset.current.x + deltaX,
+      y: mousePanStartOffset.current.y + deltaY
+    });
+  };
+
+  const handleMouseUpOrLeave = () => {
+    isDraggingMouse.current = false;
+  };
+
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const scaleFactor = e.deltaY < 0 ? 1.1 : 0.9;
+    const nextZoom = Math.min(400, Math.max(25, Math.round(zoomLevel * scaleFactor)));
+    setZoomLevel(nextZoom);
+  };
 
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
     // Prevent double-tap zoom
@@ -572,6 +619,7 @@ export default function AiStudioWorkspace() {
           body: JSON.stringify({
             tool,
             image: currentImage || THEMED_ASSETS["wedding"], // fall back to template source
+            provider: aiProvider,
             options: {
               prompt: customPrompt || "Premium Commercial Print Design Layout",
               upscaleFactor: upscaleFactor
@@ -659,6 +707,10 @@ export default function AiStudioWorkspace() {
           default:
             setCurrentImage(newImg);
             commitCanvasState(newImg);
+        }
+        
+        if (result.message) {
+          setSuccessMessage(result.message);
         }
       } catch (err: any) {
         console.error("AI Back-end Process failed:", err);
@@ -1243,7 +1295,12 @@ export default function AiStudioWorkspace() {
                   onTouchStart={handleTouchStart}
                   onTouchMove={handleTouchMove}
                   onTouchEnd={handleTouchEnd}
-                  className={`flex-1 rounded-2xl relative flex items-center justify-center overflow-auto p-4 border border-zinc-100 ${bgRemoved ? 'bg-zinc-300' : 'bg-zinc-50'}`}
+                  onMouseDown={handleMouseDown}
+                  onMouseMove={handleMouseMove}
+                  onMouseUp={handleMouseUpOrLeave}
+                  onMouseLeave={handleMouseUpOrLeave}
+                  onWheel={handleWheel}
+                  className={`flex-1 rounded-2xl relative flex items-center justify-center overflow-auto p-4 border border-zinc-100 ${bgRemoved ? 'bg-zinc-300' : 'bg-zinc-50'} cursor-grab active:cursor-grabbing`}
                   style={{
                     touchAction: "none",
                     ...(bgRemoved ? {
@@ -1301,6 +1358,12 @@ export default function AiStudioWorkspace() {
                       {/* Sliding Area Detector overlay */}
                       <div 
                         className="absolute inset-0 cursor-ew-resize z-10"
+                        onMouseDown={(e) => {
+                          e.stopPropagation();
+                        }}
+                        onTouchStart={(e) => {
+                          e.stopPropagation();
+                        }}
                         onMouseMove={(e) => {
                           if (e.buttons === 1) {
                             const rect = e.currentTarget.getBoundingClientRect();
@@ -1366,9 +1429,12 @@ export default function AiStudioWorkspace() {
                               const startY = e.clientY;
                               const startW = cropBox.w;
                               const startH = cropBox.h;
+                              const parentRect = e.currentTarget.parentElement?.parentElement?.getBoundingClientRect();
+                              const parentWidth = parentRect?.width || 350;
+                              const parentHeight = parentRect?.height || 250;
                               const handleMouseMove = (mv: MouseEvent) => {
-                                const dx = ((mv.clientX - startX) / 350) * 100;
-                                const dy = ((mv.clientY - startY) / 250) * 100;
+                                const dx = ((mv.clientX - startX) / parentWidth) * 100;
+                                const dy = ((mv.clientY - startY) / parentHeight) * 100;
                                 setCropBox((prev) => ({
                                   ...prev,
                                   w: Math.max(15, Math.min(100 - prev.x, startW + dx)),
@@ -1393,9 +1459,12 @@ export default function AiStudioWorkspace() {
                               const startY = e.clientY;
                               const startXLoc = cropBox.x;
                               const startYLoc = cropBox.y;
+                              const parentRect = e.currentTarget.parentElement?.parentElement?.getBoundingClientRect();
+                              const parentWidth = parentRect?.width || 350;
+                              const parentHeight = parentRect?.height || 250;
                               const handleMouseMove = (mv: MouseEvent) => {
-                                const dx = ((mv.clientX - startX) / 350) * 100;
-                                const dy = ((mv.clientY - startY) / 250) * 100;
+                                const dx = ((mv.clientX - startX) / parentWidth) * 100;
+                                const dy = ((mv.clientY - startY) / parentHeight) * 100;
                                 setCropBox((prev) => ({
                                   ...prev,
                                   x: Math.max(0, Math.min(100 - prev.w, startXLoc + dx)),
@@ -1422,10 +1491,54 @@ export default function AiStudioWorkspace() {
                           return (
                             <div
                               key={layer.id}
-                              className="absolute bg-white p-3 border-2 border-indigo-500 rounded-lg shadow-lg flex flex-col items-center z-30 pointer-events-auto"
+                              className="absolute bg-white p-3 border-2 border-indigo-500 rounded-lg shadow-lg flex flex-col items-center z-30 pointer-events-auto cursor-move select-none"
                               style={{ top: `${layer.y}px`, left: `${layer.x}px` }}
+                              onMouseDown={(e) => {
+                                e.stopPropagation();
+                                const startX = e.clientX;
+                                const startY = e.clientY;
+                                const startLayerX = layer.x;
+                                const startLayerY = layer.y;
+                                
+                                const handleMouseMove = (mv: MouseEvent) => {
+                                  const dx = mv.clientX - startX;
+                                  const dy = mv.clientY - startY;
+                                  setLayers((prev) => 
+                                    prev.map((l) => l.id === layer.id ? { ...l, x: startLayerX + dx, y: startLayerY + dy } : l)
+                                  );
+                                };
+                                const handleMouseUp = () => {
+                                  window.removeEventListener("mousemove", handleMouseMove);
+                                  window.removeEventListener("mouseup", handleMouseUp);
+                                };
+                                window.addEventListener("mousemove", handleMouseMove);
+                                window.addEventListener("mouseup", handleMouseUp);
+                              }}
+                              onTouchStart={(e) => {
+                                e.stopPropagation();
+                                if (!e.touches[0]) return;
+                                const startX = e.touches[0].clientX;
+                                const startY = e.touches[0].clientY;
+                                const startLayerX = layer.x;
+                                const startLayerY = layer.y;
+                                
+                                const handleTouchMove = (tv: TouchEvent) => {
+                                  if (!tv.touches[0]) return;
+                                  const dx = tv.touches[0].clientX - startX;
+                                  const dy = tv.touches[0].clientY - startY;
+                                  setLayers((prev) => 
+                                    prev.map((l) => l.id === layer.id ? { ...l, x: startLayerX + dx, y: startLayerY + dy } : l)
+                                  );
+                                };
+                                const handleTouchEnd = () => {
+                                  window.removeEventListener("touchmove", handleTouchMove);
+                                  window.removeEventListener("touchend", handleTouchEnd);
+                                };
+                                window.addEventListener("touchmove", handleTouchMove, { passive: true });
+                                window.addEventListener("touchend", handleTouchEnd);
+                              }}
                             >
-                              <svg className="w-24 h-24" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <svg className="w-24 h-24 pointer-events-none" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <rect width="100" height="100" fill="white" />
                                 <rect x="10" y="10" width="30" height="30" fill="black" />
                                 <rect x="15" y="15" width="20" height="20" fill="white" />
@@ -1444,7 +1557,7 @@ export default function AiStudioWorkspace() {
                                 <rect x="80" y="80" width="10" height="10" fill="black" />
                                 <rect x="55" y="75" width="15" height="15" fill="black" />
                               </svg>
-                              <span className="text-[8px] font-mono font-bold uppercase tracking-wider text-indigo-600 mt-1">AI SECURE QR</span>
+                              <span className="text-[8px] font-mono font-bold uppercase tracking-wider text-indigo-600 mt-1 pointer-events-none">AI SECURE QR</span>
                             </div>
                           );
                         }
@@ -1452,8 +1565,54 @@ export default function AiStudioWorkspace() {
                           return (
                             <div
                               key={layer.id}
-                              className="absolute px-3 py-1 bg-black/75 backdrop-blur text-white rounded text-xs font-heavy tracking-wide uppercase border border-white/20 select-none z-30 pointer-events-auto"
+                              className="absolute px-3 py-1.5 bg-black/75 backdrop-blur text-white rounded text-xs font-heavy tracking-wide uppercase border border-white/20 select-none z-30 pointer-events-auto cursor-move"
                               style={{ top: `${layer.y}px`, left: `${layer.x}px` }}
+                              onMouseDown={(e) => {
+                                e.stopPropagation();
+                                setSelectedLayerId(layer.id);
+                                const startX = e.clientX;
+                                const startY = e.clientY;
+                                const startLayerX = layer.x;
+                                const startLayerY = layer.y;
+                                
+                                const handleMouseMove = (mv: MouseEvent) => {
+                                  const dx = mv.clientX - startX;
+                                  const dy = mv.clientY - startY;
+                                  setLayers((prev) => 
+                                    prev.map((l) => l.id === layer.id ? { ...l, x: startLayerX + dx, y: startLayerY + dy } : l)
+                                  );
+                                };
+                                const handleMouseUp = () => {
+                                  window.removeEventListener("mousemove", handleMouseMove);
+                                  window.removeEventListener("mouseup", handleMouseUp);
+                                };
+                                window.addEventListener("mousemove", handleMouseMove);
+                                window.addEventListener("mouseup", handleMouseUp);
+                              }}
+                              onTouchStart={(e) => {
+                                e.stopPropagation();
+                                setSelectedLayerId(layer.id);
+                                if (!e.touches[0]) return;
+                                const startX = e.touches[0].clientX;
+                                const startY = e.touches[0].clientY;
+                                const startLayerX = layer.x;
+                                const startLayerY = layer.y;
+                                
+                                const handleTouchMove = (tv: TouchEvent) => {
+                                  if (!tv.touches[0]) return;
+                                  const dx = tv.touches[0].clientX - startX;
+                                  const dy = tv.touches[0].clientY - startY;
+                                  setLayers((prev) => 
+                                    prev.map((l) => l.id === layer.id ? { ...l, x: startLayerX + dx, y: startLayerY + dy } : l)
+                                  );
+                                };
+                                const handleTouchEnd = () => {
+                                  window.removeEventListener("touchmove", handleTouchMove);
+                                  window.removeEventListener("touchend", handleTouchEnd);
+                                };
+                                window.addEventListener("touchmove", handleTouchMove, { passive: true });
+                                window.addEventListener("touchend", handleTouchEnd);
+                              }}
                             >
                               {layer.content}
                             </div>
@@ -1854,6 +2013,44 @@ export default function AiStudioWorkspace() {
                      )}
                   </div>
 
+                  {/* AI PROCESSOR ENGINE SELECTION */}
+                  <div className="space-y-2 bg-gradient-to-r from-zinc-50 to-zinc-100 p-3.5 border border-zinc-250 rounded-2xl">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-zinc-500 font-extrabold uppercase tracking-wider font-mono">AI Engine Provider</span>
+                      <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded uppercase font-sans ${aiProvider === 'adobe' ? 'bg-[#FF4D00]/10 text-[#FF4D00] border border-[#FF4D00]/20' : 'bg-indigo-100 text-indigo-700'}`}>
+                        {aiProvider === 'adobe' ? 'Adobe Firefly' : 'Gemini Pro'}
+                      </span>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-1.5 p-1 bg-white/70 border border-zinc-250 rounded-xl">
+                      <button
+                        type="button"
+                        onClick={() => setAiProvider('gemini')}
+                        className={`py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition cursor-pointer text-center ${aiProvider === 'gemini' ? 'bg-zinc-950 text-white shadow-sm' : 'text-zinc-650 hover:text-zinc-950'}`}
+                      >
+                        Gemini Pro
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAiProvider('adobe')}
+                        className={`py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition cursor-pointer text-center ${aiProvider === 'adobe' ? 'bg-[#FF4D00] text-white shadow-sm' : 'text-zinc-650 hover:text-[#FF4D00]'}`}
+                      >
+                        Adobe AI
+                      </button>
+                    </div>
+
+                    {aiProvider === 'adobe' && (
+                      <div className="space-y-1 pt-1 border-t border-zinc-250 mt-1 pb-0.5">
+                        <p className="text-[9px] text-zinc-500 leading-normal">
+                          Adobe integration utilizes enterprise client credentials (<code className="font-bold bg-zinc-200 px-1 py-0.5 rounded text-zinc-800 text-[8px]">ADOBE_CLIENT_ID</code>).
+                        </p>
+                        <p className="text-[8px] text-[#FF4D00] font-bold uppercase tracking-wider font-mono">
+                          ⚡ sandbox simulation fallback active if keys missing!
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
                   <button
                     onClick={() => executeAiOperation(activeTool)}
                     disabled={isProcessing}
@@ -1929,6 +2126,32 @@ export default function AiStudioWorkspace() {
                     </div>
                   ))}
                 </div>
+
+                {/* Selected Text Layer Content Modifier */}
+                {(() => {
+                  const selectedLayer = layers.find((l) => l.id === selectedLayerId);
+                  if (selectedLayer && selectedLayer.type === "text") {
+                    return (
+                      <div className="mt-4 p-3 bg-zinc-50 border border-zinc-200 rounded-xl space-y-2">
+                        <label className="text-[9px] font-bold uppercase tracking-wider text-zinc-500 font-mono block">Modify Selected Text</label>
+                        <input
+                          type="text"
+                          value={selectedLayer.content || ""}
+                          onChange={(e) => {
+                            setLayers((prev) =>
+                              prev.map((l) =>
+                                l.id === selectedLayer.id ? { ...l, content: e.target.value.toUpperCase(), name: e.target.value || "Text Layer" } : l
+                              )
+                            );
+                          }}
+                          className="w-full px-3 py-2 bg-white border border-zinc-200 text-xs rounded-lg text-zinc-800 focus:outline-none focus:border-[#FF4D00] transition"
+                          placeholder="Type text content here..."
+                        />
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
             </div>
 

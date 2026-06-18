@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { SocialPost, ProductCategory } from '../types';
 import { db } from '../firebase';
+import { DEMO_SOCIAL_POSTS } from '../data';
 import { collection, query, orderBy, limit, onSnapshot, where } from 'firebase/firestore';
 
 interface TrendingExplorerProps {
@@ -33,6 +34,10 @@ export default function TrendingExplorer({ onPostClick, onHashtagClick, onCatego
   const [hashtags, setHashtags] = useState(['WeddingCard', 'VisitingCard', 'Logo', 'Poster', 'PrintBazaar', 'AIArt']);
 
   useEffect(() => {
+    if (!db) {
+       setPosts(DEMO_SOCIAL_POSTS as any); // Fallback to demo items if offline
+       return;
+    }
     let q = query(collection(db, 'posts'), orderBy('likesCount', 'desc'), limit(15));
     
     if (activeFilter === 'new') {

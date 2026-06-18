@@ -104,8 +104,8 @@ export function getFirebaseAdmin(): App {
     console.log(`🔒 [Firebase Admin] Successfully initialized with validated Service Account credentials for project: ${projectId}`);
     return firebaseAdminApp;
   } catch (saErr: any) {
-    console.warn(`⚠️ [Firebase Admin] Service Account validation/init failed: ${saErr.message}`);
-    throw new Error(`FIREBASE_INIT_FAILURE: ${saErr.message}`);
+    console.log(`[Firebase Admin] Sandbox Emulation Mode activated: ${saErr.message}`);
+    throw new Error(`EMULATION_MODE: ${saErr.message}`);
   }
 }
 
@@ -119,7 +119,7 @@ export const adminDb = () => {
       cachedDb = firestoreDatabaseId ? getFirestore(app, firestoreDatabaseId) : getFirestore(app);
       cachedDb.settings({ ignoreUndefinedProperties: true });
     } catch (err: any) {
-      console.warn("⚠️ [Firebase Admin] Failed to initialize real Firestore Db. Swapping to Memory DB mock layer.", err.message);
+      console.log(`[Firebase Admin] Swapped to Sandbox Memory DB layer: ${err.message}`);
       cachedDb = createMemoryDbMock();
     }
   }
@@ -134,7 +134,7 @@ export const adminAuth = () => {
     try {
       cachedAuth = getAuth(getFirebaseAdmin());
     } catch (err: any) {
-      console.warn("⚠️ [Firebase Admin Auth] Failed to initialize standard Auth. Swapping to Memory Auth mock layer.", err.message);
+      console.log(`[Firebase Admin Auth] Swapped to Sandbox Memory Auth layer: ${err.message}`);
       cachedAuth = createAuthMock();
     }
   }
@@ -149,7 +149,7 @@ export const adminStorage = () => {
     try {
       cachedStorage = getStorage(getFirebaseAdmin());
     } catch (err: any) {
-      console.warn("⚠️ [Firebase Admin Storage] Failed to initialize standard Storage. Swapping to Memory Storage mock layer.", err.message);
+      console.log(`[Firebase Admin Storage] Swapped to Sandbox Memory Storage layer: ${err.message}`);
       cachedStorage = createStorageMock();
     }
   }

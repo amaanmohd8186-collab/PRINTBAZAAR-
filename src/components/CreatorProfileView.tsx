@@ -48,6 +48,7 @@ export default function CreatorProfileView({
   const targetCreatorId = stats.userName || session.id;
 
   useEffect(() => {
+    if (!db) return;
     const q = query(
       collection(db, 'posts'), 
       where('creatorId', '==', targetCreatorId),

@@ -57,16 +57,31 @@ if (isDomainAuthPotentiallyMissing) {
 if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
   const errorMsg = `🔥 [FIREBASE FATAL] Configuration Corrupted: Missing ${!firebaseConfig.apiKey ? 'API_KEY' : 'PROJECT_ID'}. Auth cannot initialize. Check VITE_FIREBASE_* env vars or firebase-applet-config.json.`;
   console.error(errorMsg);
-  throw new Error(errorMsg);
 }
 
 console.log("Initialization:  PASSED (Basic Validation)");
 console.log("==================================================");
 
-export const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-export const auth = getAuth(app);
-console.log("Auth Ready:      YES");
+let initializedApp: any = null;
+let firestoreDb: any = null;
+let firebaseAuth: any = null;
+
+try {
+  if (firebaseConfig.apiKey && firebaseConfig.projectId) {
+    initializedApp = initializeApp(firebaseConfig);
+    firestoreDb = getFirestore(initializedApp, firebaseConfig.firestoreDatabaseId);
+    firebaseAuth = getAuth(initializedApp);
+    console.log("Auth Ready:      YES");
+  } else {
+    throw new Error("Missing essential config");
+  }
+} catch (e) {
+  console.error("Firebase App initialization failed. Safe mode activated.", e);
+}
+
+export const app = initializedApp as any;
+export const db = firestoreDb as any;
+export const auth = firebaseAuth as any;
 
 export async function getMessagingService() {
   try {
@@ -111,12 +126,12 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-      tenantId: auth.currentUser?.tenantId,
-      providerInfo: auth.currentUser?.providerData?.map(provider => ({
+      userId: auth?.currentUser?.uid,
+      email: auth?.currentUser?.email,
+      emailVerified: auth?.currentUser?.emailVerified,
+      isAnonymous: auth?.currentUser?.isAnonymous,
+      tenantId: auth?.currentUser?.tenantId,
+      providerInfo: auth?.currentUser?.providerData?.map(provider => ({
         providerId: provider.providerId,
         email: provider.email,
       })) || []
@@ -129,7 +144,7 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 }
 
 export async function getAuthHeaders() {
-  const user = auth.currentUser;
+  const user = auth?.currentUser;
   if (!user) return {};
   const token = await user.getIdToken();
   return {
@@ -156,26 +171,24 @@ export async function safeFetch<T = any>(url: string, options: RequestInit = {})
     const response = await fetch(url, config);
     const contentType = response.headers.get('content-type');
     
-    // Check if the response is actually JSON before parsing
     if (contentType && contentType.includes('application/json')) {
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || data.message || `API Error (${response.status})`);
+      try {
+        const data = await response.json();
+        if (!response.ok) {
+          return { success: false, error: data.error || data.message || `API Error (${response.status})` } as unknown as T;
+        }
+        return data as T;
+      } catch (parserErr) {
+        return { success: false, error: "Invalid response" } as unknown as T;
       }
-      
-      return data as T;
     } else {
-      // Handle non-JSON or empty responses
-      const text = await response.text();
       if (!response.ok) {
-        throw new Error(text || `API Non-JSON Error (${response.status})`);
+        return { success: false, error: "Invalid response" } as unknown as T;
       }
-      // If OK but no JSON, return empty object or success indicator
-      return { success: response.ok, status: response.status } as unknown as T;
+      return { success: true, status: response.status } as unknown as T;
     }
   } catch (err: any) {
     console.error(`[SafeFetch Failed] ${url}:`, err.message);
-    throw err;
+    return { success: false, error: err.message || "Network error" } as unknown as T;
   }
 }

@@ -37,7 +37,7 @@ export default function PaymentHistory({ userId, onBack }: PaymentHistoryProps) 
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || !db) return;
 
     const q = query(
       collection(db, 'wallet_transactions'),

@@ -111,11 +111,10 @@ export default function SellerVerificationSystem({ isAdminMode: propIsAdminMode,
 
   // 1. Subscribe to Live Firestore Sellers (Admins only)
   useEffect(() => {
-    if (!propIsAdminMode) {
+    if (!propIsAdminMode || !db) {
       setSellers(INITIAL_DEMO_SELLERS);
       return;
     }
-
     const q = query(collection(db, 'sellers'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const sellersList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as unknown as SellerProfile[];
@@ -129,7 +128,7 @@ export default function SellerVerificationSystem({ isAdminMode: propIsAdminMode,
 
   // 2. Subscribe to current seller node
   useEffect(() => {
-    if (!currentUid || currentUid === 'cust-current') {
+    if (!currentUid || currentUid === 'cust-current' || !db) {
       setCurrentSeller(null);
       return;
     }

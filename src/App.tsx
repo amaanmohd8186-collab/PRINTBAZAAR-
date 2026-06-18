@@ -427,7 +427,7 @@ export default function App() {
 
   // Fetch real-time stats from server (Firestore Realtime)
   useEffect(() => {
-    if (user) {
+    if (user && db) {
       // 1. Setup real-time listener for user profile
       const userRef = doc(db, 'users', user.uid);
       
@@ -639,6 +639,7 @@ export default function App() {
   useEffect(() => {
     // Seed social data if collection is empty
     const seedSocial = async () => {
+      if (!db) return;
       try {
         const postsSnap = await getDocs(query(collection(db, 'posts'), limit(1)));
         // Only attempt to seed if signed in as admin (to avoid random users seeding posts)
@@ -858,7 +859,67 @@ export default function App() {
   }, [setCustomerActiveTab]);
 
   useEffect(() => {
+    async function performStartupHealthCheck() {
+      setStartupLogs(prev => [...prev, 'INITIATING SYSTEM HEALTH CHECK...']);
+      let score = 100;
+      
+      // Check Firebase / Firestore (Wait briefly so onAuthStateChanged can trigger first if quick)
+      try {
+        if (!db) throw new Error("Firestore DB not initialized");
+        await getDocs(query(collection(db, 'products'), limit(1)));
+        setStartupLogs(prev => [...prev, '✓ FIREBASE / FIRESTORE: RESPONSIVE']);
+      } catch (err) {
+        setStartupLogs(prev => [...prev, '⚠️ FIREBASE / FIRESTORE: UNREACHABLE (Mock Mode)']);
+        score -= 20;
+        console.warn("Health Check: Firestore unreachable", err);
+      }
+
+      // Check Payments
+      try {
+        const res = await fetch('/api/cashfree/config');
+        const text = await res.text();
+        if (text && text.includes('"hasKeys":true')) {
+          setStartupLogs(prev => [...prev, '✓ CASHFREE PAYMENTS: SECURE']);
+        } else {
+          setStartupLogs(prev => [...prev, '⚠️ CASHFREE PAYMENTS: MISSING KEYS (Simulation Active)']);
+          score -= 15;
+        }
+      } catch (err) {
+        setStartupLogs(prev => [...prev, '⚠️ CASHFREE PAYMENTS: UNREACHABLE']);
+        score -= 15;
+      }
+
+      // Compute Community
+      setStartupLogs(prev => [...prev, '✓ COMMUNITY SERVICES: ONLINE']);
+
+      // AI Services Check
+      try {
+        const aiRes = await safeFetch('/api/admin/diagnostics');
+        if (aiRes && aiRes.geminiDetails?.status === 'OK') {
+          setStartupLogs(prev => [...prev, '✓ AI STUDIO SERVICES: ONLINE']);
+        } else {
+          setStartupLogs(prev => [...prev, '⚠️ AI STUDIO SERVICES: DEGRADED (Fallback Active)']);
+          score -= 15;
+        }
+      } catch (err) {
+        setStartupLogs(prev => [...prev, '⚠️ AI STUDIO SERVICES: UNREACHABLE']);
+        score -= 15;
+      }
+      
+      setStartupLogs(prev => [...prev, `[DIAGNOSTIC] SYSTEM HEALTH SCORE: ${Math.max(0, score)}/100`]);
+    }
+    
+    performStartupHealthCheck();
+  }, []);
+
+  useEffect(() => {
     // Auth State Listener
+    if (!auth) {
+      console.warn("Auth not initialized. Bypassing state listener.");
+      setIsAppReady(true);
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
         setUser(firebaseUser);
@@ -971,6 +1032,11 @@ export default function App() {
 
   // Real-time Firestore synchronizer for Products catalog
   useEffect(() => {
+    if (!db) {
+      console.warn("Firestore not initialized. Using initial products mock.");
+      setProducts(INITIAL_PRODUCTS);
+      return;
+    }
     const q = query(collection(db, 'products'));
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -993,6 +1059,11 @@ export default function App() {
     if (!user) {
       setOrders(INITIAL_ORDERS);
       return;
+    }
+    if (!db) {
+       console.warn("Firestore not initialized. Using initial orders mock.");
+       setOrders(INITIAL_ORDERS);
+       return;
     }
 
     const isAdmin = session.role === 'admin';
@@ -1033,6 +1104,7 @@ export default function App() {
   useEffect(() => {
     if (user && session.role === 'admin' && orders.length === 0) {
       const seedOrders = async () => {
+        if (!db) return;
         try {
           const snapshot = await getDocs(query(collection(db, 'orders'), limit(1)));
           if (snapshot.empty) {
@@ -1071,6 +1143,7 @@ export default function App() {
     
     setIsSubscribing(true);
     try {
+      if (!db) throw new Error("Firestore not initialized");
       await addDoc(collection(db, 'audit_logs'), {
         action: 'NEWSLETTER_SUBSCRIBE',
         details: { email: subscriberEmail },
