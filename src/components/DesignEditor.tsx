@@ -53,7 +53,25 @@ interface DesignEditorProps {
   onClose?: () => void;
 }
 
-const PREMIUM_FONTS = ['Inter', 'Space Grotesk', 'JetBrains Mono', 'Playfair Display', 'Oswald'];
+const PREMIUM_FONTS = [
+  // CORE
+  'Inter', 'Space Grotesk', 'JetBrains Mono', 'Playfair Display', 'Oswald',
+  // URDU/ARABIC
+  'Noto Nastaliq Urdu', 'Amiri', 'Tajawal', 'Cairo', 'Lateef',
+  // MODERN
+  'Montserrat', 'Poppins', 'Raleway', 'Nunito', 'Roboto',
+  // LUXURY
+  'Cormorant Garamond', 'Cinzel', 'Great Vibes', 'Bodoni Moda',
+  // WEDDING/HANDWRITING
+  'Dancing Script', 'Pacifico', 'Caveat', 'Satisfy', 'Alex Brush'
+];
+
+interface TextEffect {
+  id: string;
+  label: string;
+}
+
+const URDU_TRANSLITERATE_API = 'https://inputtools.google.com/request?text=';
 const THEME_COLORS = [
   '#000000', '#FFFFFF', '#FF4D00', '#3B82F6', '#10B981', 
   '#F59E0B', '#8B5CF6', '#EC4899', '#6B7280', '#1E293B'
@@ -68,7 +86,7 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvas = useRef<fabric.Canvas | null>(null);
-  const [activeTool, setActiveTool] = useState<ToolType | 'photopea' | 'adobe'>('select');
+  const [activeTool, setActiveTool] = useState<ToolType | 'easy' | 'adobe'>('select');
   const [isSaving, setIsSaving] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   
@@ -80,7 +98,7 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
   const [opacity, setOpacity] = useState(1);
   const [scale, setScale] = useState(1);
   const [rotation, setRotation] = useState(0);
-  const [rightPanelTab, setRightPanelTab] = useState<'inspector' | 'templates' | 'assets'>('inspector');
+  const [rightPanelTab, setRightPanelTab] = useState<'inspector' | 'templates' | 'assets' | 'print'>('inspector');
 
   // States & Refs for Undo, Redo, Layers, and Templates
   const historyStackRef = useRef<string[]>([]);
@@ -490,13 +508,20 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
   const loadDesigns = async () => {
     try {
       const data = await safeFetch<{ success: boolean; designs: Design[] }>('/api/designs/list');
-      if (data.success) setDesigns(data.designs);
+      if (data.success && data.designs && data.designs.length > 0) {
+        setDesigns(data.designs);
+      } else {
+        // load empty template placeholder if none exist
+        setDesigns([]);
+      }
     } catch (err) {
-      console.error("Failed to load designs", err);
+      console.error("Failed to load designs, defaulting to local cache", err);
+      // Fail nicely to empty state array
+      setDesigns([]);
     }
   };
 
-  // Canvas shapes & items modifiers
+    // Canvas shapes & items modifiers
   const addText = () => {
     const text = new fabric.IText('Smart Text Layout', {
       left: 150,
@@ -509,6 +534,21 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
     fabricCanvas.current?.add(text);
     fabricCanvas.current?.setActiveObject(text);
     fabricCanvas.current?.renderAll();
+  };
+
+  const addIconText = (iconChar: string, initialFont: string) => {
+    if (!fabricCanvas.current) return;
+    const text = new fabric.IText(iconChar, {
+      left: 200,
+      top: 200,
+      fontFamily: initialFont,
+      fontSize: 48,
+      fill: '#000000',
+    });
+    fabricCanvas.current.add(text);
+    fabricCanvas.current.setActiveObject(text);
+    fabricCanvas.current.renderAll();
+    showStatus('success', 'Inserted vector icon element!');
   };
 
   const addRect = () => {
@@ -732,8 +772,28 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
       activeObj.set({ text: value });
       setTextValue(value);
     } else if (field === 'fontFamily' && activeObj instanceof fabric.IText) {
-      activeObj.set({ fontFamily: value });
-      setFontFamily(value);
+      // Dynamic Font Load
+      const fontName = value;
+      const formattedName = fontName.replace(/ /g, '+');
+      const fontUrl = `https://fonts.googleapis.com/css2?family=${formattedName}&display=swap`;
+      
+      if (!document.getElementById(`font-${formattedName}`)) {
+        const link = document.createElement('link');
+        link.id = `font-${formattedName}`;
+        link.rel = 'stylesheet';
+        link.href = fontUrl;
+        document.head.appendChild(link);
+      }
+
+      // Wait a tiny bit for the font to load, then re-render
+      setTimeout(() => {
+        activeObj.set({ fontFamily: fontName });
+        setFontFamily(fontName);
+        fabricCanvas.current?.renderAll();
+      }, 500);
+      
+      activeObj.set({ fontFamily: fontName });
+      setFontFamily(fontName);
     } else if (field === 'fill') {
       activeObj.set({ fill: value });
       setFillColor(value);
@@ -746,6 +806,10 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
     } else if (field === 'rotation') {
       activeObj.rotate(parseFloat(value));
       setRotation(value);
+    } else if (field === 'textAlign') {
+      activeObj.set({ textAlign: value });
+    } else if (field === 'direction') {
+      activeObj.set({ direction: value });
     }
 
     fabricCanvas.current?.renderAll();
@@ -1277,6 +1341,14 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
           </button>
 
           <button 
+            onClick={() => setActiveTool('easy')}
+            title="Smart Design Studio & AI Tools"
+            className={`p-2.5 lg:p-3 rounded-full lg:rounded-xl transition shrink-0 ${activeTool === 'easy' ? 'bg-[#7D2AE8] text-white shadow-lg shadow-[#7D2AE8]/25' : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'}`}
+          >
+            <Palette size={20} className="lg:w-[22px] lg:h-[22px]" />
+          </button>
+
+          <button 
             onClick={() => setActiveTool('adobe')}
             title="Adobe Firefly Neural Studio"
             className={`p-2.5 lg:p-3 rounded-full lg:rounded-xl transition shrink-0 ${activeTool === 'adobe' ? 'bg-[#FF4D00] text-white shadow-lg shadow-[#FF4D00]/25' : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'}`}
@@ -1563,23 +1635,29 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
             </div>
           )}
           
-          {/* Photopea Pro Editor Overlay */}
-          {activeTool === 'photopea' && (
-            <div className="absolute inset-4 z-40 rounded-2xl overflow-hidden border border-zinc-800 shadow-2xl bg-zinc-900">
-              <iframe 
-                src="https://www.photopea.com" 
-                className="w-full h-full border-none outline-none overflow-hidden" 
-                title="Photopea Pro Editor"
-              />
-              <div className="absolute top-4 right-4 z-50 flex gap-2">
+          {/* Smart Designer API UI */}
+          {activeTool === 'easy' && (
+            <div className="absolute inset-2 md:inset-4 z-[99] rounded-xl md:rounded-2xl overflow-hidden border border-zinc-800 shadow-2xl bg-[#f4f5f7] flex flex-col">
+              <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-zinc-200 shadow-sm shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-6 h-6 rounded shadow bg-gradient-to-br from-[#7D2AE8] to-[#FF4D00] flex items-center justify-center">
+                    <Palette className="w-3.5 h-3.5 text-white" />
+                  </div>
+                  <span className="text-zinc-800 font-black text-[11px] uppercase tracking-wider font-sans">PrintBazaar Smart Studio</span>
+                </div>
                 <button
                   onClick={() => setActiveTool('select')}
-                  className="px-4 py-2 bg-zinc-900/90 backdrop-blur text-white text-xs font-bold uppercase rounded-lg border border-zinc-700/50 hover:bg-zinc-800 shadow-lg flex items-center gap-2 transition"
+                  className="px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-600 hover:text-zinc-900 text-[10px] font-black uppercase tracking-widest rounded-lg border border-zinc-200 transition flex items-center gap-1.5 cursor-pointer"
                 >
-                  <X size={14} />
-                  Exit Pro Mode
+                  <X size={12} />
+                  Return to Master Print Room
                 </button>
               </div>
+              <iframe 
+                src="https://studio.polotno.com" 
+                className="w-full flex-1 border-none outline-none overflow-hidden bg-[#f4f5f7]" 
+                title="Smart Print Designer Integration"
+              />
             </div>
           )}
 
@@ -1593,8 +1671,8 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
             <div 
               className="relative shadow-2xl bg-[#f8fafc] p-2.5 rounded-2xl border border-zinc-800 transition-all origin-center select-none"
               style={{ 
-                opacity: activeTool === 'photopea' ? 0 : 1, 
-                pointerEvents: activeTool === 'photopea' ? 'none' : 'auto',
+                opacity: activeTool === 'easy' ? 0 : 1, 
+                pointerEvents: activeTool === 'easy' ? 'none' : 'auto',
                 transform: `scale(${scaleFactor})`,
                 width: `${CANVAS_WIDTH + 20}px`,
                 height: `${CANVAS_HEIGHT + 20}px`
@@ -1945,7 +2023,7 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
           </motion.div>
         )}
 
-        {activeTool !== 'ai' && activeTool !== 'photopea' && activeTool !== 'adobe' && (
+        {activeTool !== 'ai' && activeTool !== 'easy' && activeTool !== 'adobe' && (
           /* STANDARD EDITOR CONTROL PANEL (SLIDERS, PALETTE, LAYER MODIFIERS) */
           <motion.div 
             key="standard-editor"
@@ -1962,7 +2040,7 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
             </div>
 
             {/* Premium Tab Toggles */}
-            <div className="grid grid-cols-3 gap-1 bg-zinc-900 p-1 border border-zinc-800 rounded-xl text-center shrink-0">
+            <div className="grid grid-cols-4 gap-1 bg-zinc-900 p-1 border border-zinc-800 rounded-xl text-center shrink-0">
               <button 
                 type="button"
                 onClick={() => setRightPanelTab('inspector')}
@@ -1984,7 +2062,83 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
               >
                 Assets
               </button>
+              <button 
+                type="button"
+                onClick={() => setRightPanelTab('print')}
+                className={`py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition cursor-pointer ${rightPanelTab === 'print' ? 'bg-[#FF4D00] text-white shadow-sm' : 'text-zinc-400 hover:text-white'}`}
+              >
+                Setup
+              </button>
             </div>
+
+            {rightPanelTab === 'print' && (
+              <div className="space-y-5 flex-1 overflow-y-auto pr-1">
+                <div className="space-y-4 p-4 bg-zinc-900 border border-zinc-800 rounded-2xl">
+                  <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-widest font-mono block border-b border-zinc-800 pb-2">Pre-Press Output Setup</span>
+                  
+                  <div className="flex items-center justify-between text-xs text-zinc-300 font-medium">
+                    <span>CMYK Conversion Profile</span>
+                    <div className="w-10 h-5 bg-[#FF4D00] rounded-full relative shadow-inner cursor-pointer">
+                      <div className="w-4 h-4 bg-white rounded-full absolute top-0.5 right-0.5 shadow-md"></div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs text-zinc-300 font-medium">
+                    <span>Show Crop Marks</span>
+                    <div className="w-10 h-5 bg-emerald-500 rounded-full relative shadow-inner cursor-pointer">
+                      <div className="w-4 h-4 bg-white rounded-full absolute top-0.5 right-0.5 shadow-md"></div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs text-zinc-300 font-medium">
+                    <span>Bleed Area (3mm)</span>
+                    <div className="w-10 h-5 bg-zinc-800 rounded-full relative shadow-inner cursor-pointer">
+                      <div className="w-4 h-4 bg-zinc-500 rounded-full absolute top-0.5 left-0.5 shadow-md"></div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs text-zinc-300 font-medium">
+                    <span>Convert Text to Curves (Vector)</span>
+                    <div className="w-10 h-5 bg-[#FF4D00] rounded-full relative shadow-inner cursor-pointer">
+                      <div className="w-4 h-4 bg-white rounded-full absolute top-0.5 right-0.5 shadow-md"></div>
+                    </div>
+                  </div>
+
+                  <button onClick={exportAsPDF} className="w-full py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-xs font-bold uppercase transition mt-4">
+                    Render PDF Print Proof
+                  </button>
+
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    <button onClick={() => {
+                        const dl = document.createElement('a');
+                        dl.href = fabricCanvas.current?.toDataURL({ format: 'png', multiplier: 2 }) || '';
+                        dl.download = `PrintBazaar_Master_${Date.now()}.png`;
+                        dl.click();
+                      }} className="py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl text-xs font-bold uppercase transition text-center">
+                      Export PNG
+                    </button>
+                    <button onClick={() => {
+                        const dl = document.createElement('a');
+                        dl.href = fabricCanvas.current?.toDataURL({ format: 'jpeg', quality: 0.9, multiplier: 2 }) || '';
+                        dl.download = `PrintBazaar_Master_${Date.now()}.jpg`;
+                        dl.click();
+                      }} className="py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl text-xs font-bold uppercase transition text-center">
+                      Export JPG
+                    </button>
+                  </div>
+                  <button onClick={() => {
+                      const svg = fabricCanvas.current?.toSVG() || '';
+                      const blob = new Blob([svg], { type: 'image/svg+xml' });
+                      const dl = document.createElement('a');
+                      dl.href = URL.createObjectURL(blob);
+                      dl.download = `PrintBazaar_Master_${Date.now()}.svg`;
+                      dl.click();
+                    }} className="w-full py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl text-xs font-bold uppercase transition text-center">
+                    Export Vector SVG
+                  </button>
+                </div>
+              </div>
+            )}
 
             {rightPanelTab === 'assets' && (
               <div className="space-y-5 flex-1 overflow-y-auto pr-1">
@@ -2016,6 +2170,56 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
                     >
                       Triangle
                     </button>
+                  </div>
+                </div>
+
+                <div className="space-y-2 bg-zinc-900/60 p-3.5 rounded-2xl border border-zinc-805">
+                  <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-widest font-mono flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-yellow-500" />
+                    <span>Islamic Elements</span>
+                  </span>
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    <button
+                      type="button"
+                      onClick={() => addIconText('🕋', 'Islamic Icons')}
+                      className="p-2.5 bg-zinc-950 border border-zinc-800 hover:border-yellow-500 transition rounded-xl text-[10px] text-zinc-300 font-bold uppercase cursor-pointer text-center"
+                    >
+                      Kaaba
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => addIconText('🌙', 'Islamic Icons')}
+                      className="p-2.5 bg-zinc-950 border border-zinc-800 hover:border-yellow-500 transition rounded-xl text-[10px] text-zinc-300 font-bold uppercase cursor-pointer text-center"
+                    >
+                      Crescent
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => addIconText('🕌', 'Islamic Icons')}
+                      className="p-2.5 bg-zinc-950 border border-zinc-800 hover:border-yellow-500 transition rounded-xl text-[10px] text-zinc-300 font-bold uppercase cursor-pointer text-center"
+                    >
+                      Mosque
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => addIconText('✨', 'Islamic Icons')}
+                      className="p-2.5 bg-zinc-950 border border-zinc-800 hover:border-yellow-500 transition rounded-xl text-[10px] text-zinc-300 font-bold uppercase cursor-pointer text-center"
+                    >
+                      Stars
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-2 bg-zinc-900/60 p-3.5 rounded-2xl border border-zinc-805">
+                  <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-widest font-mono flex items-center gap-1.5">
+                    <Briefcase className="w-3.5 h-3.5 text-blue-500" />
+                    <span>Business Icons</span>
+                  </span>
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    <button onClick={() => addIconText('📞', 'Inter')} className="p-2.5 bg-zinc-950 border border-zinc-800 hover:border-blue-500 transition rounded-xl text-[10px] text-zinc-300 font-bold uppercase cursor-pointer text-center">Phone</button>
+                    <button onClick={() => addIconText('📍', 'Inter')} className="p-2.5 bg-zinc-950 border border-zinc-800 hover:border-blue-500 transition rounded-xl text-[10px] text-zinc-300 font-bold uppercase cursor-pointer text-center">Location</button>
+                    <button onClick={() => addIconText('✉️', 'Inter')} className="p-2.5 bg-zinc-950 border border-zinc-800 hover:border-blue-500 transition rounded-xl text-[10px] text-zinc-300 font-bold uppercase cursor-pointer text-center">Email</button>
+                    <button onClick={() => addIconText('🌐', 'Inter')} className="p-2.5 bg-zinc-950 border border-zinc-800 hover:border-blue-500 transition rounded-xl text-[10px] text-zinc-300 font-bold uppercase cursor-pointer text-center">Website</button>
                   </div>
                 </div>
 
@@ -2121,6 +2325,25 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
                           onChange={(e) => updateActiveObjectProperty('text', e.target.value)}
                           className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-2.5 text-xs text-white outline-none"
                         />
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (!textValue) return;
+                            try {
+                              const res = await fetch(`${URDU_TRANSLITERATE_API}${encodeURIComponent(textValue)}&itc=ur-t-i0-und&num=1`);
+                              const data = await res.json();
+                              const urduText = data?.[1]?.[0]?.[1]?.[0] || textValue;
+                              updateActiveObjectProperty('text', urduText);
+                              // Auto-switch to Urdu Font
+                              updateActiveObjectProperty('fontFamily', 'Noto Nastaliq Urdu');
+                            } catch (e) {
+                              console.warn("Transliteration failed", e);
+                            }
+                          }}
+                          className="w-full py-2 bg-gradient-to-r from-emerald-600 to-teal-500 hover:opacity-90 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition cursor-pointer"
+                        >
+                          Translate to Urdu (میرا نام)
+                        </button>
 
                         {/* Font families selection list */}
                         <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-widest font-mono block mt-3">Family Typography</span>
@@ -2133,6 +2356,38 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
                             <option key={f} value={f}>{f}</option>
                           ))}
                         </select>
+
+                        <div className="grid grid-cols-4 gap-1.5 mt-2">
+                           <button
+                             type="button"
+                             onClick={() => updateActiveObjectProperty('textAlign', 'left')}
+                             className="py-1.5 bg-zinc-950 border border-zinc-800 hover:border-[#FF4D00] text-zinc-400 hover:text-white rounded-lg text-xs font-bold transition flex justify-center items-center"
+                           >
+                             LTR
+                           </button>
+                           <button
+                             type="button"
+                             onClick={() => updateActiveObjectProperty('textAlign', 'center')}
+                             className="py-1.5 bg-zinc-950 border border-zinc-800 hover:border-[#FF4D00] text-zinc-400 hover:text-white rounded-lg text-xs font-bold transition flex justify-center items-center"
+                           >
+                             CTR
+                           </button>
+                           <button
+                             type="button"
+                             onClick={() => updateActiveObjectProperty('textAlign', 'right')}
+                             className="py-1.5 bg-zinc-950 border border-zinc-800 hover:border-[#FF4D00] text-zinc-400 hover:text-white rounded-lg text-xs font-bold transition flex justify-center items-center"
+                           >
+                             RTL
+                           </button>
+                           <button
+                             type="button"
+                             onClick={() => updateActiveObjectProperty('direction', 'rtl')}
+                             className="py-1.5 bg-zinc-950 border border-zinc-800 hover:border-[#FF4D00] text-[#00C4CC] rounded-lg text-[10px] font-bold transition flex justify-center items-center"
+                             title="Force Right-to-Left Arabic/Urdu rendering"
+                           >
+                             اردو
+                           </button>
+                        </div>
 
                         {/* Text Effects selection list */}
                         <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-widest font-mono block mt-3">Special FX & Curve</span>

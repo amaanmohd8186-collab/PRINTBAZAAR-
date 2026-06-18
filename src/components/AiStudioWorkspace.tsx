@@ -97,14 +97,20 @@ export default function AiStudioWorkspace() {
        setIsVerified(false);
        return;
     }
+    let unsubSeller: (() => void) | null = null;
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setCheckingAuth(true);
+      if (unsubSeller) {
+        unsubSeller();
+        unsubSeller = null;
+      }
+
       if (firebaseUser) {
         try {
           const sellerRef = doc(db, 'sellers', firebaseUser.uid);
           
           // Setup real-time listener for seller status
-          const unsubSeller = onSnapshot(sellerRef, (docSnap) => {
+          unsubSeller = onSnapshot(sellerRef, (docSnap) => {
             if (docSnap.exists()) {
               const sellerData = docSnap.data();
               setCurrentSellerStatus(sellerData.status || "Draft");
@@ -119,8 +125,6 @@ export default function AiStudioWorkspace() {
             setIsVerified(false);
             setCheckingAuth(false);
           });
-
-          return () => unsubSeller();
         } catch (err) {
           console.error("Failed to setup seller listener:", err);
           setIsVerified(false);
@@ -132,7 +136,11 @@ export default function AiStudioWorkspace() {
         setCheckingAuth(false);
       }
     });
-    return () => unsubscribe();
+
+    return () => {
+      unsubscribe();
+      if (unsubSeller) unsubSeller();
+    };
   }, []);
 
   // Canvas State & History Stack

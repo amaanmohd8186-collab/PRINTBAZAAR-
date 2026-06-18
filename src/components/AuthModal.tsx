@@ -1,44 +1,25 @@
 import React, { useState } from 'react';
-import { Mail, Lock, User, X, Smartphone, ArrowRight, ShieldAlert, Key } from 'lucide-react';
-import { auth, safeFetch } from '../firebase';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, GoogleAuthProvider, signInWithPopup, sendEmailVerification, sendPasswordResetEmail } from 'firebase/auth';
+import { X, ShieldAlert } from 'lucide-react';
+import { auth } from '../firebase';
+import { GoogleAuthProvider, signInWithPopup, signInWithRedirect } from 'firebase/auth';
 
 export const AuthModal = ({ onClose, triggerToast }: { onClose: () => void, triggerToast: (msg: string, type?: 'success' | 'warn' | 'error') => void }) => {
-  const [view, setView] = useState<'login' | 'register' | 'forgot_password'>('login');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-  const [rememberMe, setRememberMe] = useState(true);
-
-  const [form, setForm] = useState({
-    name: '',
-    email: '',
-    password: '',
-    mobile: ''
-  });
-
-  const validatePassword = (password: string) => {
-    if (password.length < 8) return "Password must be at least 8 characters long.";
-    if (!/[A-Z]/.test(password)) return "Password must contain at least one uppercase letter (A-Z).";
-    if (!/[0-9]/.test(password)) return "Password must contain at least one number (0-9).";
-    return null;
-  };
 
   const handleGoogle = async () => {
+    setLoading(true);
+    setErrorMsg('');
     try {
       const provider = new GoogleAuthProvider();
       
-      // Fallback for mobile and in-app browsers where popup might fail
       const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
       const isInstagram = /Instagram/i.test(navigator.userAgent);
       
       if (isMobileDevice || isInstagram) {
-        console.log("🚀 [FIREBASE AUTH] Detected Mobile/In-App Browser - Using Redirect for Resilience");
         await signInWithPopup(auth, provider).catch(async (popupErr) => {
           console.warn("Popup blocked or failed, falling back to redirect:", popupErr);
-          // Redirect is sometimes restricted in iframes, but usually okay in mobile browser
-          // For high resilience, we could use signInWithRedirect here, but it requires setPersistence
-          // and complex state handling on return. We'll stick to a more helpful error for now.
-          throw popupErr;
+          await signInWithRedirect(auth, provider);
         });
       } else {
         await signInWithPopup(auth, provider);
@@ -47,311 +28,59 @@ export const AuthModal = ({ onClose, triggerToast }: { onClose: () => void, trig
       triggerToast('Google Sign-In successful!', 'success');
       onClose();
     } catch (e: any) {
-      console.error("🚀 [FIREBASE GOOGLE AUTH FAILURE]", { 
-        code: e.code, 
-        message: e.message,
-        projectId: auth.app.options.projectId,
-        authDomain: auth.app.options.authDomain,
-        currentHost: window.location.hostname
-      });
+      console.error("🚀 [FIREBASE GOOGLE AUTH FAILURE]", e);
       if (e.code === 'auth/unauthorized-domain') {
-        setErrorMsg(`Google Auth Error: This domain (${window.location.hostname}) is not authorized in Firebase Console > Auth > Settings > Authorized Domains.`);
+        setErrorMsg(`Google Auth Error: this domain is not authorized in Firebase Console.`);
       } else if (e.code === 'auth/popup-blocked') {
-        setErrorMsg("Auth Error: Popup was blocked by your browser. Please allow popups for this site.");
-      } else if (e.code === 'auth/operation-not-allowed') {
-        setErrorMsg("Auth Error: Google provider is not enabled in Firebase Console.");
+        setErrorMsg("Auth Error: Popup was blocked by your browser. Please allow popups.");
       } else {
         setErrorMsg(e.message || 'Google Auth Failed');
       }
-    }
-  };
-
-  const handleForgotPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.email) {
-      setErrorMsg('Please enter your email address.');
-      return;
-    }
-    setLoading(true);
-    try {
-      await sendPasswordResetEmail(auth, form.email);
-      triggerToast('Password reset email sent! Check your inbox.', 'success');
-      setView('login');
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to send reset email');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMsg('');
-
-    if (view === 'register') {
-      if (!form.email || !form.password) {
-        setErrorMsg("Please fill in email and password.");
-        return;
-      }
-      if (!form.name) {
-        setErrorMsg("Full legal name is required.");
-        return;
-      }
-
-      // Strong password validation
-      const passError = validatePassword(form.password);
-      if (passError) {
-        setErrorMsg(passError);
-        return;
-      }
-
-      setLoading(true);
-      try {
-        const cred = await createUserWithEmailAndPassword(auth, form.email, form.password);
-        await updateProfile(cred.user, { displayName: form.name });
-        
-        // Dispatch email verification link
-        await sendEmailVerification(cred.user);
-        
-        triggerToast("Registration successful! Please check your email inbox to verify your account.", "success");
-        onClose();
-      } catch (err: any) {
-        console.error("🚀 [FIREBASE REGISTRATION FAILURE]", {
-          code: err.code,
-          message: err.message,
-          projectId: auth.app.options.projectId,
-          authDomain: auth.app.options.authDomain,
-          configKey: auth.app.options.apiKey?.substring(0, 6)
-        });
-        if (err.code === 'auth/email-already-in-use') {
-          setErrorMsg("Account already exists with this email.");
-        } else if (err.code === 'auth/invalid-email') {
-          setErrorMsg("The email address is improperly formatted.");
-        } else if (err.code === 'auth/operation-not-allowed') {
-          setErrorMsg("Registration Error: Email/Password provider is not enabled in Firebase Console > Auth > Sign-in method.");
-        } else if (err.code === 'auth/invalid-credential') {
-          setErrorMsg("Registration Failed: Invalid Credential. This often means the API Key does not match the Project ID or Identity Toolkit is not configured.");
-        } else {
-          setErrorMsg(err.message || 'Registration Failed');
-        }
-      } finally {
-        setLoading(false);
-      }
-    } else {
-      if (!form.email || !form.password) {
-        setErrorMsg("Please fill in email and password.");
-        return;
-      }
-      setLoading(true);
-      try {
-        const cred = await signInWithEmailAndPassword(auth, form.email, form.password);
-        
-        const isLocalOrPreview = window.location.hostname === 'localhost' || 
-                                 window.location.hostname.endsWith('.run.app') ||
-                                 window.location.hostname.endsWith('.aistudio-preview.app') ||
-                                 window.location.hostname.includes('gfpnwwhd2nn5jdl7zqbtzv');
-                                 
-        if (!cred.user.emailVerified && !isLocalOrPreview) {
-          setErrorMsg("Please verify your email address before logging in. Check your inbox.");
-          await auth.signOut(); // Restrict login
-          setLoading(false);
-          return;
-        } else if (!cred.user.emailVerified && isLocalOrPreview) {
-          triggerToast("Login success! (Bypassed email verification in sandbox preview mode)", "success");
-        } else {
-          triggerToast("Login successful!", "success");
-        }
-        onClose();
-      } catch (err: any) {
-        console.error("🚀 [FIREBASE LOGIN FAILURE]", {
-          code: err.code,
-          message: err.message,
-          projectId: auth.app.options.projectId,
-          authDomain: auth.app.options.authDomain,
-          activeDomain: window.location.hostname,
-          apiKey: auth.app.options.apiKey?.substring(0, 6)
-        });
-        
-        if (err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials') {
-          setErrorMsg("Login Failed: Invalid credentials. Required Checks: 1. Is Email/Password provider enabled? 2. Is this the right Firebase Project? 3. Is the API Key valid (check GCP restrictions)?");
-        } else if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
-          setErrorMsg("Invalid email or password.");
-        } else if (err.code === 'auth/unauthorized-domain') {
-          setErrorMsg(`Auth Error: Domain ${window.location.hostname} is not authorized in Firebase Console > Auth > Authorized Domains.`);
-        } else if (err.code === 'auth/operation-not-allowed') {
-          setErrorMsg("Login Error: Email/Password provider is DISABLED in Firebase Console.");
-        } else {
-          setErrorMsg(err.message || 'Authentication Failed');
-        }
-      } finally {
-        setLoading(false);
-      }
-    }
-  };
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-m" id="auth-modal-overlay">
-      <div className="bg-white rounded-[32px] w-full max-w-md shadow-2xl relative overflow-hidden animate-in fade-in zoom-in-95 duration-200" id="auth-modal-card">
+    <div className="fixed inset-0 z-[11000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md" id="auth-modal-overlay">
+      <div className="bg-white rounded-[32px] w-full max-w-sm shadow-2xl relative overflow-hidden animate-in fade-in zoom-in-95 duration-200" id="auth-modal-card">
         <button 
           onClick={onClose}
           className="absolute top-5 right-5 text-zinc-400 hover:text-black hover:bg-zinc-100 p-2 rounded-full transition"
-          id="auth-modal-close-btn"
         >
           <X className="w-5 h-5" />
         </button>
 
-        <div className="px-8 pt-8 pb-6">
+        <div className="px-8 pt-10 pb-10 text-center flex flex-col items-center">
+          <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mb-6">
+            <ShieldAlert className="w-8 h-8 text-blue-500" />
+          </div>
+          
           <h2 className="text-2xl font-black uppercase tracking-tight text-zinc-900" id="auth-modal-title">
-            {view === 'login' && 'Welcome Back'}
-            {view === 'register' && 'Create Account'}
-            {view === 'forgot_password' && 'Reset Password'}
+            Sign In Now
           </h2>
-          <p className="text-xs font-mono text-zinc-500 mt-2" id="auth-modal-subtitle">
-            Secure offline-free enterprise authentication system node.
+          <p className="text-sm text-zinc-500 mt-2 mb-8 leading-relaxed">
+            Welcome to PrintBazaar Design Studio. Continue securely with your Google account.
           </p>
 
           {errorMsg && (
-            <div className="mt-4 p-3 bg-rose-50 border border-rose-100 rounded-xl text-[10px] text-rose-600 font-bold uppercase" id="auth-modal-error">
+            <div className="mb-6 p-4 w-full bg-rose-50 border border-rose-100 rounded-2xl text-[11px] text-rose-600 font-bold uppercase tracking-wider text-left">
               {errorMsg}
             </div>
           )}
 
-          {view === 'forgot_password' ? (
-            <form onSubmit={handleForgotPassword} className="mt-6 space-y-4" id="forgot-password-form">
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
-                <input
-                  type="email"
-                  required
-                  placeholder="Email Address"
-                  value={form.email}
-                  onChange={e => setForm({...form, email: e.target.value})}
-                  className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl pl-11 pr-4 py-3.5 text-sm focus:ring-2 focus:ring-black outline-none transition"
-                  id="forgot-email-input"
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-4 mt-2 bg-black hover:bg-[#FF4D00] text-white text-xs font-black uppercase tracking-wider rounded-2xl transition disabled:opacity-50 cursor-pointer"
-                id="forgot-submit-btn"
-              >
-                {loading ? 'Sending...' : 'Send Reset Link'}
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={handleSubmit} className="mt-6 space-y-4" id="password-login-form">
-              {view === 'register' && (
-                <div className="space-y-4 animate-in slide-in-from-top-2" id="register-name-field">
-                  <div className="relative">
-                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
-                    <input
-                      type="text"
-                      required
-                      placeholder="Full Legal Name"
-                      value={form.name}
-                      onChange={e => setForm({...form, name: e.target.value})}
-                      className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl pl-11 pr-4 py-3.5 text-sm focus:ring-2 focus:ring-black outline-none transition"
-                      id="register-name-input"
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
-                <input
-                  type="email"
-                  required
-                  placeholder="Email Address"
-                  value={form.email}
-                  onChange={e => setForm({...form, email: e.target.value})}
-                  className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl pl-11 pr-4 py-3.5 text-sm focus:ring-2 focus:ring-black outline-none transition"
-                  id="login-email-input"
-                />
-              </div>
-              
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
-                <input
-                  type="password"
-                  required
-                  placeholder="Password"
-                  value={form.password}
-                  onChange={e => setForm({...form, password: e.target.value})}
-                  className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl pl-11 pr-4 py-3.5 text-sm focus:ring-2 focus:ring-black outline-none transition"
-                  id="login-password-input"
-                />
-              </div>
-
-              {view === 'register' && (
-                <p className="text-[10px] text-zinc-450 text-zinc-400 font-mono leading-normal pt-1" id="pass-hints">
-                  💡 Must contain min 8 chars, 1 uppercase letter and 1 number.
-                </p>
-              )}
-
-              {view === 'login' && (
-                <div className="flex items-center justify-between pt-1 text-[11px] font-bold uppercase tracking-wider text-zinc-405 text-zinc-400">
-                  <label className="flex items-center gap-1.5 cursor-pointer hover:text-black transition">
-                    <input 
-                      type="checkbox" 
-                      checked={rememberMe} 
-                      onChange={e => setRememberMe(e.target.checked)}
-                      className="rounded accent-black" 
-                    />
-                    <span>Remember Me</span>
-                  </label>
-                  <button 
-                    type="button" 
-                    onClick={() => setView('forgot_password')}
-                    className="hover:text-black font-bold uppercase transition"
-                    id="forgot-pwd-trigger"
-                  >
-                    Forgot Password?
-                  </button>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-4 mt-2 bg-[#FF4D00] hover:bg-black text-white text-xs font-black uppercase tracking-wider rounded-2xl transition disabled:opacity-50 cursor-pointer"
-                id="submit-auth-btn"
-              >
-                {loading ? 'Processing...' : (view === 'login' ? 'Sign In Security Node' : 'Initialize Account')}
-              </button>
-            </form>
-          )}
-
-          {view !== 'forgot_password' && (
-            <>
-              <div className="relative mt-8 mb-6 text-center" id="social-divider">
-                <span className="bg-white px-4 text-[10px] font-bold uppercase text-zinc-400 relative z-10">Or continue with</span>
-                <div className="absolute top-1/2 left-0 w-full h-px bg-zinc-100 -translate-y-1/2" />
-              </div>
-              <button
-                type="button"
-                onClick={handleGoogle}
-                className="w-full relative py-3.5 bg-zinc-50 hover:bg-zinc-100 text-zinc-900 border border-zinc-200 text-xs font-bold rounded-2xl transition flex items-center justify-center gap-3 cursor-pointer"
-                id="google-sso-btn"
-              >
-                <img src="https://www.google.com/favicon.ico" alt="Google" className="w-4 h-4" />
-                <span>Google Single Sign-On</span>
-              </button>
-            </>
-          )}
-        </div>
-
-        <div className="bg-zinc-50 border-t border-zinc-100 p-6 text-center" id="auth-modal-footer">
-          <p className="text-[11px] font-medium text-zinc-500">
-            {view === 'login' ? "Don't have an account? " : "Already established? "}
-            <button 
-              onClick={() => setView(view === 'login' ? 'register' : 'login')}
-              className="text-black font-black hover:underline"
-              id="auth-toggle-view"
-            >
-              {view === 'login' ? 'Register Now' : 'Sign In'}
-            </button>
+          <button
+            type="button"
+            onClick={handleGoogle}
+            disabled={loading}
+            className="w-full relative py-4 bg-zinc-50 hover:bg-zinc-100 disabled:opacity-50 text-zinc-900 border border-zinc-200 text-sm font-black uppercase tracking-widest rounded-2xl transition flex items-center justify-center gap-3 cursor-pointer shadow-sm"
+          >
+            <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5" />
+            <span>{loading ? 'Processing...' : 'Continue with Google'}</span>
+          </button>
+          
+          <p className="text-[10px] text-zinc-400 mt-6 max-w-xs uppercase tracking-wider font-mono">
+            Secure offline-free enterprise authentication system node.
           </p>
         </div>
       </div>

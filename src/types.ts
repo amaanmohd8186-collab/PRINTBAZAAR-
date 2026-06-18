@@ -205,7 +205,10 @@ export type ToolType =
   | 'image' 
   | 'ai' 
   | 'background' 
-  | 'verification';
+  | 'verification'
+  | 'urdu'
+  | 'typography'
+  | 'vector';
 
 export interface VerificationAudit {
   id: string;

@@ -921,7 +921,7 @@ export default function App() {
       return;
     }
 
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         setUser(firebaseUser);
         const userEmail = firebaseUser.email || '';
@@ -930,11 +930,32 @@ export default function App() {
           'gazisiddiqui01@gmail.com'
         ].includes(userEmail);
         
+        const userRole = isAdminEmail ? 'admin' : 'customer';
+
+        // SYNC USER DATA TO FIRESTORE
+        try {
+          if (db) {
+            const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
+            const userRef = doc(db, 'users', firebaseUser.uid);
+            await setDoc(userRef, {
+              uid: firebaseUser.uid,
+              name: firebaseUser.displayName || userEmail.split('@')[0] || 'User',
+              email: userEmail,
+              photoURL: firebaseUser.photoURL || '',
+              role: userRole === 'customer' ? 'user' : userRole, // Firestore schema needs 'user' per user instruction
+              createdAt: serverTimestamp(),
+              lastLoginAt: serverTimestamp()
+            }, { merge: true });
+          }
+        } catch (e) {
+          console.warn("Could not sync user profile to Firestore:", e);
+        }
+
         setSession({
           id: firebaseUser.uid,
           name: firebaseUser.displayName || userEmail.split('@')[0] || 'Authenticated User',
           email: userEmail,
-          role: isAdminEmail ? 'admin' : 'customer'
+          role: userRole
         });
 
         // Intercept Deactivation
