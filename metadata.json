@@ -1,6 +1,6 @@
 {
   "name": "PrintBazaar Pro Design Platform",
   "description": "Professional Canva-grade design application with AI-powered creative tools and banking-standard verification architecture.",
-  "requestFramePermissions": ["camera", "microphone"],
+  "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

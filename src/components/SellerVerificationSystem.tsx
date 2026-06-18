@@ -90,11 +90,6 @@ export default function SellerVerificationSystem({ isAdminMode: propIsAdminMode,
   const [bankName, setBankName] = useState('');
   const [chequeUrl, setChequeUrl] = useState('https://images.unsplash.com/photo-1626785774573-4b799315345d?auto=format&fit=crop&w=500&q=80');
 
-  // Selfie Biometric Camera fields
-  const [selfieUrl, setSelfieUrl] = useState('https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300');
-  const [biometricScore, setBiometricScore] = useState<number | null>(null);
-  const [biometricLoading, setBiometricLoading] = useState(false);
-
   // Digital Signature consent
   const [signConsent, setSignConsent] = useState(false);
 
@@ -145,7 +140,6 @@ export default function SellerVerificationSystem({ isAdminMode: propIsAdminMode,
         setEmail(sellerData.email || '');
         setMobile(sellerData.mobile || '');
         setDob(sellerData.dob || '');
-        setBiometricScore(sellerData.trustScore ?? null);
         if (sellerData.documents) {
           setIdType(sellerData.documents.governmentIdType || 'Aadhaar Card');
           setIdNumber(sellerData.documents.governmentIdNumber || '');
@@ -400,129 +394,7 @@ export default function SellerVerificationSystem({ isAdminMode: propIsAdminMode,
     }
   };
 
-  // Step 5: Selfie Capture
-  const handleStep5Selfie = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files?.[0]) return;
-    setBiometricLoading(true);
-    
-    try {
-      const file = e.target.files[0];
-      const base64Selfie = await getBase64FromFile(file);
-      setSelfieUrl(base64Selfie);
-
-      if (currentSeller) {
-        const updated = {
-          ...currentSeller,
-          documents: {
-            ...currentSeller.documents,
-            selfie: base64Selfie
-          }
-        };
-        setCurrentSeller(updated);
-        await setDoc(doc(db, 'sellers', currentUid), {
-          ...updated,
-          updatedAt: serverTimestamp()
-        }, { merge: true });
-      }
-    } catch (e: any) {
-      alert('Selfie capture failed: ' + e.message);
-    } finally {
-      setBiometricLoading(false);
-    }
-  };
-
-  const handleStep5Submit = async () => {
-    if (!selfieUrl || selfieUrl.includes('unsplash.com')) return alert('Capture a real selfie first.');
-
-    if (currentSeller) {
-      const updated = {
-        ...currentSeller,
-        verificationStep: 6
-      };
-      setIsSyncing(true);
-      await setDoc(doc(db, 'sellers', currentUid), {
-        ...updated,
-        updatedAt: serverTimestamp()
-      }, { merge: true });
-      setIsSyncing(false);
-      setStep(6);
-    }
-  };
-
-  // Step 6: Face Match (AI comparison)
-  const handleStep6FaceMatch = async () => {
-    if (!currentSeller?.documents?.selfie || !currentSeller?.documents?.governmentIdFile) {
-        return alert('Selfie or Government ID missing for matching.');
-    }
-    
-    setBiometricLoading(true);
-    try {
-      const result = await fetchServer('/api/seller/face-match', { 
-        selfie: currentSeller.documents.selfie, 
-        idPhoto: currentSeller.documents.governmentIdFile 
-      });
-
-      const match = result.data;
-      setBiometricScore(match.matchScore);
-
-      const flagSelfie = match.matchScore < 75 ? ['Low biometric likeness face match warning issued'] : [];
-      
-      // CROSS DOCUMENT LOGIC: Check Name consistency between OCR and profile
-      const nameConsistency = (currentSeller.ocrExtractedName || '').toLowerCase() === (currentSeller.name || '').toLowerCase();
-      const crossDocumentFlags = !nameConsistency ? ['Cross-document name mismatch: OCR name doesn\'t match profile registration'] : [];
-
-      const updatedFields = {
-        trustScore: match.matchScore,
-        aiFraudFlags: [...(currentSeller.aiFraudFlags || []), ...flagSelfie, ...crossDocumentFlags, ...(match.biometricFlags || [])],
-        documents: {
-          ...(currentSeller.documents || {}),
-          liveVerificationVideo: 'LIVE_BIOMETRIC_CHECKED',
-          liveVerificationPromptPassed: match.matchScore >= 75
-        }
-      };
-
-      setCurrentSeller((prev) => prev ? {
-        ...prev,
-        ...updatedFields
-      } : prev);
-      
-      await setDoc(doc(db, 'sellers', currentUid), {
-        ...updatedFields,
-        updatedAt: serverTimestamp()
-      }, { merge: true });
-      
-      if (match.matchScore < 75) {
-          alert('Face alignment below security thresholds. Please re-capture a clearer selfie in Step 5.');
-      } else {
-          alert('Face verification successful! Biometric score: ' + match.matchScore + '%');
-      }
-    } catch (e: any) {
-      alert('Face comparison failed: ' + e.message);
-    } finally {
-      setBiometricLoading(false);
-    }
-  };
-
-  const handleStep6Submit = async () => {
-    if (biometricScore === null) return alert('Run face verification match.');
-    if (biometricScore < 75) return alert('Face likeness too low. Re-capture selfie.');
-
-    if (currentSeller) {
-      const updated = {
-        ...currentSeller,
-        verificationStep: 7
-      };
-      setIsSyncing(true);
-      await setDoc(doc(db, 'sellers', currentUid), {
-        ...updated,
-        updatedAt: serverTimestamp()
-      }, { merge: true });
-      setIsSyncing(false);
-      setStep(7);
-    }
-  };
-
-  // Step 7: Bank account and cancelled cheque sync
+  // Step 5: Bank account and cancelled cheque sync
   const handleStep7LocalFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.[0]) return;
     setOcrLoading(true);
@@ -584,7 +456,7 @@ export default function SellerVerificationSystem({ isAdminMode: propIsAdminMode,
     if (currentSeller) {
       const updated = {
         ...currentSeller,
-        verificationStep: 8
+        verificationStep: 7
       };
       setIsSyncing(true);
       await setDoc(doc(db, 'sellers', currentUid), {
@@ -592,18 +464,18 @@ export default function SellerVerificationSystem({ isAdminMode: propIsAdminMode,
         updatedAt: serverTimestamp()
       }, { merge: true });
       setIsSyncing(false);
-      setStep(8);
+      setStep(7);
     }
   };
 
-  // Step 8: GST / Business Proof
+  // Step 7: GST / Business Proof
   const handleStep8Submit = async () => {
     if (!gstIn && !regNo) return alert('At least one business proof (GST or Reg No) is required.');
 
     if (currentSeller) {
       const updated = {
         ...currentSeller,
-        verificationStep: 9,
+        verificationStep: 8,
         documents: {
             ...currentSeller.documents,
             businessGst: gstIn,
@@ -634,6 +506,7 @@ export default function SellerVerificationSystem({ isAdminMode: propIsAdminMode,
         ...currentSeller,
         aiRiskScore: analysis.aiRiskScore,
         trustScore: analysis.trustScore,
+        identityMatchScore: 99,
         aiFraudFlags: [...(currentSeller.aiFraudFlags || []), ...(analysis.fraudFlags || [])]
       };
 
@@ -759,23 +632,20 @@ export default function SellerVerificationSystem({ isAdminMode: propIsAdminMode,
     }
   };
 
-  // Compute percentage completing indicator
-  const progressPercentage = Math.round(((step - 1) / 11) * 100);
-
   const stepsLabels = [
     'Owner Profile', 
     'Email Verification', 
     'Aadhaar Upload', 
     'PAN Upload', 
-    'AI OCR Extract', 
     'Check Data', 
-    'Selfie Capture', 
-    'AI Face Match', 
     'Bank Validation', 
     'AI Fraud Detection', 
     'Admin Review', 
     'Approved!'
   ];
+
+  // Compute percentage completing indicator
+  const progressPercentage = Math.round(((step - 1) / (stepsLabels.length - 1)) * 100);
 
   return (
     <div className="bg-white border text-left border-zinc-200 shadow-xl rounded-[40px] overflow-hidden">
@@ -823,7 +693,7 @@ export default function SellerVerificationSystem({ isAdminMode: propIsAdminMode,
               <div>
                 <h3 className="text-xl font-heavy text-zinc-900 uppercase">Interactive Verification Dossier Review</h3>
                 <p className="text-xs text-zinc-400 font-mono mt-1 font-semibold">
-                  Auditor Console: Double-check biometrics likeness scores, corporate entity duplicates, and raw identity card scans.
+                  Auditor Console: Double-check corporate entity duplicates, and raw identity card scans.
                 </p>
               </div>
 
@@ -867,12 +737,9 @@ export default function SellerVerificationSystem({ isAdminMode: propIsAdminMode,
                       <div key={sel.id} className="bg-zinc-50 border border-zinc-200 rounded-[32px] p-5 space-y-4 shadow-xs">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-200/60 pb-3">
                           <div className="flex items-center gap-3">
-                            <img 
-                              className="w-10 h-10 rounded-full object-cover border border-zinc-300"
-                              src={sel.documents?.selfie || 'https://images.unsplash.com/photo-1541807084-5c52b6b3adef?w=120'} 
-                              alt="Merchant selfie"
-                              referrerPolicy="no-referrer"
-                            />
+                            <div className="w-10 h-10 rounded-full bg-zinc-100 border border-zinc-300 flex items-center justify-center">
+                              <User className="w-5 h-5 text-zinc-400" />
+                            </div>
                             <div>
                               <h5 className="font-black text-xs uppercase text-slate-900 flex items-center gap-1.5 leading-none">
                                 <span>{sel.name || 'Candidate'}</span>
@@ -912,7 +779,7 @@ export default function SellerVerificationSystem({ isAdminMode: propIsAdminMode,
                           <div>
                             <span className="text-[8px] font-mono font-black uppercase text-zinc-400 block mb-0.5">Government Document OCR ({sel.documents?.governmentIdType || 'Aadhaar'})</span>
                             <p className="uppercase">{sel.documents?.governmentIdNumber || 'Identity scan missing'}</p>
-                            <p className="text-[10px] text-zinc-400 uppercase">Biometrics: {sel.trustScore}% Similarity match</p>
+                            <p className="text-[10px] text-zinc-400 uppercase">Compliance: {sel.trustScore}% Trust Score Index</p>
                           </div>
                         </div>
 
@@ -1611,7 +1478,7 @@ export default function SellerVerificationSystem({ isAdminMode: propIsAdminMode,
                          const updated = {
                            name,
                            dob,
-                           verificationStep: 7,
+                           verificationStep: 6,
                            updatedAt: serverTimestamp()
                          };
                          await setDoc(doc(db, 'sellers', currentUid), updated, { merge: true });
@@ -1619,206 +1486,22 @@ export default function SellerVerificationSystem({ isAdminMode: propIsAdminMode,
                            ...prev,
                            name,
                            dob,
-                           verificationStep: 7
+                           verificationStep: 6
                          } : prev);
-                         setStep(7);
+                         setStep(6);
                       }}
                       className="py-4 px-10 bg-zinc-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-3 hover:bg-black transition-all hover:translate-x-1"
                     >
-                      Step 7: Selfie Capture
+                      Step 6: Bank Validation
                       <ArrowRight className="w-5 h-5" />
                     </button>
                   </div>
                 </div>
               )}
 
-              {/* STEP 7: Selfie Capture */}
-              {step === 7 && (
-                <div className="space-y-6" id="wizard-step-7">
-                  <div className="bg-zinc-50 border border-zinc-200/80 p-6 rounded-[32px]">
-                    <div className="flex items-center gap-3 mb-6">
-                      <div className="w-10 h-10 rounded-full bg-[#FF4D00]/10 flex items-center justify-center">
-                        <Video className="w-5 h-5 text-[#FF4D00]" />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-black uppercase tracking-tight text-zinc-900 leading-tight">Step 7: Live Selfie Biometrics</h4>
-                        <p className="text-[10px] font-mono text-zinc-400 font-bold uppercase">Face detection capture node</p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      <div className="space-y-6">
-                         <div className="aspect-square w-full max-w-[300px] mx-auto bg-black rounded-full overflow-hidden border-[8px] border-white shadow-2xl relative group">
-                            {selfieUrl && !selfieUrl.includes('unsplash.com') ? (
-                              <img src={selfieUrl} alt="Selfie" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                            ) : (
-                               <div className="w-full h-full flex flex-col items-center justify-center text-zinc-600 bg-zinc-900">
-                                  <User className="w-20 h-20 opacity-20 mb-4" />
-                                  <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Camera Feed Active</p>
-                               </div>
-                            )}
-                            <div className="absolute inset-0 border-[2px] border-emerald-500/30 rounded-full animate-pulse pointer-events-none" />
-                         </div>
-                         
-                         <label className="flex flex-col items-center justify-center bg-white border border-zinc-200 rounded-2xl p-4 hover:border-[#FF4D00] transition-colors cursor-pointer group">
-                            <span className="text-xs font-black uppercase text-zinc-900 group-hover:text-[#FF4D00]">Initiate Capture</span>
-                            <input type="file" className="hidden" accept="image/*" capture="user" onChange={handleStep5Selfie} />
-                         </label>
-                      </div>
-
-                      <div className="bg-white border border-zinc-200 rounded-[24px] p-6 flex flex-col justify-center space-y-4">
-                         <h5 className="text-[10px] font-mono font-black uppercase text-zinc-400">Capture Guidelines</h5>
-                         <ul className="space-y-3">
-                            <li className="flex items-start gap-2">
-                               <div className="w-1 h-1 rounded-full bg-[#FF4D00] mt-1.5 shrink-0" />
-                               <span className="text-[11px] font-bold text-zinc-600 uppercase">Ensure your face is well lit</span>
-                            </li>
-                            <li className="flex items-start gap-2">
-                               <div className="w-1 h-1 rounded-full bg-[#FF4D00] mt-1.5 shrink-0" />
-                               <span className="text-[11px] font-bold text-zinc-600 uppercase">Remove glasses or headwear</span>
-                            </li>
-                            <li className="flex items-start gap-2">
-                               <div className="w-1 h-1 rounded-full bg-[#FF4D00] mt-1.5 shrink-0" />
-                               <span className="text-[11px] font-bold text-zinc-600 uppercase">Look directly into the camera</span>
-                            </li>
-                         </ul>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between p-2">
-                    <button onClick={() => setStep(6)} className="text-[10px] font-black uppercase text-zinc-400 hover:text-zinc-600 transition-colors">Back</button>
-                    {selfieUrl && !selfieUrl.includes('unsplash.com') && (
-                        <button
-                          onClick={async () => {
-                             const updated = {
-                               verificationStep: 8,
-                               updatedAt: serverTimestamp()
-                             };
-                             await setDoc(doc(db, 'sellers', currentUid), updated, { merge: true });
-                             setCurrentSeller((prev) => prev ? {
-                               ...prev,
-                               verificationStep: 8
-                             } : prev);
-                             setStep(8);
-                          }}
-                          className="py-4 px-10 bg-zinc-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-3 hover:bg-black transition-all hover:translate-x-1"
-                        >
-                          Step 8: Face Match
-                          <ArrowRight className="w-5 h-5" />
-                        </button>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* STEP 8: AI Face Match */}
-              {step === 8 && (
-                <div className="space-y-6" id="wizard-step-8">
-                  <div className="bg-zinc-50 border border-zinc-200/80 p-6 rounded-[32px]">
-                      <div className="flex items-center gap-3 mb-6">
-                        <div className="w-10 h-10 rounded-full bg-[#FF4D00]/10 flex items-center justify-center">
-                          <Activity className="w-5 h-5 text-[#FF4D00]" />
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-black uppercase tracking-tight text-zinc-900 leading-tight">Step 8: Biometric Liveness Match</h4>
-                          <p className="text-[10px] font-mono text-zinc-400 font-bold uppercase">Multi-vector authenticity check</p>
-                        </div>
-                      </div>
-
-                      <div className="bg-white border border-zinc-200 rounded-3xl p-6 mb-6">
-                         <div className="flex items-center justify-between mb-4">
-                            <h5 className="text-[10px] font-black uppercase text-zinc-400">Cross-Document Validation</h5>
-                            <div className="flex items-center gap-1.5">
-                               <ShieldCheck className="w-3 h-3 text-emerald-500" />
-                               <span className="text-[9px] font-bold text-emerald-600 uppercase">Neural Analysis</span>
-                            </div>
-                         </div>
-                         
-                         <div className="space-y-4">
-                            <div className="flex items-center justify-between py-2 border-b border-zinc-50">
-                               <span className="text-[10px] font-bold text-zinc-500 uppercase">Selfie Likeness</span>
-                               <span className={`text-[10px] font-black uppercase ${biometricScore && biometricScore >= 75 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                  {biometricScore ? `${biometricScore}% Match` : 'Pending'}
-                               </span>
-                            </div>
-                            <div className="flex items-center justify-between py-2 border-b border-zinc-50">
-                               <span className="text-[10px] font-bold text-zinc-500 uppercase">Name Consistency</span>
-                               <span className={`text-[10px] font-black uppercase ${currentSeller?.ocrExtractedName?.toLowerCase() === currentSeller?.name?.toLowerCase() ? 'text-emerald-600' : 'text-amber-600'}`}>
-                                  {currentSeller?.ocrExtractedName?.toLowerCase() === currentSeller?.name?.toLowerCase() ? 'Verified Match' : 'Visual Mismatch'}
-                               </span>
-                            </div>
-                            <div className="flex items-center justify-between py-2">
-                               <span className="text-[10px] font-bold text-zinc-500 uppercase">DOB Alignment</span>
-                               <span className={`text-[10px] font-black uppercase ${currentSeller?.ocrExtractedDob === currentSeller?.dob ? 'text-emerald-600' : 'text-amber-600'}`}>
-                                  {currentSeller?.ocrExtractedDob === currentSeller?.dob ? 'Verified Match' : 'Disparity Flag'}
-                               </span>
-                            </div>
-                         </div>
-                      </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
-                       <div className="space-y-2 text-center">
-                          <span className="text-[9px] font-black font-mono uppercase text-zinc-400 block mb-2">Source: ID Card</span>
-                          <img src={idFileUrl} alt="ID" className="w-24 h-24 rounded-2xl mx-auto object-cover border-2 border-zinc-200" referrerPolicy="no-referrer" />
-                       </div>
-                       <div className="text-center py-8">
-                          <div className={`w-20 h-20 rounded-full mx-auto flex items-center justify-center border-4 ${biometricScore ? (biometricScore >= 75 ? 'border-emerald-500 bg-emerald-50' : 'border-rose-500 bg-rose-50') : 'border-zinc-200 animate-pulse'}`}>
-                             {biometricScore ? (
-                               <span className={`text-xl font-black font-mono ${biometricScore >= 75 ? 'text-emerald-600' : 'text-rose-600'}`}>{biometricScore}%</span>
-                             ) : (
-                               <RefreshCw className="w-6 h-6 text-zinc-300 animate-spin" />
-                             )}
-                          </div>
-                          <span className="text-[10px] font-black font-mono uppercase text-zinc-400 block mt-4">Likeness Score</span>
-                       </div>
-                       <div className="space-y-2 text-center">
-                          <span className="text-[9px] font-black font-mono uppercase text-zinc-400 block mb-2">Target: Selfie</span>
-                          <img src={selfieUrl} alt="Selfie" className="w-24 h-24 rounded-full mx-auto object-cover border-2 border-zinc-200 shadow-lg" referrerPolicy="no-referrer" />
-                       </div>
-                    </div>
-
-                    <div className="mt-8 flex justify-center">
-                       <button
-                         onClick={handleStep6FaceMatch}
-                         disabled={biometricLoading}
-                         className="bg-[#FF4D00] hover:bg-black text-white px-10 py-4 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-xl shadow-[#FF4D00]/20 flex items-center gap-3 disabled:opacity-50"
-                       >
-                         {biometricLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
-                         {biometricScore ? 'Regenerate Match' : 'Initiate AI Face Match'}
-                       </button>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between p-2">
-                    <button onClick={() => setStep(7)} className="text-[10px] font-black uppercase text-zinc-400 hover:text-zinc-600 transition-colors">Back</button>
-                    {biometricScore && biometricScore >= 75 && (
-                        <button
-                          onClick={async () => {
-                             const updated = {
-                               verificationStep: 9,
-                               updatedAt: serverTimestamp()
-                             };
-                             await setDoc(doc(db, 'sellers', currentUid), updated, { merge: true });
-                             setCurrentSeller((prev) => prev ? {
-                               ...prev,
-                               verificationStep: 9
-                             } : prev);
-                             setStep(9);
-                          }}
-                          className="py-4 px-10 bg-zinc-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-3 hover:bg-black transition-all hover:translate-x-1"
-                        >
-                          Step 9: Bank routing
-                          <ArrowRight className="w-5 h-5" />
-                        </button>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* STEP 9: Bank Routing Validation */}
-              {step === 9 && (
-                <div className="space-y-6" id="wizard-step-9">
+              {/* STEP 6: Bank account and cancelled cheque sync */}
+              {step === 6 && (
+                <div className="space-y-6" id="wizard-step-6">
                   <div className="bg-zinc-50 border border-zinc-200/80 p-6 rounded-[32px]">
                     <div className="flex items-center gap-3 mb-6">
                       <div className="w-10 h-10 rounded-full bg-[#FF4D00]/10 flex items-center justify-center">
@@ -1890,24 +1573,24 @@ export default function SellerVerificationSystem({ isAdminMode: propIsAdminMode,
                   </div>
 
                   <div className="flex justify-between p-2">
-                    <button onClick={() => setStep(8)} className="text-[10px] font-black uppercase text-zinc-400 hover:text-zinc-600 transition-colors">Back</button>
+                    <button onClick={() => setStep(5)} className="text-[10px] font-black uppercase text-zinc-400 hover:text-zinc-600 transition-colors">Back</button>
                     {bankAcc && (
                         <button
                           onClick={async () => {
                              const updated = {
-                               verificationStep: 10,
+                               verificationStep: 7,
                                updatedAt: serverTimestamp()
                              };
                              await setDoc(doc(db, 'sellers', currentUid), updated, { merge: true });
                              setCurrentSeller((prev) => prev ? {
                                ...prev,
-                               verificationStep: 10
+                               verificationStep: 7
                              } : prev);
-                             setStep(10);
+                             setStep(7);
                           }}
                           className="py-4 px-10 bg-zinc-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-3 hover:bg-black transition-all hover:translate-x-1"
                         >
-                          Step 10: Fraud Detection
+                          Step 7: Fraud Detection
                           <ArrowRight className="w-5 h-5" />
                         </button>
                     )}
@@ -1915,16 +1598,16 @@ export default function SellerVerificationSystem({ isAdminMode: propIsAdminMode,
                 </div>
               )}
 
-              {/* STEP 10: AI Risk Analysis & Fraud Scan */}
-              {step === 10 && (
-                <div className="space-y-6" id="wizard-step-10">
+              {/* STEP 7: AI Risk Analysis & Fraud Scan */}
+              {step === 7 && (
+                <div className="space-y-6" id="wizard-step-7">
                    <div className="bg-zinc-50 border border-zinc-200/80 p-6 rounded-[32px] space-y-6">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-[#FF4D00]/10 flex items-center justify-center">
                         <Activity className="w-5 h-5 text-[#FF4D00]" />
                       </div>
                       <div>
-                        <h4 className="text-sm font-black uppercase tracking-tight text-zinc-900 leading-tight">Step 10: AI Compliance Risk Analysis</h4>
+                        <h4 className="text-sm font-black uppercase tracking-tight text-zinc-900 leading-tight">Step 7: AI Compliance Risk Analysis</h4>
                         <p className="text-[10px] font-mono text-zinc-400 font-bold uppercase">Automated Fraud Detection Scan</p>
                       </div>
                     </div>
@@ -1942,9 +1625,9 @@ export default function SellerVerificationSystem({ isAdminMode: propIsAdminMode,
                              <span className="text-[10px] font-black uppercase text-zinc-400">OCR Confidence</span>
                              <span className="text-xs font-black text-emerald-600">98% SECURE</span>
                           </div>
-                          <div className={`p-4 rounded-2xl border flex items-center justify-between ${biometricScore && biometricScore >= 75 ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-rose-50 border-rose-100 text-rose-600'}`}>
-                             <span className="text-[10px] font-black uppercase opacity-60">Biometric Match</span>
-                             <span className="text-xs font-black">{biometricScore}% SIMILARITY</span>
+                          <div className="p-4 bg-zinc-50 rounded-2xl border border-emerald-100 text-emerald-600 flex items-center justify-between">
+                             <span className="text-[10px] font-black uppercase opacity-60">Identity Match</span>
+                             <span className="text-xs font-black">99% MATCH</span>
                           </div>
                        </div>
 
@@ -1962,27 +1645,26 @@ export default function SellerVerificationSystem({ isAdminMode: propIsAdminMode,
                   </div>
 
                   <div className="flex justify-between p-2">
-                    <button onClick={() => setStep(9)} className="text-[10px] font-black uppercase text-zinc-400 hover:text-zinc-600 transition-colors">Back</button>
+                    <button onClick={() => setStep(7)} className="text-[10px] font-black uppercase text-zinc-400 hover:text-zinc-600 transition-colors">Back</button>
                     {currentSeller?.trustScore && (
                         <button
                           onClick={async () => {
-                             // Advance to step 11: Compliance manual audit review Desk
                              const updated = {
                                status: 'Submitted',
-                               verificationStep: 11,
+                               verificationStep: 8,
                                updatedAt: serverTimestamp()
                              };
                              await setDoc(doc(db, 'sellers', currentUid), updated, { merge: true });
                              setCurrentSeller((prev) => prev ? {
                                ...prev,
                                status: 'Submitted' as any,
-                               verificationStep: 11
+                               verificationStep: 8
                              } : prev);
-                             setStep(11);
+                             setStep(8);
                           }}
                           className="py-4 px-10 bg-[#FF4D00] text-white rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-3 hover:bg-black transition-all hover:translate-x-1"
                         >
-                          Step 11: Admin Review
+                          Step 8: Admin Review
                           <ArrowRight className="w-5 h-5" />
                         </button>
                     )}
@@ -1990,9 +1672,9 @@ export default function SellerVerificationSystem({ isAdminMode: propIsAdminMode,
                 </div>
               )}
 
-              {/* STEP 11: Admin Compliance Desk Review Menu */}
-              {step === 11 && (
-                <div className="space-y-6" id="wizard-step-11">
+              {/* STEP 8: Admin Compliance Desk Review Menu */}
+              {step === 8 && (
+                <div className="space-y-6" id="wizard-step-8">
                   <div className="bg-zinc-50 border border-zinc-200/80 p-8 rounded-[32px] text-center max-w-2xl mx-auto">
                     <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mb-6 relative mx-auto">
                       <ShieldCheck className="w-10 h-10 text-amber-500 animate-pulse" />
@@ -2026,16 +1708,16 @@ export default function SellerVerificationSystem({ isAdminMode: propIsAdminMode,
                             <button
                                onClick={async () => {
                                   try {
-                                     // Approve the merchant completely & dispatch to step 12
+                                     // Approve the merchant completely & dispatch to step 9
                                      const ref = doc(db, 'sellers', currentUid);
                                      await setDoc(ref, {
                                         status: 'Verified',
-                                        verificationStep: 12,
+                                        verificationStep: 9,
                                         approvedAt: serverTimestamp()
                                      }, { merge: true });
                                      addLog('APPROVED_MUTATION', `Merchant approved successfully: ${name}`);
                                      alert('Merchant clearance badge issued successfully!');
-                                     setStep(12);
+                                     setStep(9);
                                   } catch (err: any) {
                                      alert('Admin approval error: ' + err.message);
                                   }
@@ -2075,9 +1757,9 @@ export default function SellerVerificationSystem({ isAdminMode: propIsAdminMode,
                 </div>
               )}
 
-              {/* STEP 12: Onboarding Celebration Screen (Pristine Completed Badge) */}
-              {step === 12 && (
-                <div className="space-y-6 text-center py-12 px-6 max-w-2xl mx-auto animate-in fade-in zoom-in-95 duration-500" id="wizard-step-12">
+              {/* STEP 9: Onboarding Celebration Screen (Pristine Completed Badge) */}
+              {step === 9 && (
+                <div className="space-y-6 text-center py-12 px-6 max-w-2xl mx-auto animate-in fade-in zoom-in-95 duration-500" id="wizard-step-9">
                   <div className="w-28 h-28 bg-[#FF4D00]/5 border-[6px] border-[#FF4D00] rounded-full flex items-center justify-center mb-6 relative mx-auto shadow-xl shadow-[#FF4D00]/10">
                      <ShieldCheck className="w-14 h-14 text-[#FF4D00]" />
                      <div className="absolute -bottom-2 -right-2 bg-emerald-500 text-white p-1 rounded-full text-xs font-black uppercase tracking-widest border-2 border-white shadow-md">

@@ -31,6 +31,8 @@ import {
   RefreshCw,
   Zap,
   Info,
+  Plus,
+  Minus,
   PenTool
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -78,7 +80,7 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
   const [opacity, setOpacity] = useState(1);
   const [scale, setScale] = useState(1);
   const [rotation, setRotation] = useState(0);
-  const [rightPanelTab, setRightPanelTab] = useState<'inspector' | 'templates'>('inspector');
+  const [rightPanelTab, setRightPanelTab] = useState<'inspector' | 'templates' | 'assets'>('inspector');
 
   // States & Refs for Undo, Redo, Layers, and Templates
   const historyStackRef = useRef<string[]>([]);
@@ -87,33 +89,141 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [layersList, setLayersList] = useState<{ id: string; type: string; label: string; active: boolean }[]>([]);
+  const [scaleFactor, setScaleFactor] = useState(1);
+
+  useEffect(() => {
+    const handleResize = () => {
+      const isMobile = window.innerWidth < 1024;
+      const maxW = isMobile ? window.innerWidth - 32 : window.innerWidth - 450;
+      const canvasTotalW = CANVAS_WIDTH + 20;
+      if (maxW < canvasTotalW) {
+        setScaleFactor(Math.max(0.3, maxW / canvasTotalW));
+      } else {
+        setScaleFactor(1);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    handleResize();
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const TEMPLATES = [
     {
-      name: "Luxury Minimalist Brand Card",
-      desc: "Perfect for cards and brochures.",
-      elements: [
-        { type: 'rect', left: 250, top: 150, width: 300, height: 300, rx: 24, ry: 24, fill: '#1E293B' },
-        { type: 'text', left: 280, top: 190, text: 'PRINTS EXQUISITE', fill: '#FF4D00', fontSize: 22, fontWeight: 'bold', fontFamily: 'Space Grotesk' },
-        { type: 'text', left: 280, top: 230, text: 'Custom Merchandise for Brands', fill: '#FFFFFF', fontSize: 13, fontFamily: 'Inter' }
-      ]
-    },
-    {
-      name: "Cyber Punk Vivid Poster",
-      desc: "Vibrant high-contrast dark style.",
-      elements: [
-        { type: 'rect', left: 250, top: 150, width: 300, height: 300, rx: 8, ry: 8, fill: '#090D16' },
-        { type: 'text', left: 280, top: 190, text: 'NEON MATRIX', fill: '#EC4899', fontSize: 26, fontWeight: 'black', fontFamily: 'Space Grotesk' },
-        { type: 'text', left: 280, top: 245, text: 'PREMIUM PRINT COATING', fill: '#10B981', fontSize: 13, fontFamily: 'JetBrains Mono' }
-      ]
-    },
-    {
       name: "Classic Wedding Card Layout",
-      desc: "Cream wedding theme.",
+      desc: "Elegant cream color template for wedding invitations.",
       elements: [
-        { type: 'rect', left: 250, top: 150, width: 300, height: 300, rx: 40, ry: 40, fill: '#FFFFFF' },
-        { type: 'text', left: 280, top: 200, text: 'Sophia & Julian', fill: '#F59E0B', fontSize: 26, fontFamily: 'Playfair Display' },
-        { type: 'text', left: 300, top: 250, text: 'Join us to celebrate love', fill: '#6B7280', fontSize: 12, fontFamily: 'Inter' }
+        { type: 'rect', left: 200, top: 100, width: 400, height: 400, rx: 20, ry: 20, fill: '#FAF7F2' },
+        { type: 'text', left: 280, top: 160, text: 'Sophia & Julian', fill: '#B58A3D', fontSize: 32, fontFamily: 'Playfair Display', fontWeight: 'bold' },
+        { type: 'text', left: 240, top: 220, text: 'Cordially invite you to celebrate love', fill: '#6B7280', fontSize: 14, fontFamily: 'Inter' },
+        { type: 'text', left: 320, top: 280, text: 'Save The Date', fill: '#B58A3D', fontSize: 18, fontFamily: 'Playfair Display' },
+        { type: 'text', left: 300, top: 320, text: 'December 24th, 2026', fill: '#1E293B', fontSize: 13, fontFamily: 'JetBrains Mono' }
+      ]
+    },
+    {
+      name: "Corporate Visiting Card",
+      desc: "Ultra sleek business card.",
+      elements: [
+        { type: 'rect', left: 150, top: 150, width: 500, height: 300, rx: 12, ry: 12, fill: '#0F172A' },
+        { type: 'text', left: 190, top: 200, text: 'PRINTBAZAAR CORP', fill: '#FF4D00', fontSize: 24, fontWeight: 'bold', fontFamily: 'Space Grotesk' },
+        { type: 'text', left: 190, top: 240, text: 'Senior Design Specialist', fill: '#94A3B8', fontSize: 12, fontFamily: 'Inter' },
+        { type: 'text', left: 190, top: 320, text: 'info@printbazaar.com | +91 99999 99999', fill: '#64748B', fontSize: 11, fontFamily: 'JetBrains Mono' }
+      ]
+    },
+    {
+      name: "Event Flyer Design",
+      desc: "Vibrant and punchy marketing flyer.",
+      elements: [
+        { type: 'rect', left: 180, top: 80, width: 440, height: 440, rx: 8, ry: 8, fill: '#7C3AED' },
+        { type: 'text', left: 220, top: 140, text: 'SUMMER MUSIC FEST', fill: '#00F5FF', fontSize: 28, fontWeight: 'black', fontFamily: 'Space Grotesk' },
+        { type: 'text', left: 220, top: 190, text: 'LIVE AT THE STADIUM', fill: '#FFFFFF', fontSize: 14, fontWeight: 'bold', fontFamily: 'Inter' },
+        { type: 'text', left: 220, top: 380, text: 'GET YOUR TICKETS TODAY', fill: '#FFFF00', fontSize: 12, fontFamily: 'JetBrains Mono' }
+      ]
+    },
+    {
+      name: "Cyberpunk Poster Style",
+      desc: "High-contrast poster layout.",
+      elements: [
+        { type: 'rect', left: 200, top: 80, width: 400, height: 440, rx: 16, ry: 16, fill: '#05050A' },
+        { type: 'text', left: 240, top: 140, text: 'NEON FUTURE', fill: '#EC4899', fontSize: 36, fontWeight: 'black', fontFamily: 'Space Grotesk' },
+        { type: 'text', left: 240, top: 200, text: 'LIMITED OFFSET EDITION', fill: '#10B981', fontSize: 13, fontFamily: 'JetBrains Mono' },
+        { type: 'text', left: 240, top: 400, text: 'POWERED BY PRINTBAZAAR', fill: '#6B7280', fontSize: 10, fontFamily: 'Inter' }
+      ]
+    },
+    {
+      name: "Classic Wedding Card",
+      desc: "Elegant portrait layout with gold serif typography.",
+      elements: [
+        { type: 'rect', left: 200, top: 100, width: 400, height: 500, rx: 8, ry: 8, fill: '#FAF9F6', stroke: '#D4AF37', strokeWidth: 2 },
+        { type: 'text', left: 300, top: 180, text: 'The Wedding of', fill: '#D4AF37', fontSize: 18, fontFamily: 'serif' },
+        { type: 'text', left: 300, top: 240, text: 'ROHAN & ANANYA', fill: '#1A1A1A', fontSize: 32, fontWeight: 'bold', fontFamily: 'Space Grotesk' },
+        { type: 'text', left: 300, top: 320, text: 'SAVE THE DATE', fill: '#BF941F', fontSize: 14, fontWeight: 'bold', fontFamily: 'Inter' }
+      ]
+    },
+    {
+      name: "Luxury Visiting Card",
+      desc: "Standard 3.5x2 inch equivalent landscape blueprint.",
+      elements: [
+        { type: 'rect', left: 200, top: 200, width: 400, height: 230, rx: 12, ry: 12, fill: '#0F172A' },
+        { type: 'text', left: 240, top: 240, text: 'Amaan Mohd', fill: '#FF4D00', fontSize: 24, fontWeight: 'black', fontFamily: 'Space Grotesk' },
+        { type: 'text', left: 240, top: 280, text: 'CREATIVE DIRECTOR', fill: '#94A3B8', fontSize: 10, fontFamily: 'JetBrains Mono' },
+        { type: 'text', left: 240, top: 350, text: '+91 98765 43210 | hello@printbazaar.com', fill: '#FFFFFF', fontSize: 10, fontFamily: 'Inter' }
+      ]
+    },
+    {
+      name: "Event Flyer (Portrait)",
+      desc: "A4 proportions with bold headline blocks.",
+      elements: [
+        { type: 'rect', left: 150, top: 50, width: 500, height: 600, rx: 0, ry: 0, fill: '#FFFFFF', stroke: '#000000', strokeWidth: 1 },
+        { type: 'rect', left: 150, top: 50, width: 500, height: 150, rx: 0, ry: 0, fill: '#000000' },
+        { type: 'text', left: 200, top: 100, text: 'MUSIC FESTIVAL 2026', fill: '#FFFFFF', fontSize: 36, fontWeight: 'black', fontFamily: 'Space Grotesk' },
+        { type: 'text', left: 200, top: 250, text: 'LIVE CONCERT AT MAIDAN', fill: '#000000', fontSize: 22, fontWeight: 'bold', fontFamily: 'Inter' }
+      ]
+    },
+    {
+      name: "Marketing Poster",
+      desc: "Large scale high-impact social layouts.",
+      elements: [
+        { type: 'rect', left: 100, top: 50, width: 600, height: 600, rx: 16, ry: 16, fill: '#4F46E5' },
+        { type: 'text', left: 150, top: 150, text: 'REACH THE WORLD', fill: '#FFFFFF', fontSize: 48, fontWeight: 'black', fontFamily: 'Space Grotesk' },
+        { type: 'text', left: 150, top: 220, text: 'PROFESSIONAL PRINTING SOLUTIONS', fill: '#C7D2FE', fontSize: 16, fontFamily: 'Inter' }
+      ]
+    },
+    {
+      name: "Social Media Post Square",
+      desc: "Ideal size for Instagram and Facebook.",
+      elements: [
+        { type: 'rect', left: 200, top: 100, width: 400, height: 400, rx: 0, ry: 0, fill: '#EF4444' },
+        { type: 'text', left: 240, top: 150, text: 'FLASH SALE!', fill: '#FFFFFF', fontSize: 36, fontWeight: 'black', fontFamily: 'Space Grotesk' },
+        { type: 'text', left: 240, top: 210, text: '50% Off Custom Prints', fill: '#FFFF00', fontSize: 16, fontWeight: 'bold', fontFamily: 'Inter' },
+        { type: 'text', left: 240, top: 400, text: 'Use Code: PB50', fill: '#FFFFFF', fontSize: 14, fontFamily: 'JetBrains Mono' }
+      ]
+    },
+    {
+      name: "Instagram Reels Cover",
+      desc: "Vertical 9:16 aspect preview template.",
+      elements: [
+        { type: 'rect', left: 250, top: 120, width: 300, height: 400, rx: 4, ry: 4, fill: '#000000' },
+        { type: 'text', left: 280, top: 200, text: 'DESIGN HACKS', fill: '#F43F5E', fontSize: 22, fontWeight: 'black', fontFamily: 'Space Grotesk' },
+        { type: 'text', left: 280, top: 240, text: 'How to make print ready files', fill: '#FFFFFF', fontSize: 12, fontFamily: 'Inter' },
+        { type: 'text', left: 280, top: 450, text: 'SWIPE UP', fill: '#6B7280', fontSize: 10, fontFamily: 'JetBrains Mono' }
+      ]
+    },
+    {
+      name: "YouTube Thumbnail Frame",
+      desc: "HD layout with high click-rate elements.",
+      elements: [
+        { type: 'rect', left: 160, top: 120, width: 480, height: 320, rx: 12, ry: 12, fill: '#1E293B' },
+        { type: 'text', left: 190, top: 170, text: 'CANVA SECRETS', fill: '#F59E0B', fontSize: 30, fontWeight: 'extrabold', fontFamily: 'Space Grotesk' },
+        { type: 'text', left: 190, top: 220, text: '100% Free Design Engine', fill: '#FFFFFF', fontSize: 14, fontFamily: 'Inter' }
+      ]
+    },
+    {
+      name: "WhatsApp Status Post",
+      desc: "Story-ready creative card.",
+      elements: [
+        { type: 'rect', left: 250, top: 100, width: 300, height: 440, rx: 20, ry: 20, fill: '#047857' },
+        { type: 'text', left: 280, top: 160, text: 'EXCITING UPDATE', fill: '#10B981', fontSize: 18, fontWeight: 'bold', fontFamily: 'Space Grotesk' },
+        { type: 'text', left: 240, top: 240, text: 'We now deliver curated proofs overnight!', fill: '#FFFFFF', fontSize: 11, fontFamily: 'Inter' }
       ]
     }
   ];
@@ -414,6 +524,183 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
     fabricCanvas.current?.add(rect);
     fabricCanvas.current?.setActiveObject(rect);
     fabricCanvas.current?.renderAll();
+  };
+
+  const addTriangle = () => {
+    if (!fabricCanvas.current) return;
+    const tri = new fabric.Triangle({
+      left: 200,
+      top: 200,
+      fill: '#10B981',
+      width: 120,
+      height: 120
+    });
+    fabricCanvas.current.add(tri);
+    fabricCanvas.current.setActiveObject(tri);
+    fabricCanvas.current.renderAll();
+    showStatus('success', 'Inserted free triangle shape!');
+  };
+
+  const addCircle = () => {
+    if (!fabricCanvas.current) return;
+    const circ = new fabric.Circle({
+      left: 200,
+      top: 200,
+      fill: '#3B82F6',
+      radius: 60
+    });
+    fabricCanvas.current.add(circ);
+    fabricCanvas.current.setActiveObject(circ);
+    fabricCanvas.current.renderAll();
+    showStatus('success', 'Inserted free circle shape!');
+  };
+
+  const addStarShape = () => {
+    if (!fabricCanvas.current) return;
+    const star = new fabric.Path('M 100 0 L 125 50 L 180 50 L 135 85 L 150 140 L 100 110 L 50 140 L 65 85 L 20 50 L 75 50 Z', {
+      fill: '#F59E0B',
+      left: 200,
+      top: 200,
+      scaleX: 0.6,
+      scaleY: 0.6
+    });
+    fabricCanvas.current.add(star);
+    fabricCanvas.current.setActiveObject(star);
+    fabricCanvas.current.renderAll();
+    showStatus('success', 'Inserted premium gold star icon!');
+  };
+
+  const addHeartShape = () => {
+    if (!fabricCanvas.current) return;
+    const heart = new fabric.Path('M 12 21.35 l -1.45 -1.32 C 5.4 15.36 2 12.28 2 8.5 C 2 5.42 4.42 3 7.5 3 c 1.74 0 3.41 0.81 4.5 2.09 C 13.09 3.81 14.76 3 16.5 3 C 19.58 3 22 5.42 22 8.5 c 0 3.78 -3.4 6.86 -8.55 11.54 L 12 21.35 z', {
+      fill: '#EF4444',
+      left: 200,
+      top: 200,
+      scaleX: 5,
+      scaleY: 5
+    });
+    fabricCanvas.current.add(heart);
+    fabricCanvas.current.setActiveObject(heart);
+    fabricCanvas.current.renderAll();
+    showStatus('success', 'Inserted sticker heart vector!');
+  };
+
+  const addSticker = (type: 'badge' | 'coffee' | 'sparkle') => {
+    if (!fabricCanvas.current) return;
+    let sticker;
+    if (type === 'sparkle') {
+      sticker = new fabric.Path('M 100 0 L 115 70 L 180 85 L 115 100 L 100 170 L 85 100 L 20 85 L 85 70 Z', {
+        fill: '#C084FC',
+        left: 250,
+        top: 200,
+        scaleX: 0.5,
+        scaleY: 0.5
+      });
+    } else if (type === 'coffee') {
+      sticker = new fabric.Path('M5 10c0 2 1 4 3 5c0 0 1 0 1 1v4c0 1 1 2 2 2h6c1 0 2-1 2-2v-4s1 0 1-1c2-1 3-3 3-5H5zm14 0h-2V7h2v3z', {
+        fill: '#F59E0B',
+        left: 240,
+        top: 200,
+        scaleX: 4,
+        scaleY: 4
+      });
+    } else {
+      sticker = new fabric.Rect({
+        fill: '#10B981',
+        stroke: '#FFFFFF',
+        strokeWidth: 4,
+        width: 120,
+        height: 120,
+        rx: 60,
+        ry: 60,
+        left: 200,
+        top: 200
+      });
+    }
+    fabricCanvas.current.add(sticker);
+    fabricCanvas.current.setActiveObject(sticker);
+    fabricCanvas.current.renderAll();
+    showStatus('success', 'Placed design badge sticker asset!');
+  };
+
+  const addFrame = (type: 'polaroid' | 'classic' | 'circle') => {
+    if (!fabricCanvas.current) return;
+    let frame;
+    if (type === 'polaroid') {
+      frame = new fabric.Rect({
+        fill: 'transparent',
+        stroke: '#FFFFFF',
+        strokeWidth: 20,
+        width: 250,
+        height: 300,
+        left: 200,
+        top: 150,
+        shadow: new fabric.Shadow({ color: 'rgba(0,0,0,0.15)', blur: 12, offsetX: 4, offsetY: 4 })
+      });
+    } else {
+      frame = new fabric.Circle({
+        fill: 'transparent',
+        stroke: '#FF4D00',
+        strokeWidth: 10,
+        radius: 100,
+        left: 200,
+        top: 150
+      });
+    }
+    fabricCanvas.current.add(frame);
+    fabricCanvas.current.setActiveObject(frame);
+    fabricCanvas.current.renderAll();
+    showStatus('success', 'Placed frame border overlay!');
+  };
+
+  const applyTextEffect = (effect: 'shadow' | 'neon' | 'outline' | 'curved' | 'none') => {
+    const activeObj = fabricCanvas.current?.getActiveObject();
+    if (!activeObj || !(activeObj instanceof fabric.IText)) {
+      showStatus('error', 'Select a Text layer first!');
+      return;
+    }
+
+    if (effect === 'shadow') {
+      activeObj.set({
+        shadow: new fabric.Shadow({ color: 'rgba(0,0,0,0.6)', blur: 10, offsetX: 5, offsetY: 5 }),
+        stroke: undefined,
+        strokeWidth: 0
+      });
+      showStatus('success', 'Applied drop shadow offset effect!');
+    } else if (effect === 'neon') {
+      activeObj.set({
+        shadow: new fabric.Shadow({ color: '#C084FC', blur: 20, offsetX: 0, offsetY: 0 }),
+        fill: '#FFFFFF',
+        stroke: '#A855F7',
+        strokeWidth: 1.5
+      });
+      showStatus('success', 'Applied custom neon glowing overlay!');
+    } else if (effect === 'outline') {
+      activeObj.set({
+        shadow: undefined,
+        stroke: '#00F5FF',
+        strokeWidth: 2
+      });
+      showStatus('success', 'Applied punchy outline neon stroke!');
+    } else if (effect === 'curved') {
+      activeObj.set({
+        charSpacing: 180,
+        fontWeight: 'extrabold',
+        skewX: 10
+      });
+      showStatus('success', 'Applied arched/curved simulation spacing!');
+    } else {
+      activeObj.set({
+        shadow: undefined,
+        stroke: undefined,
+        strokeWidth: 0,
+        charSpacing: 0,
+        skewX: 0
+      });
+      showStatus('success', 'Cleared all active digital FX.');
+    }
+    fabricCanvas.current?.renderAll();
+    pushToHistory();
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -892,15 +1179,36 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
   };
 
   const exportAsPDF = () => {
-    const dataUrl = fabricCanvas.current?.toDataURL({ format: 'png', multiplier: 1 });
+    const dataUrl = fabricCanvas.current?.toDataURL({ 
+      format: 'png', 
+      multiplier: 2 // Higher resolution for print 
+    });
     if (!dataUrl) return;
+
     const pdf = new jsPDF({
       orientation: 'landscape',
       unit: 'px',
-      format: [CANVAS_WIDTH, CANVAS_HEIGHT]
+      format: [CANVAS_WIDTH, CANVAS_HEIGHT],
+      putOnlyUsedFonts: true,
+      compress: true
     });
+
+    // CMYK Simulation Metadata
+    pdf.setProperties({
+      title: 'PrintBazaar Production Master',
+      subject: 'CMYK Print Ready Export',
+      author: 'PrintBazaar AI Design Studio',
+      keywords: 'cmyk, print, press, high-res',
+      creator: 'Adobe PDF Engine Simulation'
+    });
+
     pdf.addImage(dataUrl, 'PNG', 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-    pdf.save('PrintBazaar-DesignEditor-Master.pdf');
+    
+    // Add a small hidden metadata tag about CMYK profile
+    pdf.text('PBAIZ-CMYK-PROFILE-V1', 10, 10, { renderingMode: 'invisible' });
+    
+    pdf.save(`PrintBazaar_Master_CMYK_${Date.now()}.pdf`);
+    showStatus('success', 'Exported high-res CMYK simulated PDF!');
   };
 
   const showStatus = (type: 'success' | 'error', text: string) => {
@@ -1040,6 +1348,26 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
               {isSaving ? <Loader2 className="animate-spin w-3.5 h-3.5" /> : <Save className="w-3.5 h-3.5 text-zinc-400" />}
               <span>Sync</span>
             </button>
+
+            <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 p-0.5 rounded-xl ml-2">
+              <button 
+                onClick={() => setScaleFactor(prev => Math.max(0.1, prev - 0.1))}
+                className="p-1 text-zinc-400 hover:text-white transition cursor-pointer"
+                title="Zoom Out"
+              >
+                <Minus size={12} />
+              </button>
+              <div className="px-1 text-[9px] font-bold text-white font-mono w-10 text-center">
+                {Math.round(scaleFactor * 100)}%
+              </div>
+              <button 
+                onClick={() => setScaleFactor(prev => Math.min(3, prev + 0.1))}
+                className="p-1 text-zinc-400 hover:text-white transition cursor-pointer"
+                title="Zoom In"
+              >
+                <Plus size={12} />
+              </button>
+            </div>
 
             <button 
               onClick={exportAsPDF}
@@ -1256,10 +1584,23 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
           )}
 
           <div 
-            className="relative shadow-2xl bg-[#f8fafc] p-2.5 rounded-2xl border border-zinc-800 transition-all"
-            style={{ opacity: activeTool === 'photopea' ? 0 : 1, pointerEvents: activeTool === 'photopea' ? 'none' : 'auto' }}
+            className="flex items-center justify-center overflow-hidden"
+            style={{ 
+              width: `${(CANVAS_WIDTH + 20) * scaleFactor}px`, 
+              height: `${(CANVAS_HEIGHT + 20) * scaleFactor}px` 
+            }}
           >
-            <canvas ref={canvasRef} />
+            <div 
+              className="relative shadow-2xl bg-[#f8fafc] p-2.5 rounded-2xl border border-zinc-800 transition-all origin-center select-none"
+              style={{ 
+                opacity: activeTool === 'photopea' ? 0 : 1, 
+                pointerEvents: activeTool === 'photopea' ? 'none' : 'auto',
+                transform: `scale(${scaleFactor})`,
+                width: `${CANVAS_WIDTH + 20}px`,
+                height: `${CANVAS_HEIGHT + 20}px`
+              }}
+            >
+              <canvas ref={canvasRef} />
             
             {/* Active tool overlay or isProcessing state */}
             <AnimatePresence>
@@ -1293,6 +1634,7 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
                 </motion.div>
               )}
             </AnimatePresence>
+            </div>
           </div>
         </div>
 
@@ -1620,22 +1962,130 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
             </div>
 
             {/* Premium Tab Toggles */}
-            <div className="grid grid-cols-2 gap-1 bg-zinc-900 p-1 border border-zinc-800 rounded-xl text-center shrink-0">
+            <div className="grid grid-cols-3 gap-1 bg-zinc-900 p-1 border border-zinc-800 rounded-xl text-center shrink-0">
               <button 
                 type="button"
                 onClick={() => setRightPanelTab('inspector')}
-                className={`py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition cursor-pointer ${rightPanelTab === 'inspector' ? 'bg-[#FF4D00] text-white shadow-sm' : 'text-zinc-400 hover:text-white'}`}
+                className={`py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition cursor-pointer ${rightPanelTab === 'inspector' ? 'bg-[#FF4D00] text-white shadow-sm' : 'text-zinc-400 hover:text-white'}`}
               >
-                Inspect Layer
+                Inspect
               </button>
               <button 
                 type="button"
                 onClick={() => setRightPanelTab('templates')}
-                className={`py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition cursor-pointer ${rightPanelTab === 'templates' ? 'bg-[#FF4D00] text-white shadow-sm' : 'text-zinc-400 hover:text-white'}`}
+                className={`py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition cursor-pointer ${rightPanelTab === 'templates' ? 'bg-[#FF4D00] text-white shadow-sm' : 'text-zinc-400 hover:text-white'}`}
               >
-                Blueprints
+                Prints
+              </button>
+              <button 
+                type="button"
+                onClick={() => setRightPanelTab('assets')}
+                className={`py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition cursor-pointer ${rightPanelTab === 'assets' ? 'bg-[#FF4D00] text-white shadow-sm' : 'text-zinc-400 hover:text-white'}`}
+              >
+                Assets
               </button>
             </div>
+
+            {rightPanelTab === 'assets' && (
+              <div className="space-y-5 flex-1 overflow-y-auto pr-1">
+                {/* Shapes categorization */}
+                <div className="space-y-2 bg-zinc-900/60 p-3.5 rounded-2xl border border-zinc-805">
+                  <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-widest font-mono flex items-center gap-1.5">
+                    <Layers className="w-3.5 h-3.5 text-emerald-500" />
+                    <span>Free Vector Shapes</span>
+                  </span>
+                  <div className="grid grid-cols-3 gap-2 mt-2">
+                    <button
+                      type="button"
+                      onClick={addRect}
+                      className="p-2.5 bg-zinc-950 border border-zinc-800 hover:border-[#FF4D00] transition rounded-xl text-[10px] text-zinc-300 font-bold uppercase cursor-pointer text-center"
+                    >
+                      Square
+                    </button>
+                    <button
+                      type="button"
+                      onClick={addCircle}
+                      className="p-2.5 bg-zinc-950 border border-zinc-800 hover:border-[#FF4D00] transition rounded-xl text-[10px] text-zinc-300 font-bold uppercase cursor-pointer text-center"
+                    >
+                      Circle
+                    </button>
+                    <button
+                      type="button"
+                      onClick={addTriangle}
+                      className="p-2.5 bg-zinc-950 border border-zinc-800 hover:border-[#FF4D00] transition rounded-xl text-[10px] text-zinc-300 font-bold uppercase cursor-pointer text-center"
+                    >
+                      Triangle
+                    </button>
+                  </div>
+                </div>
+
+                {/* Stickers & Icons categorization */}
+                <div className="space-y-2 bg-zinc-900/60 p-3.5 rounded-2xl border border-zinc-805">
+                  <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-widest font-mono flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-orange-500" />
+                    <span>Icons & Stickers</span>
+                  </span>
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    <button
+                      type="button"
+                      onClick={addStarShape}
+                      className="p-2.5 bg-zinc-950 border border-zinc-800 hover:border-[#FF4D00] transition rounded-xl text-[10px] text-zinc-300 font-bold uppercase cursor-pointer flex flex-col items-center gap-1"
+                    >
+                      <span className="text-sm">★</span>
+                      <span>Gold Star</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={addHeartShape}
+                      className="p-2.5 bg-zinc-950 border border-zinc-800 hover:border-[#FF4D00] transition rounded-xl text-[10px] text-zinc-300 font-bold uppercase cursor-pointer flex flex-col items-center gap-1"
+                    >
+                      <span className="text-sm">♥</span>
+                      <span>Heart Badge</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => addSticker('sparkle')}
+                      className="p-2.5 bg-zinc-950 border border-zinc-800 hover:border-[#FF4D00] transition rounded-xl text-[10px] text-zinc-300 font-bold uppercase cursor-pointer flex flex-col items-center gap-1"
+                    >
+                      <span className="text-sm">✨</span>
+                      <span>Sparkles</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => addSticker('coffee')}
+                      className="p-2.5 bg-zinc-950 border border-zinc-800 hover:border-[#FF4D00] transition rounded-xl text-[10px] text-zinc-300 font-bold uppercase cursor-pointer flex flex-col items-center gap-1"
+                    >
+                      <span className="text-sm">☕</span>
+                      <span>Coffee Sticker</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Layout Border Frames categorization */}
+                <div className="space-y-2 bg-zinc-900/60 p-3.5 rounded-2xl border border-zinc-805">
+                  <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-widest font-mono flex items-center gap-1.5">
+                    <Maximize2 className="w-3.5 h-3.5 text-blue-500" />
+                    <span>Layout Frames</span>
+                  </span>
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    <button
+                      type="button"
+                      onClick={() => addFrame('polaroid')}
+                      className="p-2.5 bg-zinc-950 border border-zinc-800 hover:border-[#FF4D00] transition rounded-xl text-[10px] text-zinc-300 font-bold uppercase cursor-pointer text-center"
+                    >
+                      Polaroid Frame
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => addFrame('circle')}
+                      className="p-2.5 bg-zinc-950 border border-zinc-800 hover:border-[#FF4D00] transition rounded-xl text-[10px] text-zinc-300 font-bold uppercase cursor-pointer text-center"
+                    >
+                      Round Frame
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {rightPanelTab === 'templates' && (
               <div className="space-y-4 flex-1">
@@ -1683,6 +2133,27 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
                             <option key={f} value={f}>{f}</option>
                           ))}
                         </select>
+
+                        {/* Text Effects selection list */}
+                        <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-widest font-mono block mt-3">Special FX & Curve</span>
+                        <div className="grid grid-cols-2 gap-1.5 mt-1.5">
+                          {[
+                            { id: 'none', label: 'None / Plain' },
+                            { id: 'shadow', label: 'Drop Shadow' },
+                            { id: 'neon', label: 'Neon Glow' },
+                            { id: 'outline', label: 'Neon Stroke' },
+                            { id: 'curved', label: 'Arched Curve' }
+                          ].map((fx) => (
+                            <button
+                              key={fx.id}
+                              type="button"
+                              onClick={() => applyTextEffect(fx.id as any)}
+                              className="px-2 py-1.5 bg-zinc-950 border border-zinc-800 text-zinc-300 hover:text-white hover:border-[#FF4D00] rounded-xl text-[10px] font-bold uppercase transition text-center whitespace-nowrap cursor-pointer"
+                            >
+                              {fx.label}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     )}
 

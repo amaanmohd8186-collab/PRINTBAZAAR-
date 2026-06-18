@@ -251,7 +251,6 @@ export interface SellerProfile {
     aadhaarFront?: string | null;
     aadhaarBack?: string | null;
     panCard?: string | null;
-    selfie?: string | null;
     cancelledCheque?: string | null;
     gstCert?: string | null;
     tradeLicense?: string | null;

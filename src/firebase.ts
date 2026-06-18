@@ -69,14 +69,41 @@ let firebaseAuth: any = null;
 try {
   if (firebaseConfig.apiKey && firebaseConfig.projectId) {
     initializedApp = initializeApp(firebaseConfig);
-    firestoreDb = getFirestore(initializedApp, firebaseConfig.firestoreDatabaseId);
-    firebaseAuth = getAuth(initializedApp);
-    console.log("Auth Ready:      YES");
+    console.log("Firebase App initialized successfully.");
   } else {
-    throw new Error("Missing essential config");
+    console.warn("⚠️ Firebase: Missing essential config keys.");
   }
 } catch (e) {
-  console.error("Firebase App initialization failed. Safe mode activated.", e);
+  console.error("Firebase App initialization failed:", e);
+}
+
+if (initializedApp) {
+  // Isolate Auth initialization
+  try {
+    firebaseAuth = getAuth(initializedApp);
+    console.log("Auth Ready:      YES");
+  } catch (e) {
+    console.error("Firebase Auth initialization failed:", e);
+  }
+
+  // Isolate Firestore initialization with robust fallback
+  try {
+    if (firebaseConfig.firestoreDatabaseId) {
+      try {
+        firestoreDb = getFirestore(initializedApp, firebaseConfig.firestoreDatabaseId);
+        console.log(`Firestore Ready with Named Database: "${firebaseConfig.firestoreDatabaseId}"`);
+      } catch (namedDbErr) {
+        console.warn(`Firestore named database "${firebaseConfig.firestoreDatabaseId}" failed. Trying default database fallback...`, namedDbErr);
+        firestoreDb = getFirestore(initializedApp);
+        console.log("Firestore Ready with Default Database (Fallback)");
+      }
+    } else {
+      firestoreDb = getFirestore(initializedApp);
+      console.log("Firestore Ready with Default Database");
+    }
+  } catch (e) {
+    console.error("Firestore initialization failed completely.", e);
+  }
 }
 
 export const app = initializedApp as any;

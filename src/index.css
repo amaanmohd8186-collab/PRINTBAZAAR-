@@ -114,10 +114,30 @@ html.dark ::-webkit-scrollbar-thumb:hover,
 
 /* Prevent automatic zoom on mobile when touch focusing inputs */
 @layer base {
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+  
   @media (max-width: 768px) {
     input, textarea, select, [contenteditable="true"] {
       font-size: 16px !important;
     }
+    
+    /* Better modal interaction on mobile */
+    .overflow-y-auto {
+      -webkit-overflow-scrolling: touch;
+    }
+  }
+
+  /* Optimized height for mobile browsers */
+  .min-h-screen-dynamic {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+  
+  .h-screen-dynamic {
+    height: 100vh;
+    height: 100dvh;
   }
 }
 

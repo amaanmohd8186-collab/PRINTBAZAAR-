@@ -1317,7 +1317,7 @@ export default function AiStudioWorkspace() {
                       
                       {/* BEFORE version (Full backdrop background) */}
                       <div className="absolute inset-y-0 left-0 right-0 overflow-hidden" style={{ width: `${sliderPosition}%` }}>
-                        <div className="absolute inset-y-0 left-0 w-[450px] h-full flex items-center justify-center bg-zinc-100">
+                        <div className="absolute inset-y-0 left-0 w-[450px] max-w-[83vw] sm:max-w-none h-full flex items-center justify-center bg-zinc-100">
                           <img
                             src={currentImage}
                             alt="Original Design"
@@ -1331,7 +1331,7 @@ export default function AiStudioWorkspace() {
                       {/* AFTER version (Checkerboard PNG transparency) */}
                       <div className="absolute inset-y-0 right-0 overflow-hidden" style={{ left: `${sliderPosition}%` }}>
                         <div 
-                          className="absolute inset-y-0 right-0 w-[450px] h-full flex items-center justify-center"
+                          className="absolute inset-y-0 right-0 w-[450px] max-w-[83vw] sm:max-w-none h-full flex items-center justify-center"
                           style={{
                                backgroundImage: "linear-gradient(45deg, #e4e4e7 25%, transparent 25%), linear-gradient(-45deg, #e4e4e7 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e4e4e7 75%), linear-gradient(-45deg, transparent 75%, #e4e4e7 75%)",
                                backgroundSize: "16px 16px",

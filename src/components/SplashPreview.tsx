@@ -89,7 +89,7 @@ export default function SplashPreview({ onFinish, isAppReady, startupLogs }: Spl
   // Prevent early unmount / flashes
   return (
     <motion.div 
-      className="fixed inset-0 z-[10000] bg-[#020202] flex flex-col items-center justify-center overflow-hidden touch-none select-none perspective-[1200px]"
+      className="fixed inset-0 z-[10000] bg-[#020202] flex flex-col items-center justify-center overflow-hidden touch-none select-none perspective-[1200px] min-h-screen-dynamic"
       initial={{ opacity: 1 }}
       exit={{ 
         opacity: 0, 
