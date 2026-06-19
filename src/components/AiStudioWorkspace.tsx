@@ -555,6 +555,10 @@ export default function AiStudioWorkspace() {
     img.onload = () => {
       try {
         const canvas = document.createElement("canvas");
+        if (!canvas) {
+           setIsProcessing(false);
+           return;
+        }
         const cropX = (cropBox.x / 100) * img.naturalWidth;
         const cropY = (cropBox.y / 100) * img.naturalHeight;
         const cropW = (cropBox.w / 100) * img.naturalWidth;
@@ -836,6 +840,10 @@ export default function AiStudioWorkspace() {
     img.onload = () => {
       try {
         const canvas = document.createElement("canvas");
+        if (!canvas) {
+           setIsProcessing(false);
+           return;
+        }
         
         // Define export specifications (default to customWidth and customHeight)
         canvas.width = customWidth || img.naturalWidth || 800;

@@ -30,7 +30,8 @@ import {
   Share2,
   ArrowLeft,
   FileText,
-  Trash2
+  Trash2,
+  Briefcase
 } from 'lucide-react';
 import { SmartShareSystem } from './components/SmartShareSystem';
 import { 
@@ -1807,6 +1808,21 @@ export default function App() {
                   </span>
                 )}
               </button>
+
+              {(dbIsSeller || dbOnboardingCompleted) && (
+                <button
+                  type="button"
+                  onClick={() => setEnterprisePortal('seller-dashboard')}
+                  className={`py-2 px-4.5 rounded-2xl text-xs font-heavy uppercase tracking-wider transition flex items-center gap-1.5 border border-transparent cursor-pointer ${
+                    enterprisePortal === 'seller-dashboard'
+                      ? 'bg-amber-600 text-white shadow-md'
+                      : 'text-amber-600 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 border-amber-200'
+                  }`}
+                >
+                  <Briefcase className="w-4 h-4" />
+                  <span>Seller Studio</span>
+                </button>
+              )}
 
               <button
                 type="button"

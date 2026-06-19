@@ -245,12 +245,17 @@ export const verifyPaymentHandler = async (req: Request, res: Response) => {
 export const configHandler = (req: Request, res: Response) => {
     try {
         const clientId = getCleanEnv("CASHFREE_CLIENT_ID") || getCleanEnv("CASHFREE_APP_ID");
+        const secretKey = getCleanEnv("CASHFREE_CLIENT_SECRET") || getCleanEnv("CASHFREE_SECRET_KEY");
         const environment = getCleanEnv("CASHFREE_ENVIRONMENT") || "SANDBOX";
         
         return res.json({
             success: true,
-            hasKeys: !!clientId,
-            appId: clientId || null,
+            hasKeys: !!(clientId && secretKey),
+            missing: [
+              !clientId && "CASHFREE_CLIENT_ID",
+              !secretKey && "CASHFREE_CLIENT_SECRET"
+            ].filter(Boolean),
+            appId: clientId ? `${clientId.substring(0, 4)}***` : null,
             env: environment
         });
     } catch (err: any) {

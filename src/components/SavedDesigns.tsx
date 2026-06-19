@@ -54,7 +54,7 @@ export default function SavedDesigns({ stats, onUpdateStats, onBack }: SavedDesi
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
             {designs.map((d) => (
-              <div key={d.id} className="group border border-zinc-200 rounded-[24px] overflow-hidden bg-white hover:border-[#FF4D00]' hover:shadow-lg transition-all flex flex-col">
+              <div key={d.id} className="group border border-zinc-200 rounded-[24px] overflow-hidden bg-white hover:border-[#FF4D00] hover:shadow-lg transition-all flex flex-col">
                 <div className="relative aspect-auto bg-zinc-50 h-32 overflow-hidden border-b border-zinc-100">
                   <img src={d.imageUrl} alt={d.name} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
                   <span className="absolute top-2 left-2 bg-[#FF4D00] text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-full shadow-md z-10">

@@ -466,7 +466,9 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
           mockCanvas.renderAll();
         },
         renderAll: () => {
-          const ctx = canvasRef.current?.getContext('2d');
+          const canvas = canvasRef.current;
+          if (!canvas) return;
+          const ctx = canvas.getContext('2d');
           if (ctx) {
             ctx.fillStyle = '#f8fafc';
             ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
@@ -950,6 +952,10 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
       imgObj.crossOrigin = 'anonymous';
       imgObj.onload = () => {
         const canvas = document.createElement('canvas');
+        if (!canvas) {
+          resolve(originalUrl);
+          return;
+        }
         canvas.width = imgObj.width;
         canvas.height = imgObj.height;
         const ctx = canvas.getContext('2d');

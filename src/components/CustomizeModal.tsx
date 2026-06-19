@@ -287,7 +287,7 @@ export default function CustomizeModal({
       }
 
       if (['png', 'jpg', 'jpeg'].includes(fileExt)) {
-        return new Promise<any>((resolve) => {
+        return new Promise<any>((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = (e) => {
             const srcData = e.target?.result as string;
@@ -306,6 +306,10 @@ export default function CustomizeModal({
               }
 
               const canvas = document.createElement('canvas');
+              if (!canvas) {
+                reject(new Error("Canvas initialization failed. Upgrade browser."));
+                return;
+              }
               const MAX_DIM = 1200;
               if (width > MAX_DIM || height > MAX_DIM) {
                 if (width > height) {
@@ -336,8 +340,10 @@ export default function CustomizeModal({
                 });
               }
             };
+            img.onerror = () => reject(new Error("Failed to load image for processing."));
             img.src = srcData;
           };
+          reader.onerror = () => reject(new Error("Failed to read file from disk."));
           reader.readAsDataURL(file);
         });
       } else {

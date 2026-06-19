@@ -84,6 +84,10 @@ export default function CashfreeGateway({
   };
 
   const handlePay = async () => {
+    if (!hasKeys) {
+      setErrorMsg("Cashfree Gateway is not configured. Please contact the administrator to set CASHFREE_CLIENT_ID and SECRET.");
+      return;
+    }
     setProcessing(true);
     setErrorMsg(null);
     setStep('Connecting to Cashfree Payments Node...');
@@ -244,10 +248,10 @@ export default function CashfreeGateway({
             <div className="mt-4 mx-2 p-3 bg-red-50 rounded-2xl border border-red-100 flex flex-col text-left space-y-1">
               <span className="text-[10px] font-black text-rose-700 uppercase tracking-wide flex items-center gap-1">
                 <AlertCircle className="w-3.5 h-3.5 shrink-0 text-rose-500" />
-                Payment service temporarily unavailable.
+                Cashfree Gateway Configuration Missing
               </span>
               <p className="text-[9px] text-zinc-500 leading-relaxed">
-                We are currently experiencing issues connecting to the secure gateway. Please try again later.
+                The Cashfree API credentials (CASHFREE_CLIENT_ID & SECRET) are not yet configured in the environment variables. Please check your dashboard settings.
               </p>
             </div>
           )}
