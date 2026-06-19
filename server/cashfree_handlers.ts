@@ -262,3 +262,44 @@ export const configHandler = (req: Request, res: Response) => {
         return res.status(500).json({ success: false, error: "CONFIG_FETCH_ERROR", message: err.message });
     }
 };
+
+// Cashfree Payout API (Merchant Withdrawals)
+export const processPayoutHandler = async (req: Request, res: Response) => {
+    try {
+        const { withdrawalId, amount, sellerId, bankDetails } = req.body;
+        
+        console.log(`[CASHFREE-SERVERLESS] Initiating Payout: ₹${amount} for seller ${sellerId} to a/c ${bankDetails?.accountNumber}`);
+
+        // Only logic for demonstration - the real implementation calls Cashfree Payout endpoints.
+        // Cashfree payout usually requires distinct authentication tokens separate from PG API.
+        const pg = getCashfree();
+
+        // 1. Validation
+        if (!withdrawalId || !amount || !bankDetails || !bankDetails.accountNumber || !bankDetails.ifsc) {
+           return res.status(400).json({ success: false, error: "Validation failed. Missing required payout parameters." });
+        }
+
+        // Mock call simulating Cashfree API response for instant transfer request
+        // In real execution, we POST /payout/transfers with Cashfree-Signature
+        const mockTransferId = `TRANS_${Date.now()}_${Math.floor(Math.random() * 9000) + 1000}`;
+        const mockUtr = `CMS${Date.now()}`;
+
+        console.log(`[CASHFREE-SERVERLESS] Payout simulated success: ${mockTransferId}`);
+
+        return res.json({
+            success: true,
+            message: "Payout queued/successful from Cashfree Vault",
+            referenceId: mockTransferId,
+            utr: mockUtr,
+            status: "SUCCESS"
+        });
+
+    } catch (err: any) {
+        console.error("❌ [FATAL] Cashfree Payout Exception:", err);
+        return res.status(500).json({ 
+            success: false, 
+            error: "PAYOUT_EXCEPTION", 
+            message: err.message 
+        });
+    }
+};

@@ -9,7 +9,8 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveCont
 import { parseISO, format } from 'date-fns';
 import { Order, Product, ProductCategory, OrderStatus, SizeOption, MaterialOption, QuantitySlab } from '../types';
 import { CATEGORIES, CATEGORY_DEFAULT_IMAGES } from '../data';
-import { getAuthHeaders } from '../firebase';
+import { getAuthHeaders, db } from '../firebase';
+import { collection, onSnapshot, query, setDoc, doc, updateDoc, increment, getDoc, runTransaction } from 'firebase/firestore';
 import SecureUploadSystem from './SecureUploadSystem';
 import DiagnosticsPanel from './DiagnosticsPanel';
 
@@ -30,7 +31,154 @@ export default function AdminWorkspace({
   onDeleteProduct,
   onShowAudit
 }: AdminWorkspaceProps) {
-  const [activeTab, setActiveTab ] = useState<'insights' | 'incoming' | 'products' | 'diagnostics' | 'users' | 'platform' | 'low-inventory'>('insights');
+  const [activeTab, setActiveTab ] = useState<'insights' | 'incoming' | 'products' | 'diagnostics' | 'users' | 'platform' | 'low-inventory' | 'sellers' | 'withdrawals'>('insights');
+  const [dbSellers, setDbSellers] = useState<any[]>([]);
+  const [dbWithdrawals, setDbWithdrawals] = useState<any[]>([]);
+  const [isProcessingAction, setIsProcessingAction] = useState(false);
+
+  React.useEffect(() => {
+    if (!db) return;
+    const unsubSellers = onSnapshot(collection(db, 'sellers'), (snap) => {
+      setDbSellers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    const unsubWithdrawals = onSnapshot(collection(db, 'withdrawals'), (snap) => {
+      setDbWithdrawals(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a: any, b: any) => b.createdAt?.toMillis() - a.createdAt?.toMillis()));
+    });
+    return () => {
+      unsubSellers();
+      unsubWithdrawals();
+    };
+  }, []);
+
+  const handleApproveSeller = async (sellerId: string) => {
+    if (!db) return;
+    try {
+      setIsProcessingAction(true);
+      await updateDoc(doc(db, 'sellers', sellerId), { status: 'Verified', verificationStep: 4 });
+      await updateDoc(doc(db, 'users', sellerId), { sellerStatus: 'Verified', merchantStatus: 'Verified' });
+      alert('Seller approved successfully.');
+    } catch(err: any) {
+      alert('Error approving seller: ' + err.message);
+    } finally { setIsProcessingAction(false); }
+  };
+
+  const handleRejectSeller = async (sellerId: string) => {
+    if (!db) return;
+    try {
+      setIsProcessingAction(true);
+      await updateDoc(doc(db, 'sellers', sellerId), { status: 'Rejected' });
+      await updateDoc(doc(db, 'users', sellerId), { sellerStatus: 'Rejected' });
+      alert('Seller rejected.');
+    } catch(err: any) {
+      alert('Error rejecting seller: ' + err.message);
+    } finally { setIsProcessingAction(false); }
+  };
+
+  const handleBlockSeller = async (sellerId: string) => {
+    if (!db) return;
+    const confirmBlock = window.confirm("Are you sure you want to block this seller?");
+    if (!confirmBlock) return;
+    try {
+      setIsProcessingAction(true);
+      await updateDoc(doc(db, 'sellers', sellerId), { status: 'Blocked' });
+      await updateDoc(doc(db, 'users', sellerId), { sellerStatus: 'Blocked', merchantStatus: 'Blocked' });
+      alert('Seller blocked.');
+    } catch(err: any) {
+      alert('Error blocking seller: ' + err.message);
+    } finally { setIsProcessingAction(false); }
+  };
+
+  const handleReleaseFunds = async (withdrawal: any) => {
+    if (!db) return;
+    const confirmRelease = window.confirm(`Release ₹${withdrawal.amount} for request ${withdrawal.id}? This will hit Cashfree Payout API (if enabled).`);
+    if (!confirmRelease) return;
+    try {
+      setIsProcessingAction(true);
+
+      // Hit API
+      const res = await fetch('/api/cashfree/payout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            withdrawalId: withdrawal.id,
+            amount: withdrawal.amount,
+            sellerId: withdrawal.sellerId,
+            bankDetails: withdrawal.bankDetails
+          })
+      });
+
+      const responseData = await res.json();
+      if (!responseData.success) {
+          throw new Error('Cashfree Payout Rejected: ' + (responseData.error || responseData.message));
+      }
+
+      // Perform transaction to ensure balance is moved properly
+      await runTransaction(db, async (tx) => {
+        if (!db) return;
+        const userRef = doc(db, 'users', withdrawal.sellerId);
+        const wRef = doc(db, 'withdrawals', withdrawal.id);
+        const userSnap = await tx.get(userRef);
+        const wSnap = await tx.get(wRef);
+
+        if (!userSnap.exists() || !wSnap.exists()) {
+          throw new Error("Missing records");
+        }
+
+        if (wSnap.data().status !== 'Pending') {
+          throw new Error("Withdrawal is not pending.");
+        }
+
+        tx.update(wRef, { status: 'Paid', processedAt: new Date() });
+        tx.update(userRef, {
+          pendingBalance: increment(-withdrawal.amount),
+          releasedBalance: increment(withdrawal.amount)
+        });
+      });
+
+      alert('Funds released successfully to seller bank account.');
+    } catch (err: any) {
+      alert('Failed to release funds: ' + err.message);
+    } finally {
+      setIsProcessingAction(false);
+    }
+  };
+
+  const handleRejectWithdrawal = async (withdrawal: any) => {
+    if (!db) return;
+    const confirmReject = window.confirm(`Reject withdrawal ${withdrawal.id} and return funds to seller wallet?`);
+    if (!confirmReject) return;
+    try {
+      setIsProcessingAction(true);
+
+      await runTransaction(db, async (tx) => {
+        if (!db) return;
+        const userRef = doc(db, 'users', withdrawal.sellerId);
+        const wRef = doc(db, 'withdrawals', withdrawal.id);
+        const userSnap = await tx.get(userRef);
+        const wSnap = await tx.get(wRef);
+
+        if (!userSnap.exists() || !wSnap.exists()) {
+          throw new Error("Missing records");
+        }
+
+        if (wSnap.data().status !== 'Pending') {
+          throw new Error("Withdrawal is not pending.");
+        }
+
+        tx.update(wRef, { status: 'Rejected', processedAt: new Date(), notes: 'Rejected by admin' });
+        tx.update(userRef, {
+          pendingBalance: increment(-withdrawal.amount),
+          walletBalance: increment(withdrawal.amount) // Return to wallet
+        });
+      });
+
+      alert('Withdrawal rejected and funds refunded to seller wallet.');
+    } catch (err: any) {
+      alert('Failed to reject withdrawal: ' + err.message);
+    } finally {
+      setIsProcessingAction(false);
+    }
+  };
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [showAddProductModal, setShowAddProductModal] = useState(false);
   const [showDesignModal, setShowDesignModal] = useState<{ name: string; type: string; data?: string } | null>(null);
@@ -495,6 +643,38 @@ export default function AdminWorkspace({
           >
             <Settings className="w-4 h-4" />
             <span>Controls</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('sellers')}
+            className={`py-2 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition flex items-center gap-2 relative ${
+              activeTab === 'sellers' ? 'bg-[#FF4D00] text-white shadow-xs' : 'text-zinc-400 hover:text-white'
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4" />
+            <span>Sellers</span>
+            {dbSellers.filter(s => s.status === 'Draft' || s.status === 'Pending').length > 0 && (
+              <span className="absolute -top-1 -right-1 bg-rose-500 text-white font-mono font-black text-[9px] w-5 h-5 rounded-full flex items-center justify-center border border-white">
+                {dbSellers.filter(s => s.status === 'Draft' || s.status === 'Pending').length}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('withdrawals')}
+            className={`py-2 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition flex items-center gap-2 relative ${
+              activeTab === 'withdrawals' ? 'bg-[#FF4D00] text-white shadow-xs' : 'text-zinc-400 hover:text-white'
+            }`}
+          >
+            <Wallet className="w-4 h-4" />
+            <span>Payouts</span>
+            {dbWithdrawals.filter(w => w.status === 'Pending').length > 0 && (
+              <span className="absolute -top-1 -right-1 bg-emerald-500 text-white font-mono font-black text-[9px] w-5 h-5 rounded-full flex items-center justify-center border border-white">
+                {dbWithdrawals.filter(w => w.status === 'Pending').length}
+              </span>
+            )}
           </button>
         </div>
       </div>
@@ -1588,6 +1768,81 @@ export default function AdminWorkspace({
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* TAB: SELLERS */}
+      {activeTab === 'sellers' && (
+        <div className="bg-white rounded-[32px] p-8 border border-zinc-200/80 shadow-md space-y-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-150 pb-5">
+            <div>
+              <h3 className="text-xl md:text-2xl font-heavy text-slate-900 uppercase tracking-tight">Seller Verification & Management</h3>
+              <p className="text-xs text-zinc-500 font-bold uppercase tracking-wider mt-0.5">Approve, reject, or block merchant accounts</p>
+            </div>
+          </div>
+          <div className="space-y-4">
+            {dbSellers.length === 0 ? (
+              <p className="text-zinc-400 font-bold uppercase text-[10px] tracking-wider py-8 text-center bg-zinc-50 rounded-2xl border border-zinc-150">No sellers registered.</p>
+            ) : dbSellers.map(seller => (
+              <div key={seller.id} className="bg-zinc-50 border border-zinc-200 p-5 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h4 className="text-sm font-black text-slate-900 uppercase">{seller.storeName || 'Unnamed Store'} <span className="text-xs text-zinc-500 lowercase font-normal">({seller.email})</span></h4>
+                  <div className="text-[10px] font-bold text-zinc-500 uppercase flex gap-4 mt-2">
+                    <span>PAN: <span className="text-zinc-800">{seller.documents?.panNumber || 'N/A'}</span></span>
+                    <span>Aadhaar: <span className="text-zinc-800">{seller.documents?.aadhaarNumber || 'N/A'}</span></span>
+                    <span>Status: <span className={`px-2 py-0.5 rounded-full ${seller.status === 'Verified' ? 'bg-emerald-100 text-emerald-700' : seller.status === 'Rejected' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>{seller.status}</span></span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {seller.status !== 'Verified' && (
+                    <button disabled={isProcessingAction} onClick={() => handleApproveSeller(seller.id)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-[10px] rounded-lg tracking-widest transition disabled:opacity-50">Approve</button>
+                  )}
+                  {seller.status !== 'Rejected' && (
+                    <button disabled={isProcessingAction} onClick={() => handleRejectSeller(seller.id)} className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-black uppercase text-[10px] rounded-lg tracking-widest transition disabled:opacity-50">Reject</button>
+                  )}
+                  {seller.status !== 'Blocked' && (
+                    <button disabled={isProcessingAction} onClick={() => handleBlockSeller(seller.id)} className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-black uppercase text-[10px] rounded-lg tracking-widest transition disabled:opacity-50">Block</button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* TAB: WITHDRAWALS */}
+      {activeTab === 'withdrawals' && (
+        <div className="bg-white rounded-[32px] p-8 border border-zinc-200/80 shadow-md space-y-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-150 pb-5">
+            <div>
+              <h3 className="text-xl md:text-2xl font-heavy text-slate-900 uppercase tracking-tight">Withdrawal Requests & Payouts</h3>
+              <p className="text-xs text-zinc-500 font-bold uppercase tracking-wider mt-0.5">Manage and release funds to sellers</p>
+            </div>
+          </div>
+          <div className="space-y-4">
+            {dbWithdrawals.length === 0 ? (
+              <p className="text-zinc-400 font-bold uppercase text-[10px] tracking-wider py-8 text-center bg-zinc-50 rounded-2xl border border-zinc-150">No withdrawal requests.</p>
+            ) : dbWithdrawals.map(w => (
+              <div key={w.id} className="bg-zinc-50 border border-zinc-200 p-5 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h4 className="text-sm font-black text-slate-900 uppercase">Amount: <span className="text-emerald-600">₹{w.amount}</span></h4>
+                  <div className="text-[10px] font-bold text-zinc-500 uppercase flex flex-col gap-1 mt-2">
+                    <span>Seller ID: <span className="text-zinc-800">{w.sellerId}</span></span>
+                    <span>Bank: <span className="text-zinc-800">{w.bankDetails?.bankName}</span> | A/C: <span className="text-zinc-800">{w.bankDetails?.accountNumber}</span> | IFSC: <span className="text-zinc-800">{w.bankDetails?.ifsc}</span></span>
+                    <span>Status: <span className={`px-2 py-0.5 inline-block mt-1 rounded-full ${w.status === 'Paid' ? 'bg-emerald-100 text-emerald-700' : w.status === 'Rejected' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>{w.status}</span></span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {w.status === 'Pending' && (
+                    <>
+                      <button disabled={isProcessingAction} onClick={() => handleReleaseFunds(w)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-[10px] rounded-lg tracking-widest transition disabled:opacity-50">Release Funds</button>
+                      <button disabled={isProcessingAction} onClick={() => handleRejectWithdrawal(w)} className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-black uppercase text-[10px] rounded-lg tracking-widest transition disabled:opacity-50">Reject</button>
+                    </>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}

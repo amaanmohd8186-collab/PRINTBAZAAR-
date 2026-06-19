@@ -8,7 +8,7 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
-import { createOrderHandler, configHandler, verifyPaymentHandler, getCashfree } from "./server/cashfree_handlers";
+import { createOrderHandler, configHandler, verifyPaymentHandler, getCashfree, processPayoutHandler } from "./server/cashfree_handlers";
 import crypto from "crypto";
 import twilio from "twilio";
 import nodemailer from "nodemailer";
@@ -1893,6 +1893,8 @@ Customer's custom requirements or idea prompt: "${prompt}"`;
   app.post("/api/cashfree/create-order", createOrderHandler);
 
   app.post("/api/cashfree/verify-payment", verifyPaymentHandler);
+
+  app.post("/api/cashfree/payout", processPayoutHandler);
 
   app.get("/api/payment/health", async (req, res) => {
     try {
