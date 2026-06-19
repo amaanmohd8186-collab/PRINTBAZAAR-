@@ -10,34 +10,37 @@ export const AuthModal = ({ onClose, triggerToast }: { onClose: () => void, trig
   const handleGoogle = async () => {
     setLoading(true);
     setErrorMsg('');
+    
+    // 15-second safety redirect timeout to prevent hanging the user
+    const timeoutId = setTimeout(() => {
+      setLoading(false);
+      setErrorMsg('Google Sign-In handshake took too long. Please verify your internet or tap "Open Google Sign In Again" below.');
+    }, 15000);
+
     try {
       const provider = new GoogleAuthProvider();
       
       const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
       const isInstagram = /Instagram/i.test(navigator.userAgent);
+      const useRedirect = isMobileDevice || isInstagram;
       
-      if (isMobileDevice || isInstagram) {
-        await signInWithPopup(auth, provider).catch(async (popupErr) => {
-          console.warn("Popup blocked or failed, falling back to redirect:", popupErr);
-          await signInWithRedirect(auth, provider);
-        });
+      if (useRedirect) {
+        console.log("Mobile/Embedded device detected. Initiating secure redirect auth flow.");
+        await signInWithRedirect(auth, provider);
+        clearTimeout(timeoutId);
+        // The page will redirect away from here
       } else {
+        console.log("Desktop device detected. Initiating popup auth flow.");
         await signInWithPopup(auth, provider);
+        clearTimeout(timeoutId);
+        triggerToast('Google Sign-In successful!', 'success');
+        onClose();
       }
-      
-      triggerToast('Google Sign-In successful!', 'success');
-      onClose();
     } catch (e: any) {
+      clearTimeout(timeoutId);
       console.error("🚀 [FIREBASE GOOGLE AUTH FAILURE]", e);
-      if (e.code === 'auth/unauthorized-domain') {
-        setErrorMsg(`Google Auth Error: this domain is not authorized in Firebase Console.`);
-      } else if (e.code === 'auth/popup-blocked') {
-        setErrorMsg("Auth Error: Popup was blocked by your browser. Please allow popups.");
-      } else {
-        setErrorMsg(e.message || 'Google Auth Failed');
-      }
-    } finally {
       setLoading(false);
+      setErrorMsg(e.message || 'Google Auth Failed');
     }
   };
 
@@ -64,9 +67,20 @@ export const AuthModal = ({ onClose, triggerToast }: { onClose: () => void, trig
           </p>
 
           {errorMsg && (
-            <div className="mb-6 p-4 w-full bg-rose-50 border border-rose-100 rounded-2xl text-[11px] text-rose-600 font-bold uppercase tracking-wider text-left">
+            <div className="mb-4 p-4 w-full bg-rose-50 border border-rose-100 rounded-2xl text-[11px] text-rose-600 font-bold uppercase tracking-wider text-left">
               {errorMsg}
             </div>
+          )}
+
+          {errorMsg && (
+            <button
+              type="button"
+              onClick={handleGoogle}
+              className="w-full mb-4 py-4 bg-[#FF4D00] hover:bg-[#ff5b14] text-white text-xs font-black uppercase tracking-widest rounded-2xl transition flex items-center justify-center gap-2 shadow-md cursor-pointer hover:-translate-y-0.5 active:translate-y-0"
+              id="fallback-auth-btn"
+            >
+              Open Google Sign In Again
+            </button>
           )}
 
           <button

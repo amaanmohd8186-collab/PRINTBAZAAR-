@@ -42,9 +42,14 @@ export default function SellerVerificationSystem({ isAdminMode, onVerificationCo
 
   // Bank - Step 5
   const [bankName, setBankName] = useState('');
+  const [accountHolderName, setAccountHolderName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
+  const [confirmAccountNumber, setConfirmAccountNumber] = useState('');
   const [ifscCode, setIfscCode] = useState('');
   const [upiId, setUpiId] = useState('');
+  const [bankDetails, setBankDetails] = useState<{ branch: string; city: string; state: string } | null>(null);
+  const [isCheckingIfsc, setIsCheckingIfsc] = useState(false);
+  const [ifscError, setIfscError] = useState('');
 
   // Video KYC removed
   
@@ -99,7 +104,9 @@ export default function SellerVerificationSystem({ isAdminMode, onVerificationCo
         setPortfolioUrl(data.documents?.tradeLicense || ''); // Logic mapping
         setSampleWorkUrl(data.documents?.msmeCert || '');
         setBankName(data.documents?.bankName || '');
+        setAccountHolderName(data.documents?.accountHolderName || '');
         setAccountNumber(data.documents?.bankAccountNumber || '');
+        setConfirmAccountNumber(data.documents?.bankAccountNumber || '');
         setIfscCode(data.documents?.bankIfscCode || '');
         setUpiId(data.documents?.upiId || '');
       }
@@ -125,6 +132,36 @@ export default function SellerVerificationSystem({ isAdminMode, onVerificationCo
     if (e.target.files && e.target.files[0]) {
       const b64 = await getBase64FromFile(e.target.files[0]);
       setter(b64);
+    }
+  };
+
+  const handleIfscChange = async (val: string) => {
+    const code = val.toUpperCase();
+    setIfscCode(code);
+    setIfscError('');
+    setBankDetails(null);
+
+    if (code.length === 11) {
+      setIsCheckingIfsc(true);
+      try {
+        const res = await fetch(`https://ifsc.razorpay.com/${code}`);
+        if (res.ok) {
+          const data = await res.json();
+          setBankName(data.BANK || '');
+          setBankDetails({
+            branch: data.BRANCH || 'N/A',
+            city: data.CITY || 'N/A',
+            state: data.STATE || 'N/A'
+          });
+        } else {
+          setIfscError('IFSC code not found in global directory. Please enter bank name manually.');
+          // Do not reset bankName here so they can type it
+        }
+      } catch (err) {
+        setIfscError('Verification service offline. Please verify and enter bank name manually.');
+      } finally {
+        setIsCheckingIfsc(false);
+      }
     }
   };
 
@@ -162,6 +199,7 @@ export default function SellerVerificationSystem({ isAdminMode, onVerificationCo
         governmentIdNumber: aadhaarNumber,
         aadhaarFront: aadhaarUrl,
         bankName,
+        accountHolderName,
         bankAccountNumber: accountNumber,
         bankIfscCode: ifscCode,
         upiId,
@@ -318,14 +356,14 @@ export default function SellerVerificationSystem({ isAdminMode, onVerificationCo
 
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-8">
                   {[
-                    { label: 'PAN Card', url: sel.documents?.panCard, icon: <FileCode /> },
-                    { label: 'Aadhaar', url: sel.documents?.aadhaarFront, icon: <ShieldCheck /> },
-                    { label: 'Portfolio', url: sel.documents?.tradeLicense, icon: <Package /> },
-                    { label: 'Samples', url: sel.documents?.msmeCert, icon: <Clipboard /> },
-                    { label: 'Bank Proof', url: sel.documents?.cancelledCheque, icon: <Landmark /> }
+                    { label: 'PAN Card', url: sel.documents?.panCard, icon: <FileCode />, color: 'zinc' },
+                    { label: 'Aadhaar', url: sel.documents?.aadhaarFront, icon: <ShieldCheck />, color: 'indigo' },
+                    { label: 'Portfolio', url: sel.documents?.tradeLicense, icon: <Package />, color: 'emerald' },
+                    { label: 'Samples', url: sel.documents?.msmeCert, icon: <Clipboard />, color: 'amber' },
+                    { label: 'Bank Proof', url: sel.documents?.cancelledCheque, icon: <Landmark />, color: 'zinc' }
                   ].map((doc, idx) => (
                     <div key={idx} className="bg-white border border-zinc-100 p-4 rounded-2xl flex flex-col items-center justify-center gap-3 group-hover:border-zinc-200 transition-colors">
-                      <div className={`p-2 rounded-xl bg-${doc.color || 'zinc'}-50 text-${doc.color || 'zinc'}-500 shrink-0`}>
+                      <div className={`p-2 rounded-xl bg-${doc.color}-50 text-${doc.color}-500 shrink-0`}>
                         {React.cloneElement(doc.icon as React.ReactElement<any>, { className: 'w-4 h-4' })}
                       </div>
                       <p className="text-[9px] font-black uppercase text-zinc-400 tracking-tighter text-center">{doc.label}</p>
@@ -617,36 +655,63 @@ export default function SellerVerificationSystem({ isAdminMode, onVerificationCo
 
                   <div className="grid gap-6">
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black uppercase text-zinc-400 tracking-widest">Bank Institution Name</label>
-                      <input required type="text" placeholder="e.g. HDFC Bank, ICICI, SBI" value={bankName} onChange={e => setBankName(e.target.value.toUpperCase())} className="w-full text-xs p-5 bg-zinc-50 border border-zinc-200 rounded-2xl outline-none font-bold uppercase" />
+                        <label className="text-[10px] font-black uppercase text-zinc-400 tracking-widest">Account Holder Name</label>
+                        <input required type="text" placeholder="As per Bank Records" value={accountHolderName} onChange={e => setAccountHolderName(e.target.value.toUpperCase())} className="w-full text-xs p-5 bg-zinc-50 border border-zinc-200 rounded-2xl outline-none font-bold uppercase focus:ring-2 focus:ring-amber-50" />
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-2">
                         <label className="text-[10px] font-black uppercase text-zinc-400 tracking-widest">Account Number</label>
-                        <input required type="text" placeholder="000000000000" value={accountNumber} onChange={e => setAccountNumber(e.target.value)} className="w-full text-xs p-5 bg-zinc-50 border border-zinc-200 rounded-2xl outline-none font-heavy" />
+                        <input required type="password" placeholder="••••••••••••" value={accountNumber} onChange={e => setAccountNumber(e.target.value.replace(/\D/g, ''))} className="w-full text-xs p-5 bg-zinc-50 border border-zinc-200 rounded-2xl outline-none font-heavy" />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase text-zinc-400 tracking-widest">IFSC Code Protocol</label>
-                        <input required type="text" placeholder="HDFC0001234" value={ifscCode} onChange={e => setIfscCode(e.target.value.toUpperCase())} maxLength={11} className="w-full text-xs p-5 bg-zinc-50 border border-zinc-200 rounded-2xl outline-none font-heavy uppercase" />
+                        <label className="text-[10px] font-black uppercase text-zinc-400 tracking-widest">Confirm Account Number</label>
+                        <input required type="text" placeholder="Re-type Account Number" value={confirmAccountNumber} onChange={e => setConfirmAccountNumber(e.target.value.replace(/\D/g, ''))} className="w-full text-xs p-5 bg-zinc-50 border border-zinc-200 rounded-2xl outline-none font-heavy" />
                       </div>
                     </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase text-zinc-400 tracking-widest flex items-center justify-between">
+                            <span>IFSC Code Protocol</span>
+                            {isCheckingIfsc && <RefreshCw className="w-3 h-3 animate-spin text-amber-500" />}
+                        </label>
+                        <input required type="text" placeholder="HDFC0001234" value={ifscCode} onChange={e => handleIfscChange(e.target.value)} maxLength={11} className={`w-full text-xs p-5 bg-zinc-50 border ${ifscError ? 'border-rose-300' : 'border-zinc-200'} rounded-2xl outline-none font-heavy uppercase`} />
+                        {ifscError && <p className="text-[9px] text-rose-500 font-bold uppercase">{ifscError}</p>}
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase text-zinc-400 tracking-widest">Detected Bank Entity</label>
+                        <input type="text" placeholder="Auto-detected or Manual Entry" value={bankName} onChange={e => setBankName(e.target.value.toUpperCase())} className="w-full text-xs p-5 bg-zinc-50 border border-zinc-200 rounded-2xl outline-none font-bold uppercase focus:ring-2 focus:ring-amber-50" />
+                      </div>
+                    </div>
+
+                    {bankDetails && (
+                        <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl animate-in fade-in slide-in-from-top-2">
+                            <p className="text-[9px] font-black text-emerald-700 uppercase tracking-widest mb-1">Bank Branch Logic Verified</p>
+                            <p className="text-[10px] font-bold text-emerald-600 uppercase">
+                                {bankDetails.branch} • {bankDetails.city}, {bankDetails.state}
+                            </p>
+                        </div>
+                    )}
 
                     <div className="space-y-2">
                       <label className="text-[10px] font-black uppercase text-zinc-400 tracking-widest flex items-center justify-between">
                         <span>Merchant UPI Identity (VPA)</span>
-                        <span className="text-[8px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded uppercase">Recommended</span>
+                        <span className="text-[8px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded uppercase font-bold">Optional but Recommended</span>
                       </label>
-                      <input required type="text" placeholder="merchant@upi" value={upiId} onChange={e => setUpiId(e.target.value.toLowerCase())} className="w-full text-xs p-5 bg-zinc-50 border border-amber-200 rounded-2xl outline-none font-bold lowercase focus:ring-2 focus:ring-amber-100 placeholder-zinc-300" />
+                      <input type="text" placeholder="merchant@upi" value={upiId} onChange={e => setUpiId(e.target.value.toLowerCase())} className="w-full text-xs p-5 bg-zinc-50 border border-amber-200 rounded-2xl outline-none font-bold lowercase focus:ring-2 focus:ring-amber-100 placeholder-zinc-300" />
                     </div>
 
                     <button 
-                      disabled={!bankName || !accountNumber || !ifscCode || !upiId || isSyncing} 
-                      onClick={() => handleStepSubmit(6, { documents: { ...(currentSeller?.documents || {}), bankName, bankAccountNumber: accountNumber, bankIfscCode: ifscCode, upiId } })} 
+                      disabled={!accountHolderName || !accountNumber || accountNumber !== confirmAccountNumber || !bankName || ifscCode.length !== 11 || isSyncing} 
+                      onClick={() => handleStepSubmit(6, { documents: { ...(currentSeller?.documents || {}), accountHolderName, bankName, bankAccountNumber: accountNumber, bankIfscCode: ifscCode, upiId } })} 
                       className="bg-amber-600 text-white text-[11px] font-black uppercase py-5 rounded-[24px] w-full shadow-xl hover:-translate-y-1 transition-all active:translate-y-0 disabled:opacity-50"
                     >
                       Authenticate Settlement Channel
                     </button>
+                    {accountNumber && confirmAccountNumber && accountNumber !== confirmAccountNumber && (
+                        <p className="text-[9px] text-rose-500 font-bold uppercase text-center">Account numbers do not match</p>
+                    )}
                   </div>
                 </div>
               )}
@@ -697,48 +762,31 @@ export default function SellerVerificationSystem({ isAdminMode, onVerificationCo
                       if (!db) return;
                       try {
                         const { doc, setDoc } = await import('firebase/firestore');
-                        // 1. Auto Seller Activation
+                        
+                        // 1. Set status to Pending Review (No Auto-Approval)
                         const userRef = doc(db, 'users', currentUid);
                         await setDoc(userRef, {
-                          role: 'seller',
-                          sellerStatus: 'approved',
-                          merchantStatus: 'active',
-                          isSeller: true,
-                          isVerified: true,
+                          sellerStatus: 'pending',
+                          merchantStatus: 'pending',
                           onboardingCompleted: true
                         }, { merge: true });
 
-                        // 2. Sync profile fields
+                        // 2. Sync profile status
                         await syncProfile({ 
-                          status: 'Verified', 
-                          verificationStep: 7, 
-                          isSeller: true, 
+                          status: 'Under Review', 
+                          verificationStep: 6, 
                           onboardingCompleted: true 
                         });
                         
-                        triggerToast?.('✓ Onboarding 100% Complete! Seller Dashboard is now unlocked.', 'success');
-
-                        // 3. Automatic Redirect
-                        if (onVerificationComplete) {
-                          onVerificationComplete({
-                            id: currentUid,
-                            ownerName: name || 'Amaan Mohd',
-                            storeName: businessName || 'My PrintBazaar Studio',
-                            email: email || 'seller@printbazaar.com',
-                            mobile: mobile || '9876543210',
-                            status: 'Verified',
-                            level: 'Verified Seller',
-                            verificationStep: 7
-                          });
-                        }
+                        triggerToast?.('✓ Application Staged! Auditor review protocol initiated.', 'success');
                       } catch (err: any) {
-                        console.error("Auto seller activation failed:", err);
-                        triggerToast?.('Activation error: ' + err.message, 'warn');
+                        console.error("Seller submission failed:", err);
+                        triggerToast?.('Submission error: ' + err.message, 'warn');
                       }
                     }}
                     className="bg-[#FF4D00] text-white text-[11px] font-black uppercase py-5 rounded-[24px] w-full shadow-2xl hover:-translate-y-1 transition-all active:translate-y-0"
                   >
-                    Authorize Final Deployment & Activate Seller Account
+                    Submit Final Dossier for Auditor Review
                   </button>
                 </div>
               )}

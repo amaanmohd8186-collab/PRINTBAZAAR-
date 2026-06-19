@@ -10,31 +10,34 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() && 
              (request.auth.token.email == "musagraphics75@gmail.com" || 
-              request.auth.token.email == "gazisiddiqui01@gmail.com");
+              request.auth.token.email == "gazisiddiqui01@gmail.com" ||
+              request.auth.token.email == "amaanmohd8186@gmail.com");
     }
 
     // --- COLLECTION RULES ---
 
     // 1. User Profiles
     match /users/{userId} {
-      allow read: if (isSignedIn() && request.auth.uid == userId) || isAdmin();
+      allow read: if (isSignedIn() && (request.auth.uid == userId || isAdmin()));
       allow create: if isSignedIn() && request.auth.uid == userId;
-      allow update: if (isSignedIn() && request.auth.uid == userId) || isAdmin();
+      allow update: if (isSignedIn() && (request.auth.uid == userId || isAdmin()));
       allow delete: if isAdmin();
     }
 
     // 2. Sellers & Onboarding
     match /sellers/{sellerId} {
-      allow read: if (isSignedIn() && request.auth.uid == sellerId) || isAdmin();
+      allow read: if (isSignedIn() && (request.auth.uid == sellerId || isAdmin()));
       allow create: if isSignedIn() && request.auth.uid == sellerId;
-      allow update: if (isSignedIn() && request.auth.uid == sellerId) || isAdmin();
+      allow update: if (isSignedIn() && (request.auth.uid == sellerId || isAdmin()));
       allow delete: if isAdmin();
     }
 
-    // 3. Products (Public Read, Admin Write)
+    // 3. Products (Public Read, Owner/Admin Write)
     match /products/{productId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow create: if isSignedIn();
+      allow update: if isAdmin() || (isSignedIn() && resource.data.sellerId == request.auth.uid);
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.sellerId == request.auth.uid);
     }
 
     // 4. Designs (Owner + Admin)
@@ -44,11 +47,19 @@ service cloud.firestore {
       allow update, delete: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
     }
 
-    // 5. Orders (Owner + Admin)
+    // 5. Orders (Owner + Seller + Admin)
     match /orders/{orderId} {
-      allow read: if isAdmin() || (isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.customerEmail == request.auth.token.email));
+      allow read: if isAdmin() || (isSignedIn() && (
+          resource.data.userId == request.auth.uid || 
+          resource.data.sellerId == request.auth.uid ||
+          resource.data.customerEmail == request.auth.token.email
+      ));
       allow create: if isSignedIn();
-      allow update: if isAdmin() || (isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.customerEmail == request.auth.token.email));
+      allow update: if isAdmin() || (isSignedIn() && (
+          resource.data.userId == request.auth.uid || 
+          resource.data.sellerId == request.auth.uid ||
+          resource.data.customerEmail == request.auth.token.email
+      ));
       allow delete: if isAdmin();
     }
 
@@ -58,7 +69,14 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // 7. Quotes (Owner + Admin)
+    // 7. Withdrawals (Owner Read/Create, Admin Full)
+    match /withdrawals/{requestId} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.sellerId == request.auth.uid);
+      allow create: if isSignedIn() && request.resource.data.sellerId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    // 8. Quotes (Owner + Admin)
     match /quotes/{quoteId} {
       allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
       allow create: if isSignedIn();

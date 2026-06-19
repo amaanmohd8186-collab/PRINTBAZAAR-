@@ -91,7 +91,7 @@ export default function CashfreeGateway({
       setTimeout(() => {
         setProcessing(false);
         onSuccess({
-          method: 'Demo Payment',
+          method: 'Wallet', // Using Wallet as valid Type for Demo/Sandbox
           txId: 'demo_' + Date.now(),
           amount,
           timestamp: new Date().toISOString()

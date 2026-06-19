@@ -6,7 +6,16 @@ import {
   AlertCircle, RefreshCw, Upload, Sparkles
 } from 'lucide-react';
 import { db, auth } from '../firebase';
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp, onSnapshot, collection, query, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp, onSnapshot, collection, query, getDocs, where, addDoc, orderBy } from 'firebase/firestore';
+
+interface WithdrawalRequest {
+  id: string;
+  sellerId: string;
+  amount: number;
+  status: 'Pending' | 'Approved' | 'Rejected' | 'Paid';
+  createdAt: any;
+  bankDetails?: any;
+}
 
 interface SellerDashboardProps {
   userId: string;
@@ -22,7 +31,11 @@ export default function SellerDashboard({ userId, userEmail, triggerToast, onExi
   // States loaded from Firestore
   const [userDocData, setUserDocData] = useState<any>(null);
   const [sellerProfile, setSellerProfile] = useState<any>(null);
+  const [realOrders, setRealOrders] = useState<any[]>([]);
+  const [realProducts, setRealProducts] = useState<any[]>([]);
+  const [realWithdrawals, setRealWithdrawals] = useState<WithdrawalRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form states for adding product to Catalog
   const [newProdName, setNewProdName] = useState('');
@@ -66,23 +79,50 @@ export default function SellerDashboard({ userId, userEmail, triggerToast, onExi
     const unsubUser = onSnapshot(userRef, (snap) => {
       if (snap.exists()) {
         setUserDocData(snap.data());
-      } else {
-        setUserDocData(null);
       }
     });
 
     const unsubSeller = onSnapshot(sellerRef, (snap) => {
       if (snap.exists()) {
         setSellerProfile(snap.data());
-      } else {
-        setSellerProfile(null);
       }
       setLoading(false);
+    });
+
+    // Subscriptions for orders, products, and withdrawals
+    const ordersQuery = query(collection(db, 'orders'), where('sellerId', '==', userId), orderBy('createdAt', 'desc'));
+    const unsubOrders = onSnapshot(ordersQuery, (snap) => {
+      setRealOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (err) => {
+      if (err.message.includes('requires an index')) {
+        console.error('CRITICAL: Firestore Composite Index Missing for Orders Query. Open the link in console to create it.');
+      } else {
+        triggerToast('Order sync encounter: ' + err.message, 'warn');
+      }
+    });
+
+    const productsQuery = query(collection(db, 'products'), where('sellerId', '==', userId));
+    const unsubProducts = onSnapshot(productsQuery, (snap) => {
+      setRealProducts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (err) => triggerToast('Product sync encounter: ' + err.message, 'warn'));
+
+    const withdrawalsQuery = query(collection(db, 'withdrawals'), where('sellerId', '==', userId), orderBy('createdAt', 'desc'));
+    const unsubWithdrawals = onSnapshot(withdrawalsQuery, (snap) => {
+      setRealWithdrawals(snap.docs.map(d => ({ id: d.id, ...d.data() })) as WithdrawalRequest[]);
+    }, (err) => {
+      if (err.message.includes('requires an index')) {
+        console.error('CRITICAL: Firestore Composite Index Missing for Withdrawals. Please initialize index in console.');
+      } else {
+        triggerToast('Withdrawal sync encounter: ' + err.message, 'warn');
+      }
     });
 
     return () => {
       unsubUser();
       unsubSeller();
+      unsubOrders();
+      unsubProducts();
+      unsubWithdrawals();
     };
   }, [userId]);
 
@@ -125,73 +165,99 @@ export default function SellerDashboard({ userId, userEmail, triggerToast, onExi
     }
   };
 
-  const handleCreateProduct = (e: React.FormEvent) => {
+  const handleCreateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProdName || !newProdPrice) {
       triggerToast('Please provide product name and price parameters.', 'warn');
       return;
     }
-    const newId = 'prod-' + Date.now();
-    const newProduct = {
-      id: newId,
-      name: newProdName,
-      price: parseFloat(newProdPrice),
-      category: newProdCategory,
-      image: newProdImage || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=300',
-      published: true,
-      sales: 0,
-      rating: 5.0,
-      description: newProdDescription
-    };
+    
+    setIsSubmitting(true);
+    try {
+      await addDoc(collection(db, 'products'), {
+        sellerId: userId,
+        name: newProdName,
+        price: parseFloat(newProdPrice),
+        category: newProdCategory,
+        image: newProdImage || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=300',
+        published: true,
+        sales: 0,
+        rating: 5.0,
+        description: newProdDescription,
+        createdAt: serverTimestamp()
+      });
 
-    setLocalCatalog([newProduct, ...localCatalog]);
-    triggerToast(`"${newProdName}" successfully uploaded & broadcasted to client index!`, 'success');
-
-    // Reset Form
-    setNewProdName('');
-    setNewProdPrice('');
-    setNewProdImage('');
-    setNewProdDescription('');
+      triggerToast(`"${newProdName}" successfully uploaded & broadcasted to client index!`, 'success');
+      setNewProdName('');
+      setNewProdPrice('');
+      setNewProdImage('');
+      setNewProdDescription('');
+      setActiveTab('catalog');
+    } catch (err: any) {
+      triggerToast('Upload failed: ' + err.message, 'warn');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const togglePublish = (id: string) => {
-    setLocalCatalog(prev => prev.map(p => {
-      if (p.id === id) {
-        const nextState = !p.published;
-        triggerToast(nextState ? `Published ${p.name}` : `Unpublished ${p.name}`, 'success');
-        return { ...p, published: nextState };
-      }
-      return p;
-    }));
+  const togglePublish = async (id: string, currentStatus: boolean) => {
+    try {
+      await updateDoc(doc(db, 'products', id), {
+        published: !currentStatus
+      });
+      triggerToast(!currentStatus ? 'Product Published' : 'Product Unpublished', 'success');
+    } catch (err: any) {
+      triggerToast('Update failed: ' + err.message, 'warn');
+    }
   };
 
-  const triggerWithdrawal = (e: React.FormEvent) => {
+  const triggerWithdrawal = async (e: React.FormEvent) => {
     e.preventDefault();
     const amount = parseFloat(withdrawalAmount);
     if (isNaN(amount) || amount <= 0) {
       triggerToast('Please specify a positive numerical balance to withdraw', 'warn');
       return;
     }
-    const currentBalance = userDocData?.walletBalance || 12500;
-    if (amount > currentBalance) {
+    
+    if (sellerProfile?.status !== 'Verified') {
+      triggerToast('Your account must be Verified to request withdrawals.', 'warn');
+      return;
+    }
+
+    const available = userDocData?.walletBalance || 0;
+    if (amount > available) {
       triggerToast('Insufficient funds inside merchant settlement account.', 'warn');
       return;
     }
 
-    // Success Simulation
-    triggerToast(`Auto-settlement of ₹${amount} initiated via instantaneous UPI routing layer.`, 'success');
-    setWithdrawalAmount('');
-    setLocalWithdrawals([
-      { id: 'TXN-' + (Math.floor(Math.random() * 9000) + 1000), amount, date: 'Today', status: 'Processing', channel: 'UPI (Linked Store Account)' },
-      ...localWithdrawals
-    ]);
+    setIsSubmitting(true);
+    try {
+      await addDoc(collection(db, 'withdrawals'), {
+        sellerId: userId,
+        amount,
+        status: 'Pending',
+        bankDetails: {
+            bankName: sellerProfile?.documents?.bankName,
+            accountNumber: sellerProfile?.documents?.bankAccountNumber,
+            ifsc: sellerProfile?.documents?.bankIfscCode,
+            upi: sellerProfile?.documents?.upiId
+        },
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
 
-    // Deduct via Firestore if available
-    if (db && userId) {
-      const userRef = doc(db, 'users', userId);
-      updateDoc(userRef, {
-        walletBalance: Math.max(0, currentBalance - amount)
-      }).catch(err => console.warn(err));
+      // Update available balance (Pending logic)
+      await updateDoc(doc(db, 'users', userId), {
+        walletBalance: available - amount,
+        pendingBalance: (userDocData?.pendingBalance || 0) + amount
+      });
+
+      triggerToast(`Withdrawal of ₹${amount} requested. Staged for Auditor review.`, 'success');
+      setWithdrawalAmount('');
+    } catch (err: any) {
+      triggerToast('Withdrawal failed: ' + err.message, 'warn');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -207,6 +273,22 @@ export default function SellerDashboard({ userId, userEmail, triggerToast, onExi
       reader.readAsDataURL(file);
     }
   };
+
+  // Safe date formatter for server timestamps
+    const formatDate = (timestamp: any) => {
+        if (!timestamp) return 'Staging...';
+        if (timestamp.toDate) return timestamp.toDate().toLocaleDateString();
+        if (timestamp.seconds) return new Date(timestamp.seconds * 1000).toLocaleDateString();
+        return 'Syncing';
+    };
+
+  const calculatedTotalEarnings = realOrders
+    .filter(o => o.status === 'Paid' || o.status === 'Delivered')
+    .reduce((sum, o) => sum + (o.total || 0), 0);
+  
+  const calculatedPendingEarnings = realOrders
+    .filter(o => o.status === 'Pending')
+    .reduce((sum, o) => sum + (o.total || 0), 0);
 
   if (loading) {
     return (
@@ -313,10 +395,10 @@ export default function SellerDashboard({ userId, userEmail, triggerToast, onExi
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-2.5">
+            <div className="flex flex-wrap gap-2.5">
           <div className="px-4 py-2.5 bg-zinc-800/80 border border-zinc-700/50 rounded-2xl text-left">
-            <span className="block text-[8px] font-bold text-zinc-500 uppercase tracking-widest font-mono">Withdrawal Pool</span>
-            <span className="text-sm font-black text-emerald-400 font-mono">₹{userDocData?.walletBalance || 12500}</span>
+            <span className="block text-[8px] font-bold text-zinc-500 uppercase tracking-widest font-mono">Available Balance</span>
+            <span className="text-sm font-black text-emerald-400 font-mono">₹{userDocData?.walletBalance || 0}</span>
           </div>
           <button 
             onClick={onExit}
@@ -374,28 +456,33 @@ export default function SellerDashboard({ userId, userEmail, triggerToast, onExi
       <div className="flex border-b border-zinc-200 overflow-x-auto pb-1 mb-8 gap-1.5 no-scrollbar">
         {[
           { id: 'dashboard', label: 'Dashboard', icon: <BarChart3 className="w-3.5 h-3.5" /> },
-          { id: 'orders', label: 'Orders', icon: <ShoppingBag className="w-3.5 h-3.5" /> },
-          { id: 'products', label: 'Upload Product', icon: <Plus className="w-3.5 h-3.5" /> },
-          { id: 'catalog', label: 'Catalog Manager', icon: <FolderKanban className="w-3.5 h-3.5" /> },
-          { id: 'earnings', label: 'Earnings', icon: <Banknote className="w-3.5 h-3.5" /> },
-          { id: 'analytics', label: 'Analytics Insights', icon: <TrendingUp className="w-3.5 h-3.5" /> },
-          { id: 'withdrawals', label: 'Withdrawals', icon: <CreditCard className="w-3.5 h-3.5" /> },
-          { id: 'shipping', label: 'Shipping Center', icon: <Truck className="w-3.5 h-3.5" /> },
+          { id: 'orders', label: 'Orders', icon: <ShoppingBag className="w-3.5 h-3.5" />, protected: true },
+          { id: 'products', label: 'Upload Product', icon: <Plus className="w-3.5 h-3.5" />, protected: true },
+          { id: 'catalog', label: 'Catalog Manager', icon: <FolderKanban className="w-3.5 h-3.5" />, protected: true },
+          { id: 'earnings', label: 'Earnings', icon: <Banknote className="w-3.5 h-3.5" />, protected: true },
+          { id: 'analytics', label: 'Analytics Insights', icon: <TrendingUp className="w-3.5 h-3.5" />, protected: true },
+          { id: 'withdrawals', label: 'Withdrawals', icon: <CreditCard className="w-3.5 h-3.5" />, protected: true },
+          { id: 'shipping', label: 'Shipping Center', icon: <Truck className="w-3.5 h-3.5" />, protected: true },
           { id: 'settings', label: 'Store Settings', icon: <Settings className="w-3.5 h-3.5" /> }
-        ].map((tab) => (
-          <button 
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
-            className={`flex items-center gap-2 px-5 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest shrink-0 transition-all ${
-              activeTab === tab.id 
-                ? 'bg-zinc-900 text-white shadow-md' 
-                : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-200/50'
-            }`}
-          >
-            {tab.icon}
-            {tab.label}
-          </button>
-        ))}
+        ].map((tab) => {
+          const isTabLocked = tab.protected && sellerProfile?.status !== 'Verified';
+          return (
+            <button 
+              key={tab.id}
+              disabled={isTabLocked}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`flex items-center gap-2 px-5 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest shrink-0 transition-all ${
+                activeTab === tab.id 
+                  ? 'bg-zinc-900 text-white shadow-md' 
+                  : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-200/50'
+              } ${isTabLocked ? 'opacity-50 grayscale cursor-not-allowed' : ''}`}
+            >
+              {tab.icon}
+              {tab.label}
+              {isTabLocked && <ShieldAlert className="w-2.5 h-2.5 ml-1" />}
+            </button>
+          )
+        })}
       </div>
 
       {/* 4. SELLER CONTENT RENDER ROUTERS */}
@@ -403,37 +490,52 @@ export default function SellerDashboard({ userId, userEmail, triggerToast, onExi
       {/* TAB A: OVERVIEW DASHBOARD */}
       {activeTab === 'dashboard' && (
         <div className="space-y-8 animate-in fade-in duration-500">
+          {sellerProfile?.status !== 'Verified' && (
+              <div className="bg-amber-50 border border-amber-200 p-6 rounded-3xl flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center">
+                          <ShieldAlert className="w-6 h-6" />
+                      </div>
+                      <div>
+                          <h3 className="text-xs font-black uppercase tracking-tight text-amber-900">Verification Incomplete</h3>
+                          <p className="text-[10px] text-amber-700 font-bold uppercase mt-1">Complete Verification to Activate Seller Account & Unlock all features.</p>
+                      </div>
+                  </div>
+                  <button onClick={() => setActiveTab('settings')} className="px-6 py-2.5 bg-amber-600 text-white text-[10px] font-black uppercase rounded-xl">Check Status</button>
+              </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="bg-white border border-zinc-200/70 p-6 rounded-[32px]">
               <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest font-mono">Gross Sales Revenue</span>
-              <p className="text-3xl font-black text-zinc-900 mt-2 font-mono">₹41,197</p>
+              <p className="text-3xl font-black text-zinc-900 mt-2 font-mono">₹{calculatedTotalEarnings}</p>
               <div className="text-emerald-500 text-[10px] font-bold uppercase mt-1 flex items-center gap-1">
-                <span>↑ 14.5%</span> this cycle
+                Real-time Earnings Logic
               </div>
             </div>
             <div className="bg-white border border-zinc-200/70 p-6 rounded-[32px]">
               <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest font-mono">Active Print Jobs</span>
-              <p className="text-3xl font-black text-zinc-900 mt-2 font-mono">{localOrders.filter(u => u.status !== 'Delivered').length}</p>
+              <p className="text-3xl font-black text-zinc-900 mt-2 font-mono">{realOrders.filter(o => o.status !== 'Delivered' && o.status !== 'Cancelled').length}</p>
               <div className="text-amber-500 text-[10px] font-bold uppercase mt-1">
-                Staged for local courier routing
+                Real-time queue logic
               </div>
             </div>
             <div className="bg-white border border-zinc-200/70 p-6 rounded-[32px]">
               <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest font-mono">Published Catalogs</span>
               <p className="text-3xl font-black text-zinc-900 mt-2 font-mono">
-                {localCatalog.filter(p => p.published).length} / {localCatalog.length}
+                {realProducts.filter(p => p.published).length} / {realProducts.length}
               </p>
               <div className="text-indigo-500 text-[10px] font-bold uppercase mt-1 flex items-center gap-1">
-                <span>★ Global reach active</span>
+                <span>Global reach active</span>
               </div>
             </div>
             <div className="bg-[#FF4D00] text-white p-6 rounded-[32px] relative overflow-hidden">
               <div className="absolute inset-0 bg-linear-to-b from-transparent to-black/30 pointer-events-none" />
-              <span className="text-[9px] font-black uppercase tracking-widest font-mono opacity-80">Settled to Account</span>
-              <p className="text-3xl font-black mt-2 font-mono">₹{userDocData?.walletBalance || 12500}</p>
+              <span className="text-[9px] font-black uppercase tracking-widest font-mono opacity-80">Available to Withdraw</span>
+              <p className="text-3xl font-black mt-2 font-mono">₹{userDocData?.walletBalance || 0}</p>
               <button 
+                disabled={sellerProfile?.status !== 'Verified'}
                 onClick={() => setActiveTab('withdrawals')}
-                className="mt-3 text-[9px] font-black uppercase px-4 py-2 bg-white text-zinc-900 rounded-lg hover:scale-105 transition-transform"
+                className="mt-3 text-[9px] font-black uppercase px-4 py-2 bg-white text-zinc-900 rounded-lg hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Withdraw Instantly
               </button>
@@ -448,26 +550,33 @@ export default function SellerDashboard({ userId, userEmail, triggerToast, onExi
                   <thead>
                     <tr className="text-zinc-400 border-b border-zinc-100">
                       <th className="py-3 font-bold">Invoice Ref</th>
-                      <th className="py-3 font-bold">Print Title</th>
                       <th className="py-3 font-bold">Total Amount</th>
-                      <th className="py-3 font-bold">Dispatch Status</th>
+                      <th className="py-3 font-bold">Status</th>
+                      <th className="py-3 font-bold">Date</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {localOrders.map((ord, idx) => (
+                    {realOrders.length > 0 ? realOrders.slice(0, 5).map((ord, idx) => (
                       <tr key={idx} className="border-b border-zinc-50 hover:bg-zinc-50/50">
-                        <td className="py-3.5 font-bold text-zinc-900">{ord.id}</td>
-                        <td className="py-3.5 text-zinc-650 max-w-[150px] truncate">{ord.product}</td>
-                        <td className="py-3.5 font-bold text-[#FF4D00]">₹{ord.amount}</td>
+                        <td className="py-3.5 font-bold text-zinc-900 truncate max-w-[100px]">{ord.id}</td>
+                        <td className="py-3.5 font-bold text-[#FF4D00]">₹{ord.total}</td>
                         <td className="py-3.5">
                           <span className={`px-2 py-0.5 rounded-md text-[9px] font-black ${
-                            ord.status === 'Processing' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+                            ord.status === 'Pending' ? 'bg-amber-100 text-amber-800' : 
+                            ord.status === 'Paid' || ord.status === 'Delivered' ? 'bg-emerald-100 text-emerald-800' : 'bg-zinc-100 text-zinc-600'
                           }`}>
                             {ord.status}
                           </span>
                         </td>
+                        <td className="py-3.5 text-zinc-400 text-[10px]">
+                            {formatDate(ord.createdAt)}
+                        </td>
                       </tr>
-                    ))}
+                    )) : (
+                        <tr>
+                            <td colSpan={4} className="py-12 text-center text-zinc-400 font-bold uppercase italic">No sales activity logs found</td>
+                        </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -502,39 +611,35 @@ export default function SellerDashboard({ userId, userEmail, triggerToast, onExi
         <div className="bg-white border border-zinc-200 rounded-[36px] p-6 animate-in fade-in duration-500">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-sm font-black uppercase tracking-wider text-zinc-800">Print Order Dispatch Pipeline</h3>
-            <span className="text-[10px] font-bold text-zinc-400 font-mono">Live Sync: 100% Connected</span>
+            <span className="text-[10px] font-bold text-zinc-400 font-mono">Total Orders: {realOrders.length}</span>
           </div>
 
           <div className="space-y-4">
-            {localOrders.map((ord) => (
+            {realOrders.length > 0 ? realOrders.map((ord) => (
               <div key={ord.id} className="p-5 border border-zinc-150 rounded-2xl bg-zinc-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <span className="font-mono font-black text-[#FF4D00] text-xs">{ord.id}</span>
-                    <span className="text-[10px] font-bold text-zinc-400 uppercase font-mono">• {ord.date}</span>
+                    <span className="text-[10px] font-bold text-zinc-400 uppercase font-mono">• {formatDate(ord.createdAt)}</span>
                   </div>
-                  <h4 className="text-xs font-bold text-zinc-800 uppercase">{ord.product}</h4>
-                  <p className="text-[9px] font-bold text-zinc-400 uppercase font-mono">Buyer: {ord.buyer}</p>
+                  <h4 className="text-xs font-bold text-zinc-800 uppercase">Order for {ord.userId}</h4>
+                  <p className="text-[9px] font-bold text-zinc-400 uppercase font-mono">Items Count: {ord.items?.length || 0}</p>
                 </div>
 
                 <div className="flex flex-col md:items-end gap-1.5">
-                  <p className="text-xs font-black text-zinc-900 font-mono">₹{ord.amount}</p>
-                  <p className="text-[9px] font-medium text-emerald-600 uppercase tracking-widest">{ord.shippingStatus}</p>
+                  <p className="text-xs font-black text-zinc-900 font-mono">₹{ord.total}</p>
                   <div className="flex gap-1">
-                    <button 
-                      onClick={() => {
-                        ord.shippingStatus = 'Shipped (Local Router Courier)';
-                        triggerToast(`Custom shipping manifest generated for ${ord.id}`, 'success');
-                        setLocalOrders([...localOrders]);
-                      }}
-                      className="px-2.5 py-1 bg-zinc-900 text-white rounded text-[8px] font-black uppercase tracking-widest hover:bg-[#FF4D00]"
-                    >
-                      Dispatch Parcels
-                    </button>
+                    <span className={`px-2.5 py-1 rounded text-[8px] font-black uppercase tracking-widest ${
+                        ord.status === 'Delivered' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                    }`}>
+                      {ord.status}
+                    </span>
                   </div>
                 </div>
               </div>
-            ))}
+            )) : (
+                <div className="py-20 text-center text-zinc-400 font-bold uppercase">No database orders found</div>
+            )}
           </div>
         </div>
       )}
@@ -598,11 +703,11 @@ export default function SellerDashboard({ userId, userEmail, triggerToast, onExi
         <div className="bg-white border border-zinc-200 rounded-[36px] p-6 animate-in fade-in duration-500">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-sm font-black uppercase tracking-wider text-zinc-800">Supply Catalog Manager</h3>
-            <span className="text-[10px] font-heavy text-rose-500 uppercase tracking-widest font-mono">Total catalog items: {localCatalog.length}</span>
+            <span className="text-[10px] font-heavy text-[#FF4D00] uppercase tracking-widest font-mono">Verified catalog items: {realProducts.length}</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {localCatalog.map((prod) => (
+            {realProducts.length > 0 ? realProducts.map((prod) => (
               <div key={prod.id} className="border border-zinc-155 rounded-3xl p-4 bg-zinc-50 flex flex-col justify-between hover:border-zinc-300 transition-colors">
                 <div className="space-y-3">
                   <div className="aspect-square bg-zinc-200 rounded-2xl overflow-hidden relative border border-zinc-100">
@@ -627,14 +732,16 @@ export default function SellerDashboard({ userId, userEmail, triggerToast, onExi
                     {prod.published ? '✓ In Stock' : '✕ Draft Mode'}
                   </span>
                   <button 
-                    onClick={() => togglePublish(prod.id)}
+                    onClick={() => togglePublish(prod.id, !!prod.published)}
                     className="px-3.5 py-2 bg-zinc-900 hover:bg-[#FF4D00] text-white text-[9px] font-black uppercase rounded-xl tracking-widest transition"
                   >
                     {prod.published ? 'Delist' : 'Broadcast'}
                   </button>
                 </div>
               </div>
-            ))}
+            )) : (
+                <div className="col-span-1 md:col-span-3 py-20 text-center text-zinc-400 font-bold uppercase italic">Global catalog is currently empty</div>
+            )}
           </div>
         </div>
       )}
@@ -647,8 +754,8 @@ export default function SellerDashboard({ userId, userEmail, triggerToast, onExi
               <h3 className="text-sm font-black uppercase text-zinc-400 tracking-widest font-mono">Settlement Core Status</h3>
               <div className="space-y-1">
                 <span className="text-[10px] font-bold text-zinc-400 uppercase">Live Wallet Vault</span>
-                <p className="text-4xl font-black text-emerald-500 font-mono">₹{userDocData?.walletBalance || 12500}</p>
-                <p className="text-[10px] text-zinc-400 uppercase font-mono mt-1">Pending payout cycles clear every 24 hours automatically.</p>
+                <p className="text-4xl font-black text-emerald-500 font-mono">₹{userDocData?.walletBalance || 0}</p>
+                <p className="text-[10px] text-zinc-400 uppercase font-mono mt-1">Staged for withdrawal: ₹{calculatedPendingEarnings}</p>
               </div>
               <div className="flex gap-2">
                 <span className="inline-block bg-emerald-50 text-emerald-800 border border-emerald-150 text-[9px] font-black uppercase px-3 py-1 rounded-md">
@@ -665,15 +772,15 @@ export default function SellerDashboard({ userId, userEmail, triggerToast, onExi
               <div className="space-y-2 text-xs uppercase font-mono">
                 <p className="flex justify-between border-b border-zinc-100 pb-2">
                   <span className="text-zinc-400 font-bold">UPI ID:</span>
-                  <span className="font-bold text-[#FF4D00]">{sellerProfile?.documents?.upiId || 'Amaan@okaxis'}</span>
+                  <span className="font-bold text-[#FF4D00]">{sellerProfile?.documents?.upiId || 'Not Configured'}</span>
                 </p>
                 <p className="flex justify-between border-b border-zinc-100 pb-2">
                   <span className="text-zinc-400 font-bold">Bank Name:</span>
-                  <span className="font-bold text-zinc-800">{sellerProfile?.documents?.bankName || 'State Bank of India'}</span>
+                  <span className="font-bold text-zinc-800">{sellerProfile?.documents?.bankName || 'Not Configured'}</span>
                 </p>
                 <p className="flex justify-between">
                   <span className="text-zinc-400 font-bold">A/C Number:</span>
-                  <span className="font-bold text-zinc-800">{sellerProfile?.documents?.bankAccountNumber || '••••••••9023'}</span>
+                  <span className="font-bold text-zinc-800">{sellerProfile?.documents?.bankAccountNumber ? `••••••••${sellerProfile.documents.bankAccountNumber.slice(-4)}` : 'Not Configured'}</span>
                 </p>
               </div>
             </div>
@@ -764,7 +871,7 @@ export default function SellerDashboard({ userId, userEmail, triggerToast, onExi
         <div className="bg-white border border-zinc-200 rounded-[36px] p-6 max-w-[800px] mx-auto animate-in fade-in duration-500">
           <div className="mb-6 pb-4 border-b border-[#FF4D00]/10">
             <h3 className="text-sm font-black uppercase tracking-wider text-zinc-800">Claim Merchant Royalties</h3>
-            <p className="text-[10px] text-zinc-400 font-bold uppercase mt-1">Settle your account balance directly onto linked UPI coordinates instantly.</p>
+            <p className="text-[10px] text-zinc-400 font-bold uppercase mt-1">Settle your account balance directly onto linked bank coordinates instantly.</p>
           </div>
 
           <form onSubmit={triggerWithdrawal} className="space-y-6">
@@ -774,27 +881,32 @@ export default function SellerDashboard({ userId, userEmail, triggerToast, onExi
                 <span className="absolute left-5 top-1/2 -translate-y-1/2 font-black text-zinc-400 text-lg">₹</span>
                 <input required type="number" placeholder="5000" value={withdrawalAmount} onChange={e => setWithdrawalAmount(e.target.value)} className="w-full text-lg pl-10 p-5 bg-zinc-50 border border-zinc-200 rounded-xl outline-none font-heavy tracking-widest focus:ring-1 focus:ring-[#FF4D00]/20" />
               </div>
+              <p className="text-[9px] font-bold text-zinc-400 uppercase">Available: ₹{userDocData?.walletBalance || 0}</p>
             </div>
 
-            <button type="submit" className="w-full py-5 bg-[#FF4D00] hover:bg-[#ff5507] hover:shadow-2xl text-white text-[11px] font-black uppercase rounded-[20px] tracking-widest transition-all">
-              Initialize Instant Payment Protocol
+            <button disabled={isSubmitting || !withdrawalAmount} type="submit" className="w-full py-5 bg-[#FF4D00] hover:bg-[#ff5507] hover:shadow-2xl text-white text-[11px] font-black uppercase rounded-[20px] tracking-widest transition-all disabled:opacity-50">
+              {isSubmitting ? 'Processing Neural Transfer...' : 'Initialize Secure Withdrawal Request'}
             </button>
           </form>
 
           <h4 className="text-xs font-black uppercase text-zinc-800 tracking-wider mt-8 mb-4">Settlement Requests Archives</h4>
           <div className="space-y-3">
-            {localWithdrawals.map((txn, idx) => (
+            {realWithdrawals.length > 0 ? realWithdrawals.map((txn, idx) => (
               <div key={idx} className="p-4 bg-zinc-50 border border-zinc-150 rounded-2xl flex justify-between items-center text-xs font-mono uppercase">
                 <div className="space-y-0.5">
-                  <p className="font-bold text-zinc-900">{txn.id}</p>
-                  <p className="text-[10px] text-zinc-400 font-bold">{txn.date} • {txn.channel}</p>
+                  <p className="font-bold text-zinc-900">{txn.id || 'TXN-' + idx}</p>
+                  <p className="text-[10px] text-zinc-400 font-bold">
+                    {formatDate(txn.createdAt)}
+                  </p>
                 </div>
                 <div className="text-right">
                   <p className="font-black text-zinc-800">₹{txn.amount}</p>
-                  <p className={`text-[9px] font-black ${txn.status === 'Completed' || txn.status === 'Approved' ? 'text-emerald-600' : 'text-amber-500'}`}>{txn.status}</p>
+                  <p className={`text-[9px] font-black ${txn.status === 'Paid' || txn.status === 'Approved' ? 'text-emerald-600' : txn.status === 'Rejected' ? 'text-rose-500' : 'text-amber-500'}`}>{txn.status}</p>
                 </div>
               </div>
-            ))}
+            )) : (
+                <div className="py-12 bg-zinc-50/50 rounded-2xl text-center text-zinc-400 font-bold text-[10px] uppercase italic">Financial archives empty</div>
+            )}
           </div>
         </div>
       )}

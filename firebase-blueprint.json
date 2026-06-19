@@ -58,6 +58,9 @@
         "displayName": { "type": "string" },
         "role": { "type": "string", "enum": ["user", "seller", "admin"] },
         "walletBalance": { "type": "number" },
+        "pendingBalance": { "type": "number" },
+        "totalEarnings": { "type": "number" },
+        "withdrawnAmount": { "type": "number" },
         "aiCredits": { "type": "integer" },
         "loyaltyPoints": { "type": "integer" },
         "ordersCount": { "type": "integer" },
@@ -66,6 +69,25 @@
       },
       "required": ["id", "email"]
     },
+    "WithdrawalRequest": {
+      "title": "Withdrawal Request",
+      "description": "Request by a seller to withdraw funds.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "sellerId": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": {
+          "type": "string",
+          "enum": ["Pending", "Approved", "Rejected", "Paid"]
+        },
+        "bankDetails": { "type": "object" },
+        "adminNotes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "sellerId", "amount", "status", "createdAt"]
+    },
     "Order": {
       "title": "Order",
       "description": "Represents a customer order.",
@@ -73,6 +95,7 @@
       "properties": {
         "id": { "type": "string" },
         "userId": { "type": "string" },
+        "sellerId": { "type": "string" },
         "items": { "type": "array", "items": { "type": "object" } },
         "total": { "type": "number" },
         "status": { "type": "string" },
@@ -163,6 +186,10 @@
     "/payments/{paymentId}": {
       "schema": "Payment",
       "description": "Payment transaction records."
+    },
+    "/withdrawals/{requestId}": {
+      "schema": "WithdrawalRequest",
+      "description": "Withdrawal requests from sellers."
     },
     "/audit_logs/{logId}": {
       "schema": "AuditLog",

@@ -63,6 +63,8 @@ import { db, auth, safeFetch } from './firebase';
 import { 
   onAuthStateChanged, 
   signInWithPopup, 
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider, 
   signOut,
   User as FirebaseUser
@@ -927,6 +929,94 @@ export default function App() {
     
     performStartupHealthCheck();
   }, []);
+
+  // Handle Firebase Google Redirect Authentication Result for Mobile and WebViews
+  useEffect(() => {
+    if (!auth) return;
+
+    const handleRedirectResultCompletion = async () => {
+      try {
+        setStartupLogs(prev => [...prev, 'CHECKING SECURE GOOGLE REDIRECT AUTH COMPLETION...']);
+        
+        // Timeout check to guarantee no hangs during loading
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error("Google identity handshake timed out (15s limit).")), 15000)
+        );
+
+        const result = await Promise.race([
+          getRedirectResult(auth),
+          timeoutPromise
+        ]) as any;
+
+        if (result && result.user) {
+          const firebaseUser = result.user;
+          const userEmail = firebaseUser.email || '';
+          setStartupLogs(prev => [...prev, `✓ REDIRECT AUTH COMPLETED SUCCESSFULLY FOR: ${userEmail}`]);
+          triggerToast(`Google Sign-In successful! Welcome back, ${firebaseUser.displayName || 'User'}`, 'success');
+
+          // SYNC USER DATA TO FIRESTORE AND REDIRECT TO DASHBOARD
+          if (db) {
+            const { doc, getDoc, setDoc, serverTimestamp } = await import('firebase/firestore');
+            const userRef = doc(db, 'users', firebaseUser.uid);
+            
+            // Look up existing role or seller status before replacing
+            const docSnap = await getDoc(userRef);
+            let isSeller = false;
+            let onboardingCompleted = false;
+            let finalRole = 'user';
+
+            if (docSnap.exists()) {
+              const data = docSnap.data();
+              isSeller = data.isSeller === true || data.role === 'seller';
+              onboardingCompleted = data.onboardingCompleted === true;
+              finalRole = data.role || 'user';
+            }
+
+            const isAdminEmail = [
+              'musagraphics75@gmail.com',
+              'gazisiddiqui01@gmail.com',
+              'amaanmohd8186@gmail.com'
+            ].includes(userEmail);
+            
+            if (isAdminEmail) {
+              finalRole = 'admin';
+            } else if (isSeller) {
+              finalRole = 'seller';
+            }
+
+            await setDoc(userRef, {
+              uid: firebaseUser.uid,
+              name: firebaseUser.displayName || userEmail.split('@')[0] || 'User',
+              email: userEmail,
+              photoURL: firebaseUser.photoURL || '',
+              role: finalRole,
+              createdAt: docSnap.exists() ? (docSnap.data().createdAt || serverTimestamp()) : serverTimestamp(),
+              lastLoginAt: serverTimestamp()
+            }, { merge: true });
+
+            // Automatically route of redirect user to appropriate portal
+            if (isSeller || onboardingCompleted) {
+              setEnterprisePortal('seller-dashboard');
+              setCustomerActiveTab('profile'); // Align main frame
+              triggerToast('Automatically redirected to Seller Dashboard', 'success');
+            } else {
+              setCustomerActiveTab('profile');
+              setEnterprisePortal('none');
+              triggerToast('Automatically redirected to Customer Profile', 'success');
+            }
+          } else {
+            setCustomerActiveTab('profile');
+          }
+        }
+      } catch (err: any) {
+        console.error("🔥 [GOOGLE REDIRECT AUTH COMPLETION SYSTEM EXCEPTION]", err);
+        setStartupLogs(prev => [...prev, `⚠️ REDIRECT HANDSHAKE ENCOUNTERED ISSUES: ${err.message || err}`]);
+        triggerToast(`Google Redirect Authentication Failed: ${err.message || err}`, 'warn');
+      }
+    };
+
+    handleRedirectResultCompletion();
+  }, [auth]);
 
   useEffect(() => {
     // Auth State Listener
