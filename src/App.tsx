@@ -2643,7 +2643,7 @@ export default function App() {
                   >
                     <div className="flex items-center gap-2">
                       <span className="text-amber-500">{dbIsSeller || dbOnboardingCompleted ? '💼' : '🔐'}</span>
-                      <span>{dbIsSeller || dbOnboardingCompleted ? 'Seller Studio & Dashboard' : 'Seller Onboarding & KYC'}</span>
+                      <span>{dbIsSeller || dbOnboardingCompleted ? 'Seller Studio & Dashboard' : 'Seller Onboarding'}</span>
                     </div>
                     <ChevronRight className="w-4 h-4 text-zinc-400" />
                   </button>

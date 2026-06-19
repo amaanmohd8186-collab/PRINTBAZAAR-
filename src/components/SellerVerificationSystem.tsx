@@ -46,8 +46,7 @@ export default function SellerVerificationSystem({ isAdminMode, onVerificationCo
   const [ifscCode, setIfscCode] = useState('');
   const [upiId, setUpiId] = useState('');
 
-  // Video KYC - Step 6
-  const [videoKycUrl, setVideoKycUrl] = useState('');
+  // Video KYC removed
   
   // States
   const [adminNotes, setAdminNotes] = useState('');
@@ -103,7 +102,6 @@ export default function SellerVerificationSystem({ isAdminMode, onVerificationCo
         setAccountNumber(data.documents?.bankAccountNumber || '');
         setIfscCode(data.documents?.bankIfscCode || '');
         setUpiId(data.documents?.upiId || '');
-        setVideoKycUrl(data.documents?.videoKycUrl || '');
       }
       setIsLoading(false);
     }, (err) => {
@@ -167,7 +165,6 @@ export default function SellerVerificationSystem({ isAdminMode, onVerificationCo
         bankAccountNumber: accountNumber,
         bankIfscCode: ifscCode,
         upiId,
-        videoKycUrl,
         tradeLicense: portfolioUrl,
         msmeCert: sampleWorkUrl
       }
@@ -204,8 +201,7 @@ export default function SellerVerificationSystem({ isAdminMode, onVerificationCo
     { id: 3, label: 'Aadhaar', icon: <ShieldCheck className="w-3.5 h-3.5" /> },
     { id: 4, label: 'Portfolio', icon: <Package className="w-3.5 h-3.5" /> },
     { id: 5, label: 'Bank/UPI', icon: <Landmark className="w-3.5 h-3.5" /> },
-    { id: 6, label: 'Video KYC', icon: <Video className="w-3.5 h-3.5" /> },
-    { id: 7, label: 'Review', icon: <Clock className="w-3.5 h-3.5" /> }
+    { id: 6, label: 'Review', icon: <Clock className="w-3.5 h-3.5" /> }
   ];
 
   if (isLoading) {
@@ -324,7 +320,6 @@ export default function SellerVerificationSystem({ isAdminMode, onVerificationCo
                   {[
                     { label: 'PAN Card', url: sel.documents?.panCard, icon: <FileCode /> },
                     { label: 'Aadhaar', url: sel.documents?.aadhaarFront, icon: <ShieldCheck /> },
-                    { label: 'KYC Video', url: sel.documents?.videoKycUrl, icon: <Video />, color: 'rose' },
                     { label: 'Portfolio', url: sel.documents?.tradeLicense, icon: <Package /> },
                     { label: 'Samples', url: sel.documents?.msmeCert, icon: <Clipboard /> },
                     { label: 'Bank Proof', url: sel.documents?.cancelledCheque, icon: <Landmark /> }
@@ -656,64 +651,8 @@ export default function SellerVerificationSystem({ isAdminMode, onVerificationCo
                 </div>
               )}
 
-              {/* Video KYC Step */}
-              {step === 6 && (
-                <div className="space-y-10 animate-in fade-in slide-in-from-bottom-8">
-                  <div className="bg-zinc-50 border-l-[6px] border-rose-600 p-6 rounded-r-3xl flex items-center justify-between">
-                    <div>
-                      <h3 className="text-xl font-black uppercase tracking-tight">Step 06: AI VIDEO KYC</h3>
-                      <p className="text-[10px] text-zinc-500 font-bold uppercase mt-1 tracking-wider">3D Face mapping & liveness detection for anti-fraud architecture.</p>
-                    </div>
-                    <Video className="w-10 h-10 text-zinc-200" />
-                  </div>
-
-                  <div className="flex flex-col items-center gap-10">
-                    <div className="w-full aspect-video bg-zinc-950 rounded-[48px] overflow-hidden relative shadow-2xl border-4 border-zinc-900 group">
-                      {videoKycUrl ? (
-                         <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-emerald-500/10">
-                            <div className="w-16 h-16 bg-emerald-600 text-white rounded-full flex items-center justify-center animate-pulse"><CheckCircle2 className="w-10 h-10" /></div>
-                            <p className="text-emerald-500 text-xs font-black uppercase tracking-widest">Identity Stream Captured</p>
-                            <button onClick={() => setVideoKycUrl('')} className="px-6 py-2 bg-white/10 hover:bg-white/20 text-white text-[9px] font-black uppercase rounded-lg border border-white/20 transition-all">Discard & Reshoot</button>
-                         </div>
-                      ) : (
-                        <>
-                          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 z-10">
-                            <div className="w-20 h-20 rounded-full border-4 border-[#FF4D00] border-t-transparent animate-spin" />
-                            <p className="text-white text-xs font-black uppercase tracking-widest animate-pulse">Initializing Neural Link...</p>
-                          </div>
-                          <div className="absolute inset-0 bg-linear-to-b from-transparent via-transparent to-black/80 flex flex-col items-center justify-end p-10 z-20">
-                            <button 
-                              onClick={() => {
-                                setIsSyncing(true);
-                                setTimeout(() => {
-                                  setVideoKycUrl('https://demo.video/kyc-verified-stream');
-                                  setIsSyncing(false);
-                                  triggerToast?.('Liveness verified', 'success');
-                                }, 2500);
-                              }} 
-                              className="bg-rose-600 hover:bg-rose-700 text-white px-12 py-5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-2xl transition-all active:scale-95 flex items-center gap-3"
-                            >
-                              <Video className="w-5 h-5" /> Start AI Scan Sequence
-                            </button>
-                            <p className="text-zinc-500 text-[9px] font-bold uppercase mt-6 tracking-tight max-w-xs text-center">By starting, you authorize PrintBazaar to match your face mesh against Govt ID records.</p>
-                          </div>
-                        </>
-                      )}
-                    </div>
-
-                    <button 
-                      disabled={!videoKycUrl || isSyncing} 
-                      onClick={() => handleStepSubmit(7, { documents: { ...(currentSeller?.documents || {}), videoKycUrl } })} 
-                      className="bg-rose-600 text-white text-[11px] font-black uppercase py-5 rounded-[24px] w-full shadow-xl hover:-translate-y-1 transition-all active:translate-y-0 disabled:opacity-50"
-                    >
-                      Authenticate Biometric Lock
-                    </button>
-                  </div>
-                </div>
-              )}
-
               {/* Review Step */}
-              {step === 7 && (
+              {step === 6 && (
                 <div className="space-y-10 animate-in fade-in zoom-in-95 duration-1000">
                   <div className="text-center space-y-4">
                     <div className="w-24 h-24 bg-zinc-900 text-[#FF4D00] rounded-[32px] flex items-center justify-center mx-auto shadow-2xl rotate-3">

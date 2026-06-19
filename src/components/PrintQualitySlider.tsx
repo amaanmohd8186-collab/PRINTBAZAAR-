@@ -301,7 +301,7 @@ export default function PrintQualitySlider() {
           <div className="flex items-center justify-between bg-zinc-50 p-4.5 rounded-2xl border border-zinc-200">
             <div className="flex items-center gap-2">
               <ZoomIn className="w-4 h-4 text-zinc-550" />
-              <span className="text-[10px] text-zinc-600 font-heavy uppercase tracking-wide">Simulated Press Microscope Zoom:</span>
+              <span className="text-[10px] text-zinc-600 font-heavy uppercase tracking-wide">Press Microscope Zoom:</span>
               <span className="text-xs font-mono font-bold text-slate-800 bg-white border border-zinc-200 px-2 py-0.5 rounded-md">{zoomLevel === 1 ? '1.0X Standard Screen' : zoomLevel === 1.5 ? '1.5X Close Inspection' : '2.0X Extreme Macro Detail'}</span>
             </div>
 

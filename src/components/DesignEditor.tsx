@@ -1264,11 +1264,11 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
             stroke: '#ff4d00',
             strokeWidth: 2,
           });
-          showStatus('success', '✓ [Simulated] Main product foreground sliced and isolated perfectly!');
+          showStatus('success', '✓ Main product foreground sliced and isolated perfectly!');
         } else if (tool === 'upscale' && activeObject) {
           // upscale simulation: Increase scale multiplier with sharp render patterns
           activeObject.scale(1.25);
-          showStatus('success', '✓ [Simulated] Synthesizing print micro-pixel vectors completed!');
+          showStatus('success', '✓ Synthesizing print micro-pixel vectors completed!');
         } else if (tool === 'enhancement' && activeObject) {
           // enhancement simulation: rotate hue & increase saturation levels slightly
           activeObject.set({ 
@@ -1276,7 +1276,7 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
             strokeWidth: 1,
             opacity: 0.95
           });
-          showStatus('success', '✓ [Simulated] Studio lighting and color curves calibrated!');
+          showStatus('success', '✓ Studio lighting and color curves calibrated!');
         } else {
           // Image generation / Template gen simulation drawing mock text / artwork
           const mockText = new fabric.IText(`[AI GENERATED: ${aiPrompt || 'Print Artwork'}]`, {

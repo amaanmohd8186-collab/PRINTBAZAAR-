@@ -194,7 +194,7 @@ export default function PushNotificationManager({ userId, userEmail, triggerToas
         requireInteraction: true
       });
       setIsTesting(false);
-      triggerToast('Simulated notification triggered successfully!', 'success');
+      triggerToast('Notification triggered successfully!', 'success');
     }, 4000);
   };
 

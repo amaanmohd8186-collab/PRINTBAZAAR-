@@ -90,7 +90,7 @@ export default function SellerDashboard({ userId, userEmail, triggerToast, onExi
   const isDocSeller = userDocData?.isSeller === true || userDocData?.role === 'seller';
   const isSellerApproved = userDocData?.sellerStatus === 'approved' || sellerProfile?.status === 'Verified';
   const isMerchantActive = userDocData?.merchantStatus === 'active' || sellerProfile?.status === 'Verified';
-  const onboardingCompleted = userDocData?.onboardingCompleted === true || sellerProfile?.verificationStep >= 6;
+  const onboardingCompleted = userDocData?.onboardingCompleted === true || sellerProfile?.verificationStep >= 5;
 
   // Final check to see if the dashboard should indeed unlock
   const hasDashboardAccess = isDocSeller || onboardingCompleted;
@@ -249,7 +249,7 @@ export default function SellerDashboard({ userId, userEmail, triggerToast, onExi
                 <div className="flex justify-between items-center border-b border-zinc-100 pb-2">
                   <span className="text-zinc-500">KYC Onboarding Progress:</span>
                   <span className="font-mono bg-zinc-200/50 text-zinc-700 font-black px-2 py-0.5 rounded uppercase text-[10px]">
-                    {sellerProfile?.verificationStep ? `${Math.round((sellerProfile.verificationStep / 7) * 100)}% Complete` : 'Unregistered (0%)'}
+                    {sellerProfile?.verificationStep ? `${Math.round((sellerProfile.verificationStep / 6) * 100)}% Complete` : 'Unregistered (0%)'}
                   </span>
                 </div>
                 <div className="flex justify-between items-center border-b border-zinc-100 pb-2">
@@ -266,7 +266,7 @@ export default function SellerDashboard({ userId, userEmail, triggerToast, onExi
             </div>
 
             <p className="text-xs text-zinc-500 leading-relaxed max-w-md">
-              Your merchant node is in step <span className="font-bold text-zinc-900">#{sellerProfile?.verificationStep || 'None'}</span>. Once your biometric Video KYC and bank reconciliation tests score 100%, the supply network automatically activates production slots.
+              Your merchant node is in step <span className="font-bold text-zinc-900">#{sellerProfile?.verificationStep || 'None'}</span>. Once your account reconciliation tests score 100%, the supply network automatically activates production slots.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-3 w-full pt-4">
