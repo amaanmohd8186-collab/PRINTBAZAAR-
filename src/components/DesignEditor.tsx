@@ -84,7 +84,8 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
   userStats,
   onClose
 }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
   const fabricCanvas = useRef<fabric.Canvas | null>(null);
   const [activeTool, setActiveTool] = useState<ToolType | 'easy' | 'adobe'>('select');
   const [isSaving, setIsSaving] = useState(false);
@@ -415,10 +416,18 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
   }, [userId]);
 
   useEffect(() => {
-    if (!canvasRef.current) return;
+    if (!canvasContainerRef.current) return;
+
+    // Clear previous runs
+    canvasContainerRef.current.innerHTML = '';
+
+    // Dynamically insert an isolated canvas element to bypass React StrictMode & unmount / dispose collision
+    const el = document.createElement('canvas');
+    canvasContainerRef.current.appendChild(el);
+    canvasRef.current = el;
 
     try {
-      fabricCanvas.current = new fabric.Canvas(canvasRef.current, {
+      fabricCanvas.current = new fabric.Canvas(el, {
         width: CANVAS_WIDTH,
         height: CANVAS_HEIGHT,
         backgroundColor: '#f8fafc',
@@ -595,6 +604,10 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
           console.warn("Fabric sync dispose exception:", syncErr);
         }
       }
+      if (canvasContainerRef.current) {
+        canvasContainerRef.current.innerHTML = '';
+      }
+      canvasRef.current = null;
     };
   }, []);
 
@@ -1775,7 +1788,7 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
                 height: `${CANVAS_HEIGHT + 20}px`
               }}
             >
-              <canvas ref={canvasRef} />
+              <div ref={canvasContainerRef} style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }} />
             
             {/* Active tool overlay or isProcessing state */}
             <AnimatePresence>
