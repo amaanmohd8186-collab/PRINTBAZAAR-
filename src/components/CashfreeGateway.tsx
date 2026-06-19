@@ -256,13 +256,22 @@ export default function CashfreeGateway({
           </p>
 
           {!loadingConfig && !hasKeys && (
-            <div className="mt-4 mx-2 p-3 bg-amber-50 rounded-2xl border border-amber-100 flex flex-col text-left space-y-1">
+            <div className="mt-4 mx-2 p-3 bg-amber-50 rounded-2xl border border-amber-100 flex flex-col text-left space-y-2">
               <span className="text-[10px] font-black text-amber-700 uppercase tracking-wide flex items-center gap-1">
                 <AlertCircle className="w-3.5 h-3.5 shrink-0 text-amber-500" />
-                Gateway Sandbox Mode
+                SETUP REQUIRED: CASHFREE PAYMENTS
               </span>
               <p className="text-[9px] text-zinc-500 leading-relaxed font-bold">
-                API credentials missing. System is currently running in a zero-value sandbox mode for flow verification.
+                API credentials missing. To enable live payments:
+              </p>
+              <ul className="text-[9px] text-zinc-600 font-mono list-decimal pl-4 space-y-0.5">
+                <li>Create an account at cashfree.com</li>
+                <li>Go to Developers &gt; API Keys</li>
+                <li>Add CASHFREE_CLIENT_ID to your environment secrets</li>
+                <li>Add CASHFREE_CLIENT_SECRET to your environment secrets</li>
+              </ul>
+              <p className="text-[9px] text-zinc-500 font-bold italic mt-1">
+                Running in zero-value simulation mode.
               </p>
             </div>
           )}
