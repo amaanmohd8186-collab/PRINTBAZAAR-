@@ -1,10 +1,10 @@
 {
-  "projectId": "thugs-of-sultan-3cb83",
-  "appId": "1:569804689508:web:a40e8f9c217caf8eeecf71",
-  "apiKey": "AIzaSyDPw1JScBo4K6YO2ptQAFBCwhm2H3S8VQk",
-  "authDomain": "thugs-of-sultan-3cb83.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-cbdc0a21-76ec-4497-9c62-516031d0800d",
-  "storageBucket": "thugs-of-sultan-3cb83.firebasestorage.app",
-  "messagingSenderId": "569804689508",
-  "measurementId": "G-H3JNC2MVDF"
+  "projectId": "fixble",
+  "appId": "1:923827993409:web:ff7058be9214db4743bfc0",
+  "apiKey": "AIzaSyD6ZsdEn3buQkcxBSd0WaCDR_Z5GmXb83U",
+  "authDomain": "fixble.firebaseapp.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "fixble.firebasestorage.app",
+  "messagingSenderId": "923827993409",
+  "measurementId": "G-GPYBF8YL55"
 }

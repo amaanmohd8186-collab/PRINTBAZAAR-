@@ -291,7 +291,9 @@ export default function App() {
   const [startupLogs, setStartupLogs] = useState<string[]>(['INITIALIZING SECURE ENVIRONMENT...']);
   
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const [showDiagnostics, setShowDiagnostics] = useState(() => {
+    return !import.meta.env.VITE_FIREBASE_PROJECT_ID || !import.meta.env.VITE_FIREBASE_API_KEY;
+  });
   // 1. Core State shifted to Firestore only
   const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
   const [orders, setOrders] = useState<Order[]>([]);
