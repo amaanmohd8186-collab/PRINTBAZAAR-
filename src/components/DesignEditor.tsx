@@ -584,7 +584,17 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
     }
 
     return () => {
-      fabricCanvas.current?.dispose();
+      if (fabricCanvas.current) {
+        const c = fabricCanvas.current;
+        fabricCanvas.current = null;
+        try {
+          c.dispose().catch((err: any) => {
+            console.warn("Fabric async dispose exception (safely ignored during unmount):", err);
+          });
+        } catch (syncErr) {
+          console.warn("Fabric sync dispose exception:", syncErr);
+        }
+      }
     };
   }, []);
 

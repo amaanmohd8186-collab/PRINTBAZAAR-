@@ -26,6 +26,7 @@ export const AuthModal = ({ onClose, triggerToast }: { onClose: () => void, trig
       
       if (useRedirect) {
         console.log("Mobile/Embedded device detected. Initiating secure redirect auth flow.");
+        localStorage.setItem('firebase_auth_redirect_in_progress', 'true');
         await signInWithRedirect(auth, provider);
         clearTimeout(timeoutId);
         // The page will redirect away from here

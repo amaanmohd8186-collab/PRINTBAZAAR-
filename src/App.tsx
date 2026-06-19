@@ -935,18 +935,28 @@ export default function App() {
     if (!auth) return;
 
     const handleRedirectResultCompletion = async () => {
-      try {
-        setStartupLogs(prev => [...prev, 'CHECKING SECURE GOOGLE REDIRECT AUTH COMPLETION...']);
-        
-        // Timeout check to guarantee no hangs during loading
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error("Google identity handshake timed out (15s limit).")), 15000)
-        );
+      const redirectInProgress = localStorage.getItem('firebase_auth_redirect_in_progress') === 'true';
 
-        const result = await Promise.race([
-          getRedirectResult(auth),
-          timeoutPromise
-        ]) as any;
+      try {
+        let result: any = null;
+
+        if (redirectInProgress) {
+          setStartupLogs(prev => [...prev, 'CHECKING SECURE GOOGLE REDIRECT AUTH COMPLETION...']);
+
+          // Timeout check to guarantee no hangs during loading
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error("Google identity handshake timed out (15s limit).")), 15000)
+          );
+
+          result = await Promise.race([
+            getRedirectResult(auth),
+            timeoutPromise
+          ]);
+
+          localStorage.removeItem('firebase_auth_redirect_in_progress');
+        } else {
+          result = await getRedirectResult(auth).catch(() => null);
+        }
 
         if (result && result.user) {
           const firebaseUser = result.user;
@@ -1009,9 +1019,18 @@ export default function App() {
           }
         }
       } catch (err: any) {
-        console.error("🔥 [GOOGLE REDIRECT AUTH COMPLETION SYSTEM EXCEPTION]", err);
-        setStartupLogs(prev => [...prev, `⚠️ REDIRECT HANDSHAKE ENCOUNTERED ISSUES: ${err.message || err}`]);
-        triggerToast(`Google Redirect Authentication Failed: ${err.message || err}`, 'warn');
+        if (redirectInProgress) {
+          localStorage.removeItem('firebase_auth_redirect_in_progress');
+          console.error("🔥 [GOOGLE REDIRECT AUTH COMPLETION SYSTEM EXCEPTION]", err);
+          setStartupLogs(prev => [...prev, `⚠️ REDIRECT HANDSHAKE ENCOUNTERED ISSUES: ${err.message || err}`]);
+          
+          const isInIframe = window.self !== window.top;
+          if (isInIframe) {
+            triggerToast("Google Sign-In redirects are restricted inside preview frames. Please use 'Open in New Tab' at the top-right of your screen to complete sign-in.", "warn");
+          } else {
+            triggerToast(`Google Sign-In: ${err.message || err}`, 'warn');
+          }
+        }
       }
     };
 
