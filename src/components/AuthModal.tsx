@@ -11,12 +11,6 @@ export const AuthModal = ({ onClose, triggerToast }: { onClose: () => void, trig
     setLoading(true);
     setErrorMsg('');
     
-    // 15-second safety redirect timeout to prevent hanging the user
-    const timeoutId = setTimeout(() => {
-      setLoading(false);
-      setErrorMsg('Google Sign-In handshake took too long. Please verify your internet or tap "Open Google Sign In Again" below.');
-    }, 15000);
-
     try {
       const provider = new GoogleAuthProvider();
       
@@ -28,17 +22,14 @@ export const AuthModal = ({ onClose, triggerToast }: { onClose: () => void, trig
         console.log("Mobile/Embedded device detected. Initiating secure redirect auth flow.");
         localStorage.setItem('firebase_auth_redirect_in_progress', 'true');
         await signInWithRedirect(auth, provider);
-        clearTimeout(timeoutId);
         // The page will redirect away from here
       } else {
         console.log("Desktop device detected. Initiating popup auth flow.");
         await signInWithPopup(auth, provider);
-        clearTimeout(timeoutId);
         triggerToast('Google Sign-In successful!', 'success');
         onClose();
       }
     } catch (e: any) {
-      clearTimeout(timeoutId);
       console.error("🚀 [FIREBASE GOOGLE AUTH FAILURE]", e);
       setLoading(false);
       setErrorMsg(e.message || 'Google Auth Failed');
