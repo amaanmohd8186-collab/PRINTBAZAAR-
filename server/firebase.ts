@@ -42,10 +42,6 @@ export function getFirebaseAdmin(): App {
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
   let rawPrivateKey = process.env.FIREBASE_PRIVATE_KEY;
 
-  if (projectId === 'thugs-of-sultan-3cb83') {
-    throw new Error("🔥 [FATAL] Application blocked: Server is still using 'thugs-of-sultan-3cb83'. You MUST update FIREBASE_PROJECT_ID in Settings > Secrets to the new 'fixble' project.");
-  }
-
   console.log(`[Firebase Startup Validation] Pre-init verification...`);
   console.log(`- FIREBASE_PROJECT_ID: ${projectId || 'MISSING'}`);
   console.log(`- FIREBASE_CLIENT_EMAIL: ${clientEmail || 'MISSING'}`);

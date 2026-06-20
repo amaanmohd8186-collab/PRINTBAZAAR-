@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ShieldAlert, CheckCircle2, AlertTriangle, TerminalSquare, X, Globe, ShieldCheck, Database, Key, Server, History } from 'lucide-react';
-import { auth, db, storage, safeFetch } from '../firebase';
+import { auth, db, safeFetch } from '../firebase';
 
 export const FirebaseDiagnosticsPanel = ({ onClose }: { onClose: () => void }) => {
   const [logs, setLogs] = useState<string[]>([]);
@@ -11,7 +11,6 @@ export const FirebaseDiagnosticsPanel = ({ onClose }: { onClose: () => void }) =
     apiKeyPresent: !!auth?.app?.options?.apiKey,
     currentUser: auth?.currentUser?.uid || 'None',
     firestoreStatus: 'Testing...',
-    storageConnected: !!storage,
     recaptchaReady: 'Unknown',
     authorizedDomain: 'Verifying...',
     healthScore: 'Pending',
@@ -21,29 +20,15 @@ export const FirebaseDiagnosticsPanel = ({ onClose }: { onClose: () => void }) =
 
   useEffect(() => {
     addLog("System Initialization Sequence: [Active]");
-    
-    const windowDiagnostics = (window as any).__FIREBASE_DIAGNOSTICS__;
-    if (windowDiagnostics) {
-      setDiagnostics(p => ({
-        ...p,
-        projectId: windowDiagnostics.projectId,
-        authDomain: windowDiagnostics.authDomain,
-        firestoreStatus: windowDiagnostics.firestoreConnected ? 'Connected' : 'Missing',
-        storageConnected: windowDiagnostics.storageConnected
-      }));
-      addLog(`Identity Path: ${windowDiagnostics.projectId}`);
-    } else {
-      addLog(`Identity Path: ${diagnostics.projectId}`);
-    }
+    addLog(`Identity Path: ${diagnostics.projectId}`);
     
     // Domain Check
     const currentHost = window.location.hostname;
-    // We treat the current host as verified if it matches authDomain, or if it's the known Vercel preview environments, or localhost
-    const isDomainMatch = !!diagnostics.authDomain?.includes(currentHost) || currentHost === 'localhost' || currentHost === '127.0.0.1' || currentHost.includes('.run.app');
+    const isDomainMatch = diagnostics.authDomain.includes(currentHost) || currentHost === 'localhost' || currentHost === '127.0.0.1';
     
     setDiagnostics(p => ({ 
       ...p, 
-      authorizedDomain: isDomainMatch ? `Verified (${currentHost})` : `Action Required: Add ${currentHost} to Firebase > Authentication > Settings > Authorized domains`
+      authorizedDomain: isDomainMatch ? `Verified (${currentHost})` : `Mismatch Alert: ${currentHost} not in ${diagnostics.authDomain}`
     }));
 
     // Check Recaptcha Ready (by checking script loading)
@@ -73,8 +58,7 @@ export const FirebaseDiagnosticsPanel = ({ onClose }: { onClose: () => void }) =
           setDiagnostics(p => ({ 
             ...p, 
             ...serverDiag,
-            // Only update DB status if it hasn't successfully been logged already
-            firestoreStatus: windowDiagnostics?.firestoreConnected ? 'Triple-Verified (R/W/D)' : (serverDiag?.db_ops?.write === 'PASS' ? 'Triple-Verified (R/W/D)' : 'Degraded'),
+            firestoreStatus: serverDiag?.db_ops?.write === 'PASS' ? 'Triple-Verified (R/W/D)' : 'Degraded',
             cashfree: { status: paymentHealth?.cashfreeConnected ? 'Connected' : 'Missing Keys' },
             email: { status: 'Unknown' }
           }));
@@ -88,12 +72,12 @@ export const FirebaseDiagnosticsPanel = ({ onClose }: { onClose: () => void }) =
     };
     
     runFullDiagnostics();
-  }, [diagnostics.authDomain, diagnostics.projectId]);
+  }, []);
 
   const getStatusColor = (val: any) => {
     const s = String(val).toLowerCase();
-    if (s.includes('pass') || s.includes('active') || s.includes('verified') || s === 'yes' || s.includes('connected') || s === 'true') return 'text-emerald-400';
-    if (s.includes('fail') || s.includes('missing') || s.includes('error') || s === 'no' || s.includes('mismatch') || s === 'false') return 'text-rose-400';
+    if (s.includes('pass') || s.includes('active') || s.includes('verified') || s === 'yes' || s.includes('connected')) return 'text-emerald-400';
+    if (s.includes('fail') || s.includes('missing') || s.includes('error') || s === 'no' || s.includes('mismatch')) return 'text-rose-400';
     return 'text-amber-400';
   };
 
@@ -115,7 +99,7 @@ export const FirebaseDiagnosticsPanel = ({ onClose }: { onClose: () => void }) =
               <TerminalSquare className="w-5 h-5 text-rose-500" />
             </div>
             <div>
-              <h2 className="text-sm font-black uppercase tracking-[0.2em] text-white">Startup Diagnostic Diagnostics</h2>
+              <h2 className="text-sm font-black uppercase tracking-[0.2em] text-white">Advanced System Diagnostics</h2>
               <div className="flex items-center gap-2 mt-1">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                 <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest leading-none">Status: Live Monitoring</span>
@@ -139,7 +123,7 @@ export const FirebaseDiagnosticsPanel = ({ onClose }: { onClose: () => void }) =
                   <div className="px-2 py-0.5 bg-zinc-900 rounded text-[10px] text-zinc-500">v4.2 PROD</div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {Object.entries(diagnostics).filter(([k]) => typeof diagnostics[k] !== 'object' && !['healthScore', 'recaptchaReady'].includes(k)).map(([k, v]) => (
+                  {Object.entries(diagnostics).filter(([k]) => typeof diagnostics[k] !== 'object').map(([k, v]) => (
                     <div key={k} className="group bg-zinc-950/50 p-4 rounded-3xl border border-zinc-900/50 hover:border-zinc-800 transition-all flex flex-col justify-between h-24">
                       <div className="flex items-center justify-between">
                         <span className="text-[9px] uppercase text-zinc-600 font-bold tracking-wider">{k.replace(/([A-Z])/g, ' $1')}</span>

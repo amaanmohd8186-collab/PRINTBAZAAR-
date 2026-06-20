@@ -1,7 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
 import { getMessaging, getToken, isSupported } from 'firebase/messaging';
 import baseConfig from '../firebase-applet-config.json';
 
@@ -15,11 +14,6 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID || baseConfig.appId,
   firestoreDatabaseId: import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || baseConfig.firestoreDatabaseId
 };
-
-// FAIL FAST: Ensure no trace of the old project exists
-if (Object.values(firebaseConfig).some(val => typeof val === 'string' && val.includes('thugs-of-sultan'))) {
-  throw new Error("🔥 [FATAL] Application blocked: Hardcoded 'thugs-of-sultan' reference detected in Firebase configuration! Please update to the Fixble project credentials.");
-}
 
 // --- STARTUP AUDIT ---
 const audit: any = {
@@ -48,7 +42,7 @@ if (audit.projectId && authDomainName && audit.projectId !== authDomainName) {
   console.warn(`⚠️ [FIREBASE AUDIT] Mismatch detected: projectId (${audit.projectId}) does not match authDomain prefix (${authDomainName}). This is a common cause of auth/invalid-credential.`);
 }
 
-const isDomainAuthPotentiallyMissing = !firebaseConfig.authDomain?.includes(audit.currentHost) && 
+const isDomainAuthPotentiallyMissing = !firebaseConfig.authDomain.includes(audit.currentHost) && 
                                        audit.currentHost !== 'localhost' && 
                                        !audit.currentHost.endsWith('.asia-southeast1.run.app');
 
@@ -71,7 +65,6 @@ console.log("==================================================");
 let initializedApp: any = null;
 let firestoreDb: any = null;
 let firebaseAuth: any = null;
-let firebaseStorage: any = null;
 
 try {
   if (firebaseConfig.apiKey && firebaseConfig.projectId) {
@@ -111,31 +104,15 @@ if (initializedApp) {
   } catch (e) {
     console.error("Firestore initialization failed completely.", e);
   }
-
-  // Isolate Storage initialization
-  try {
-    firebaseStorage = getStorage(initializedApp);
-    console.log("Storage Ready:   YES");
-  } catch (e) {
-    console.error("Firebase Storage initialization failed:", e);
-  }
 }
 
-// Expose diagnostic global variables for the startup UI overlay
 if (typeof window !== 'undefined') {
   (window as any).firebaseInitStatus = firestoreDb ? 'Success (Firestore Connected)' : 'Disconnected (Credentials Unloaded)';
-  (window as any).__FIREBASE_DIAGNOSTICS__ = {
-    projectId: firebaseConfig.projectId,
-    authDomain: firebaseConfig.authDomain,
-    firestoreConnected: !!firestoreDb,
-    storageConnected: !!firebaseStorage
-  };
 }
 
 export const app = initializedApp as any;
 export const db = firestoreDb as any;
 export const auth = firebaseAuth as any;
-export const storage = firebaseStorage as any;
 
 export async function getMessagingService() {
   try {
