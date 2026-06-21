@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Bell, BellRing, Check, AlertCircle, Sparkles, Radio, Trash2, Eye } from 'lucide-react';
-import { db, getMessagingService, getToken, isSupported } from '../firebase';
-import { doc, setDoc, updateDoc } from 'firebase/firestore';
+import { db, getMessagingService, getToken, isSupported, doc, setDoc, updateDoc } from '../firebase';
 
 interface PushNotificationManagerProps {
   userId: string | null;

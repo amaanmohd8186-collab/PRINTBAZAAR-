@@ -342,7 +342,7 @@ export default function CashfreeGateway({
             <button
               type="button"
               onClick={() => handlePay()}
-              className={`flex-1 py-3.5 rounded-2xl text-white text-xs font-heavy uppercase tracking-wider transition shadow-md flex items-center justify-center gap-1.5 ${hasKeys ? 'bg-black hover:bg-[#FF4D00]' : 'bg-amber-600 hover:bg-amber-700'}`}
+              className={`flex-1 py-3.5 rounded-2xl text-white text-xs font-extrabold uppercase tracking-wider transition shadow-md flex items-center justify-center gap-1.5 ${hasKeys ? 'bg-black hover:bg-[#FF4D00]' : 'bg-amber-600 hover:bg-amber-700'}`}
             >
               <span>{hasKeys ? 'Pay via Cashfree' : 'Simulate Payment'}</span>
             </button>

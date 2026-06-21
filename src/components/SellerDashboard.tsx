@@ -5,8 +5,7 @@ import {
   Plus, Check, X, CreditCard, ShieldAlert, CheckCircle, 
   AlertCircle, RefreshCw, Upload, Sparkles
 } from 'lucide-react';
-import { db, auth } from '../firebase';
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp, onSnapshot, collection, query, getDocs, where, addDoc, orderBy } from 'firebase/firestore';
+import { db, auth, doc, getDoc, setDoc, updateDoc, serverTimestamp, onSnapshot, collection, query, getDocs, where, addDoc, orderBy } from '../firebase';
 
 interface WithdrawalRequest {
   id: string;

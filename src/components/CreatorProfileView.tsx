@@ -17,8 +17,7 @@ import {
   Share2
 } from 'lucide-react';
 import { UserStats, UserSession, SocialPost, Achievement } from '../types';
-import { db } from '../firebase';
-import { collection, query, where, orderBy, onSnapshot, limit } from 'firebase/firestore';
+import { db, collection, query, where, orderBy, onSnapshot, limit } from '../firebase';
 
 interface CreatorProfileViewProps {
   stats: UserStats;

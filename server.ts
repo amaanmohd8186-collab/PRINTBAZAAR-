@@ -397,6 +397,16 @@ async function verifyAdmin(req: any, res: any, next: any) {
 export function createExpressApp() {
   const app = express();
 
+  // Vercel Serverless path adaptation: Ensure `/api` prefix matches of Express routes if stripped
+  app.use((req, res, next) => {
+    if (req.url && !req.url.startsWith('/api') && (req.url.startsWith('/cashfree') || req.url.startsWith('/user') || req.url.startsWith('/premium') || req.url.startsWith('/credits') || req.url.startsWith('/admin') || req.url.startsWith('/seller') || req.url.startsWith('/wallet') || req.url.startsWith('/emails') || req.url.startsWith('/quotes') || req.url.startsWith('/designs') || req.url.startsWith('/verification') || req.url.startsWith('/studio') || req.url.startsWith('/orders') || req.url.startsWith('/payment') || req.url.startsWith('/gemini'))) {
+      const original = req.url;
+      req.url = '/api' + (original.startsWith('/') ? original : '/' + original);
+      console.log(`[VERCEL ADAPTER] URL Normalized: "${original}" -> "${req.url}"`);
+    }
+    next();
+  });
+
   // Enable JSON request body parsing
   // Add raw body to requests for Cashfree webhook signature verification
   app.use(express.json({ 
@@ -406,7 +416,7 @@ export function createExpressApp() {
     }
   }));
 
-  // Environment Variable Check Middleware
+  // Environment Variable Check Middleware (Graceful warnings to allow simulation/sandbox features)
   app.use("/api", (req, res, next) => {
     const requiredEnvVars = [
       "FIREBASE_PROJECT_ID",
@@ -416,14 +426,9 @@ export function createExpressApp() {
       "CASHFREE_CLIENT_SECRET"
     ];
 
-    for (const envVar of requiredEnvVars) {
-      if (!process.env[envVar]) {
-        console.error(`Missing Environment Variable: ${envVar}`);
-        return res.status(500).json({
-          success: false,
-          error: "Missing environment variable"
-        });
-      }
+    const missing = requiredEnvVars.filter(envVar => !process.env[envVar]);
+    if (missing.length > 0) {
+      console.warn(`⚠️ [API Environment Support] Missing variables: ${missing.join(", ")}. Sandbox simulation and dynamic mock fallbacks are active.`);
     }
     next();
   });

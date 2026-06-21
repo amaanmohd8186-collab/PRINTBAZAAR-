@@ -6,9 +6,8 @@ import {
   Upload, CheckCircle2, AlertCircle
 } from 'lucide-react';
 import { SellerProfile } from '../types';
-import { db, auth } from '../firebase';
-import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { collection, doc, query, onSnapshot, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { db, auth, onAuthStateChanged, collection, doc, query, onSnapshot, setDoc, serverTimestamp, updateDoc } from '../firebase';
+type FirebaseUser = any;
 
 interface SellerVerificationSystemProps {
   isAdminMode: boolean;
@@ -761,8 +760,6 @@ export default function SellerVerificationSystem({ isAdminMode, onVerificationCo
                     onClick={async () => {
                       if (!db) return;
                       try {
-                        const { doc, setDoc } = await import('firebase/firestore');
-                        
                         // 1. Set status to Pending Review (No Auto-Approval)
                         const userRef = doc(db, 'users', currentUid);
                         await setDoc(userRef, {

@@ -37,8 +37,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { jsPDF } from 'jspdf';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db, safeFetch } from '../firebase';
+import { db, safeFetch, doc, updateDoc } from '../firebase';
 import confetti from 'canvas-confetti';
 import { ToolType, Design, UserStats } from '../types';
 
@@ -418,6 +417,9 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
   useEffect(() => {
     if (!canvasContainerRef.current) return;
 
+    let active = true;
+    let canvasInstance: any = null;
+
     // Clear previous runs
     canvasContainerRef.current.innerHTML = '';
 
@@ -427,11 +429,13 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
     canvasRef.current = el;
 
     try {
-      fabricCanvas.current = new fabric.Canvas(el, {
+      const c = new fabric.Canvas(el, {
         width: CANVAS_WIDTH,
         height: CANVAS_HEIGHT,
         backgroundColor: '#f8fafc',
       });
+      canvasInstance = c;
+      fabricCanvas.current = c;
       (window as any).canvasInitStatus = 'Success (FabricJS)';
     } catch (fabricErr) {
       console.warn("Fabric Canvas failed to initialize. Setting up active 2D Canvas Fallback.", fabricErr);
@@ -440,6 +444,7 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
       const mockCanvas: any = {
         _objects: [] as any[],
         _listeners: {} as Record<string, Function[]>,
+        backgroundColor: '#f8fafc',
         on: (ev: string, cb: any) => {
           if (!mockCanvas._listeners[ev]) mockCanvas._listeners[ev] = [];
           mockCanvas._listeners[ev].push(cb);
@@ -474,27 +479,46 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
           mockCanvas._objects = [];
           mockCanvas.renderAll();
         },
+        bringObjectToFront: (obj: any) => {
+          mockCanvas._objects = mockCanvas._objects.filter((o: any) => o !== obj);
+          mockCanvas._objects.push(obj);
+          mockCanvas.renderAll();
+        },
+        sendObjectToBack: (obj: any) => {
+          mockCanvas._objects = mockCanvas._objects.filter((o: any) => o !== obj);
+          mockCanvas._objects.unshift(obj);
+          mockCanvas.renderAll();
+        },
+        discardActiveObject: () => {},
+        toDataURL: (options?: any) => {
+          const cv = canvasRef.current;
+          if (cv) {
+            return cv.toDataURL(options?.format === 'jpg' || options?.format === 'jpeg' ? 'image/jpeg' : 'image/png', options?.quality || 0.85);
+          }
+          return '';
+        },
+        toSVG: () => '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><rect width="800" height="600" fill="#f8fafc"/></svg>',
         renderAll: () => {
           const canvas = canvasRef.current;
           if (!canvas) return;
           const ctx = canvas.getContext('2d');
           if (ctx) {
-            ctx.fillStyle = '#f8fafc';
+            ctx.fillStyle = mockCanvas.backgroundColor || '#f8fafc';
             ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
             mockCanvas._objects.forEach((obj: any) => {
               ctx.save();
               ctx.fillStyle = obj.fill || '#FF4D00';
               ctx.globalAlpha = obj.opacity !== undefined ? obj.opacity : 1;
               if (obj.type === 'rect' || obj.width) {
-                const l = obj.left || 0;
-                const t = obj.top || 0;
-                const w = obj.width || 120;
-                const h = obj.height || 120;
-                ctx.fillRect(l, t, w, h);
+                 const l = obj.left || 0;
+                 const t = obj.top || 0;
+                 const w = obj.width || 120;
+                 const h = obj.height || 120;
+                 ctx.fillRect(l, t, w, h);
               } else if (obj.text) {
-                ctx.fillStyle = obj.fill || '#000000';
-                ctx.font = `${obj.fontSize || 24}px ${obj.fontFamily || 'Inter'}`;
-                ctx.fillText(obj.text, obj.left || 50, obj.top || 100);
+                 ctx.fillStyle = obj.fill || '#000000';
+                 ctx.font = `${obj.fontSize || 24}px ${obj.fontFamily || 'Inter'}`;
+                 ctx.fillText(obj.text, obj.left || 50, obj.top || 100);
               }
               ctx.restore();
             });
@@ -505,15 +529,19 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
         dispose: () => {}
       };
 
+      canvasInstance = mockCanvas;
       fabricCanvas.current = mockCanvas;
 
       setTimeout(() => {
-        mockCanvas.renderAll();
+        if (active) {
+          mockCanvas.renderAll();
+        }
       }, 100);
     }
 
     // Object event listeners to update sliders
     const handleSelection = () => {
+      if (!active) return;
       const activeObj = fabricCanvas.current?.getActiveObject();
       if (!activeObj) {
         setSelectedObjType(null);
@@ -542,17 +570,21 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
       updateLayersList();
     });
     fabricCanvas.current.on('selection:cleared', () => {
+      if (!active) return;
       setSelectedObjType(null);
       updateLayersList();
     });
     fabricCanvas.current.on('object:modified', () => {
+      if (!active) return;
       handleSelection();
       pushToHistory();
     });
     fabricCanvas.current.on('object:added', () => {
+      if (!active) return;
       pushToHistory();
     });
     fabricCanvas.current.on('object:removed', () => {
+      if (!active) return;
       pushToHistory();
     });
 
@@ -563,11 +595,13 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
     if (saved) {
       isHistoryLoadingRef.current = true;
       fabricCanvas.current.loadFromJSON(saved).then(() => {
+        if (!active) return;
         fabricCanvas.current?.renderAll();
         isHistoryLoadingRef.current = false;
         pushToHistory();
         showStatus('success', 'Restored unsaved designer work progress.');
       }).catch(() => {
+        if (!active) return;
         setupWelcomeRect();
       });
     } else {
@@ -575,6 +609,7 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
     }
 
     function setupWelcomeRect() {
+      if (!active) return;
       if (!fabricCanvas.current) return;
       const welcomeRect = new fabric.Rect({
         left: 320,
@@ -593,21 +628,40 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
     }
 
     return () => {
-      if (fabricCanvas.current) {
-        const c = fabricCanvas.current;
-        fabricCanvas.current = null;
+      active = false;
+      fabricCanvas.current = null;
+      canvasRef.current = null;
+
+      if (canvasInstance) {
         try {
-          c.dispose().catch((err: any) => {
-            console.warn("Fabric async dispose exception (safely ignored during unmount):", err);
-          });
-        } catch (syncErr) {
-          console.warn("Fabric sync dispose exception:", syncErr);
+          const disposeResult = canvasInstance.dispose();
+          if (disposeResult && typeof disposeResult.then === 'function') {
+            disposeResult.then(() => {
+              if (canvasContainerRef.current) {
+                canvasContainerRef.current.innerHTML = '';
+              }
+            }).catch((err: any) => {
+              console.warn("Fabric async dispose failed:", err);
+              if (canvasContainerRef.current) {
+                canvasContainerRef.current.innerHTML = '';
+              }
+            });
+          } else {
+            if (canvasContainerRef.current) {
+              canvasContainerRef.current.innerHTML = '';
+            }
+          }
+        } catch (e) {
+          console.warn("Error throwing during Fabric dispose:", e);
+          if (canvasContainerRef.current) {
+            canvasContainerRef.current.innerHTML = '';
+          }
+        }
+      } else {
+        if (canvasContainerRef.current) {
+          canvasContainerRef.current.innerHTML = '';
         }
       }
-      if (canvasContainerRef.current) {
-        canvasContainerRef.current.innerHTML = '';
-      }
-      canvasRef.current = null;
     };
   }, []);
 

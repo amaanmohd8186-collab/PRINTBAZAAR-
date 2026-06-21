@@ -9,8 +9,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveCont
 import { parseISO, format } from 'date-fns';
 import { Order, Product, ProductCategory, OrderStatus, SizeOption, MaterialOption, QuantitySlab } from '../types';
 import { CATEGORIES, CATEGORY_DEFAULT_IMAGES } from '../data';
-import { getAuthHeaders, db } from '../firebase';
-import { collection, onSnapshot, query, setDoc, doc, updateDoc, increment, getDoc, runTransaction } from 'firebase/firestore';
+import { getAuthHeaders, db, collection, onSnapshot, query, setDoc, doc, updateDoc, increment, getDoc, runTransaction } from '../firebase';
 import SecureUploadSystem from './SecureUploadSystem';
 import DiagnosticsPanel from './DiagnosticsPanel';
 

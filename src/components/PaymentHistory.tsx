@@ -4,8 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { db } from '../firebase';
-import { collection, query, where, orderBy, limit, onSnapshot } from 'firebase/firestore';
+import { db, collection, query, where, orderBy, limit, onSnapshot } from '../firebase';
 import { 
   Loader2, 
   FileText, 

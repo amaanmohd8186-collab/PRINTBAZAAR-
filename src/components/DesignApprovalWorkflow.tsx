@@ -22,8 +22,7 @@ import {
   X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { doc, updateDoc, onSnapshot, getDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, doc, updateDoc, onSnapshot, getDoc } from '../firebase';
 import { Order, OrderStatus } from '../types';
 
 interface DesignPin {

@@ -17,9 +17,8 @@ import {
   Play
 } from 'lucide-react';
 import { SocialPost, ProductCategory } from '../types';
-import { db } from '../firebase';
+import { db, collection, query, orderBy, limit, onSnapshot, where } from '../firebase';
 import { DEMO_SOCIAL_POSTS } from '../data';
-import { collection, query, orderBy, limit, onSnapshot, where } from 'firebase/firestore';
 
 interface TrendingExplorerProps {
   onPostClick: (post: SocialPost) => void;

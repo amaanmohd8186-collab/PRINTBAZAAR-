@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
-import { db, auth } from "../firebase";
-import { onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
-import { doc, getDoc, onSnapshot } from "firebase/firestore";
+import { db, auth, onAuthStateChanged, doc, getDoc, onSnapshot } from "../firebase";
+type FirebaseUser = any;
 import {
   Upload,
   Wand2,

@@ -59,17 +59,12 @@ import {
   getLocalStorageData, 
   setLocalStorageData 
 } from './data';
-import { db, auth, safeFetch } from './firebase';
 import { 
+  db, 
+  auth, 
+  safeFetch,
   onAuthStateChanged, 
-  signInWithPopup, 
-  signInWithRedirect,
-  getRedirectResult,
-  GoogleAuthProvider, 
   signOut,
-  User as FirebaseUser
-} from 'firebase/auth';
-import { 
   collection, 
   doc, 
   getDoc, 
@@ -85,7 +80,8 @@ import {
   limit, 
   Timestamp,
   serverTimestamp
-} from 'firebase/firestore';
+} from './firebase';
+type FirebaseUser = any;
 import CustomizeModal from './components/CustomizeModal';
 import CartView from './components/CartView';
 import OrdersTracker from './components/OrdersTracker';
@@ -750,7 +746,7 @@ export default function App() {
   // Require Auth Action Wrapper
   const requireUserAuthAction = (action: () => void) => {
     if (!user) {
-      alert("Please Connect your Google Account or Sign In first to access this feature.");
+      alert("Please Sign In with your Gmail Account first to access this feature.");
       setCustomerActiveTab('profile'); // Send them to the profile screen showing sign in button
       return;
     }
@@ -930,112 +926,10 @@ export default function App() {
     performStartupHealthCheck();
   }, []);
 
-  // Handle Firebase Google Redirect Authentication Result for Mobile and WebViews
+  // Clean up legacy Google Auth redirect flags if present in client storage
   useEffect(() => {
-    if (!auth) return;
-
-    const handleRedirectResultCompletion = async () => {
-      const redirectInProgress = localStorage.getItem('firebase_auth_redirect_in_progress') === 'true';
-
-      try {
-        let result: any = null;
-
-        if (redirectInProgress) {
-          setStartupLogs(prev => [...prev, 'CHECKING SECURE GOOGLE REDIRECT AUTH COMPLETION...']);
-
-          // Timeout check to guarantee no hangs during loading
-          const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error("Google identity handshake timed out (15s limit).")), 15000)
-          );
-
-          result = await Promise.race([
-            getRedirectResult(auth),
-            timeoutPromise
-          ]);
-
-          localStorage.removeItem('firebase_auth_redirect_in_progress');
-        } else {
-          result = await getRedirectResult(auth).catch(() => null);
-        }
-
-        if (result && result.user) {
-          const firebaseUser = result.user;
-          const userEmail = firebaseUser.email || '';
-          setStartupLogs(prev => [...prev, `✓ REDIRECT AUTH COMPLETED SUCCESSFULLY FOR: ${userEmail}`]);
-          triggerToast(`Google Sign-In successful! Welcome back, ${firebaseUser.displayName || 'User'}`, 'success');
-
-          // SYNC USER DATA TO FIRESTORE AND REDIRECT TO DASHBOARD
-          if (db) {
-            const { doc, getDoc, setDoc, serverTimestamp } = await import('firebase/firestore');
-            const userRef = doc(db, 'users', firebaseUser.uid);
-            
-            // Look up existing role or seller status before replacing
-            const docSnap = await getDoc(userRef);
-            let isSeller = false;
-            let onboardingCompleted = false;
-            let finalRole = 'user';
-
-            if (docSnap.exists()) {
-              const data = docSnap.data();
-              isSeller = data.isSeller === true || data.role === 'seller';
-              onboardingCompleted = data.onboardingCompleted === true;
-              finalRole = data.role || 'user';
-            }
-
-            const isAdminEmail = [
-              'musagraphics75@gmail.com',
-              'gazisiddiqui01@gmail.com',
-              'amaanmohd8186@gmail.com'
-            ].includes(userEmail);
-            
-            if (isAdminEmail) {
-              finalRole = 'admin';
-            } else if (isSeller) {
-              finalRole = 'seller';
-            }
-
-            await setDoc(userRef, {
-              uid: firebaseUser.uid,
-              name: firebaseUser.displayName || userEmail.split('@')[0] || 'User',
-              email: userEmail,
-              photoURL: firebaseUser.photoURL || '',
-              role: finalRole,
-              createdAt: docSnap.exists() ? (docSnap.data().createdAt || serverTimestamp()) : serverTimestamp(),
-              lastLoginAt: serverTimestamp()
-            }, { merge: true });
-
-            // Automatically route of redirect user to appropriate portal
-            if (isSeller || onboardingCompleted) {
-              setEnterprisePortal('seller-dashboard');
-              setCustomerActiveTab('profile'); // Align main frame
-              triggerToast('Automatically redirected to Seller Dashboard', 'success');
-            } else {
-              setCustomerActiveTab('profile');
-              setEnterprisePortal('none');
-              triggerToast('Automatically redirected to Customer Profile', 'success');
-            }
-          } else {
-            setCustomerActiveTab('profile');
-          }
-        }
-      } catch (err: any) {
-        if (redirectInProgress) {
-          localStorage.removeItem('firebase_auth_redirect_in_progress');
-          console.error("🔥 [GOOGLE REDIRECT AUTH COMPLETION SYSTEM EXCEPTION]", err);
-          setStartupLogs(prev => [...prev, `⚠️ REDIRECT HANDSHAKE ENCOUNTERED ISSUES: ${err.message || err}`]);
-          
-          const isInIframe = window.self !== window.top;
-          if (isInIframe) {
-            triggerToast("Google Sign-In redirects are restricted inside preview frames. Please use 'Open in New Tab' at the top-right of your screen to complete sign-in.", "warn");
-          } else {
-            triggerToast(`Google Sign-In: ${err.message || err}`, 'warn');
-          }
-        }
-      }
-    };
-
-    handleRedirectResultCompletion();
-  }, [auth]);
+    localStorage.removeItem('firebase_auth_redirect_in_progress');
+  }, []);
 
   useEffect(() => {
     // Auth State Listener
@@ -1059,7 +953,6 @@ export default function App() {
         // SYNC USER DATA TO FIRESTORE
         try {
           if (db) {
-            const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
             const userRef = doc(db, 'users', firebaseUser.uid);
             await setDoc(userRef, {
               uid: firebaseUser.uid,

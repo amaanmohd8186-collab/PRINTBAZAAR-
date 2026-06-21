@@ -18,22 +18,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { SocialPost, SocialComment, UserSession } from '../types';
-import { db } from '../firebase';
-import { 
-  collection, 
-  query, 
-  orderBy, 
-  limit, 
-  onSnapshot, 
-  where, 
-  addDoc, 
-  serverTimestamp, 
-  increment,
-  updateDoc,
-  doc,
-  getDocs,
-  writeBatch
-} from 'firebase/firestore';
+import { db, collection, query, orderBy, limit, onSnapshot, where, addDoc, serverTimestamp, increment, updateDoc, doc, getDocs, writeBatch } from '../firebase';
 
 interface CommunityFeedProps {
   session: UserSession;
