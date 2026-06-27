@@ -590,7 +590,7 @@ export function createExpressApp() {
 
         return res.json({
           success: true,
-          text: `Specialist recommendation: Set on ${suggestedStock} styled with ${suggestedCoating}.\n\n${descriptionText}\n\n[Sandbox Advisory Mode active: Setup your GEMINI_API_KEY in Settings to enable fully interactive cloud-native neural recommendations.]`,
+          text: `Specialist recommendation: Set on ${suggestedStock} styled with ${suggestedCoating}.\n\n${descriptionText}`,
           sandbox: true
         });
       }

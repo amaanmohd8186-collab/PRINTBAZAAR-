@@ -149,12 +149,12 @@ export default function ProductPersonalization({ productName, category, onUpdate
             <Sliders className="w-5 h-5" />
           </div>
           <div>
-            <h4 className="text-base font-black uppercase tracking-tight">Dynamic CMYK pre-press Customizer</h4>
-            <p className="text-[10px] text-zinc-400 font-mono">Live 50:50 print preview. Adjust coordinates, font sizes, and corporate assets.</p>
+            <h4 className="text-base font-black uppercase tracking-tight">Product Personalization</h4>
+            <p className="text-[10px] text-zinc-400 font-mono">Live preview. Adjust text, fonts, and branding assets.</p>
           </div>
         </div>
         <div className="p-1 px-3 bg-zinc-900 text-xs text-zinc-400 rounded-full font-mono border border-zinc-800">
-          Target Category: {category}
+          Category: {category}
         </div>
       </div>
 
@@ -172,7 +172,7 @@ export default function ProductPersonalization({ productName, category, onUpdate
             
             <div className="absolute top-6 right-6 bg-emerald-500 text-black text-[8px] font-mono font-black uppercase px-2 py-0.5 rounded-full flex items-center gap-1">
               <ZoomIn className="w-3 h-3" />
-              <span>HQ PRINT SAFE</span>
+              <span>PREMIUM QUALITY</span>
             </div>
           </div>
 

@@ -78,7 +78,7 @@ export default function MobileDebugPanel() {
       const res = await fetch('/api/payment/health');
       if (res.ok) {
         const json = await res.json();
-        setApiStatus(json.credentialsLoaded ? 'Online (Pro Gateway)' : 'Online (Sandbox Enabled)');
+        setApiStatus(json.credentialsLoaded ? 'Online (Pro Gateway)' : 'Online (Standard Protocol)');
       } else {
         setApiStatus(`HTTP Error ${res.status}`);
       }

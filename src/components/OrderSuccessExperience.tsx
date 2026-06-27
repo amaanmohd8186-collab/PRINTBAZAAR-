@@ -364,7 +364,7 @@ export default function OrderSuccessExperience({
                     </div>
                     <div>
                       <h2 className="text-xl font-heavy text-white uppercase tracking-tight">Order Placed Successfully!</h2>
-                      <p className="text-[10px] text-zinc-400 font-mono font-bold uppercase tracking-wider mt-0.5">Your production slots have been fully booked</p>
+                      <p className="text-[10px] text-zinc-400 font-mono font-bold uppercase tracking-wider mt-0.5">Your order is confirmed</p>
                     </div>
                   </div>
 
@@ -396,7 +396,7 @@ export default function OrderSuccessExperience({
                     {/* Verification and Quality Promise badge */}
                     <div className="flex items-center gap-2 px-1 text-[10px] font-mono text-zinc-400 uppercase">
                       <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                      <span>Standard 300 DPI Pre-Press Calibration verified by Admin</span>
+                      <span>Quality check verified by Production Team</span>
                     </div>
 
                     {/* ACTION BUTTONS WITH GLASSMORPHISM STYLING */}

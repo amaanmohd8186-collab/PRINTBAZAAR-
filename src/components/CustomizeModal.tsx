@@ -11,6 +11,8 @@ import { calculateItemPrice, CATEGORY_DEFAULT_IMAGES } from '../data';
 import ProductPersonalization from './ProductPersonalization';
 import ShippingCheckCard from './ShippingCheckCard';
 import PrintQualityAuditor from './PrintQualityAuditor';
+import MockupEngine from './MockupEngine';
+import ShippingEstimator from './ShippingEstimator';
 
 interface CustomizeModalProps {
   product: Product;
@@ -98,11 +100,11 @@ export default function CustomizeModal({
       if (data.success && data.text) {
         setAiResponse(data.text);
       } else {
-        setAiResponse(data.error || 'Failed to retrieve advice. Please try again or verify your settings.');
+        setAiResponse(data.error || 'Failed to retrieve advice. Please try again.');
       }
     } catch (err: any) {
-      console.error("Gemini advice request error:", err);
-      setAiResponse(`Advisory Error: ${err.message || 'Unable to reach Gemini print advisory desk.'}`);
+      console.error("Design advice request error:", err);
+      setAiResponse(`Error: ${err.message || 'Unable to reach design advisory desk.'}`);
     } finally {
       setIsGeneratingAi(false);
     }
@@ -551,7 +553,9 @@ export default function CustomizeModal({
               </div>
             ) : (
               <div className="rounded-[24px] overflow-hidden border border-slate-800 shadow-lg aspect-4/3 relative bg-slate-900 group">
-                {product.video ? (
+                {designFile ? (
+                  <MockupEngine designUrl={designFile.fileData} category={product.category} />
+                ) : product.video ? (
                   <video 
                     src={product.video} 
                     autoPlay
@@ -572,7 +576,7 @@ export default function CustomizeModal({
                     }}
                   />
                 )}
-                {product.video && (
+                {product.video && !designFile && (
                   <span className="absolute bottom-4 left-4 bg-black/80 backdrop-blur-md text-white font-micro px-3 py-1.5 rounded-full shadow-sm z-10 pointer-events-none flex items-center gap-1">
                     ▶ MEDIA PLAYING
                   </span>
@@ -921,21 +925,21 @@ export default function CustomizeModal({
             />
 
             {/* 4.6. SHIPROCKET SERVICEABILITY CHECKER */}
-            <ShippingCheckCard />
+            <ShippingEstimator />
 
             {/* 5. GEMINI AI PRINT SPECIALIST ASSISTANT */}
             <div className="bg-gradient-to-br from-neutral-900 to-neutral-950 p-6 rounded-[32px] text-white border border-white/5 space-y-4 shadow-xl">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                   <Sparkles className="w-4 h-4 text-[#FF4D00] animate-pulse" />
-                  <span className="text-[10px] font-black uppercase tracking-widest text-[#FF4D00] font-mono">Gemini Press Advisor</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-[#FF4D00] font-mono">Design Assistant</span>
                 </div>
-                <span className="text-[9px] uppercase font-bold text-neutral-400 font-mono">AI Creative Companion</span>
+                <span className="text-[9px] uppercase font-bold text-neutral-400 font-mono">Creative Companion</span>
               </div>
 
               <div className="space-y-2">
                 <p className="text-[11px] text-neutral-300 leading-normal text-left">
-                  Type a prompt to ask Gemini for advice on paper stocks, creative layouts, laminations, or print coating suggestions tailored specifically for this luxury catalog item!
+                  Ask our design assistant for advice on paper stocks, layouts, or finishing tailored specifically for this item!
                 </p>
                 <div className="flex gap-2">
                   <input
@@ -1048,7 +1052,7 @@ export default function CustomizeModal({
 
             {/* Shiprocket Phase 1 Integration: Serviceability Check */}
             <div className="pt-2">
-               <ShippingCheckCard settings={settings} />
+               <ShippingEstimator />
             </div>
 
             {/* CTA action buttons */}

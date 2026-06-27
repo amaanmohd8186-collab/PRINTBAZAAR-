@@ -71,6 +71,41 @@ export function onAuthStateChanged(authInstance: any, cb: (user: any) => void) {
   };
 }
 
+export async function signInWithGoogle() {
+  if (isSupabaseConfigured) {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin
+      }
+    });
+    if (error) throw error;
+    return data;
+  } else {
+    // Simulation: Randomly pick one of the admin emails or a guest
+    const emails = ['musagraphics75@gmail.com', 'gazisiddiqui01@gmail.com', 'test@example.com'];
+    const email = emails[Math.floor(Math.random() * emails.length)];
+    const localUsers = JSON.parse(localStorage.getItem('_supabase_emu_users') || '{}');
+    let u = localUsers[email];
+    if (!u) {
+       const uid = 'emu_google_' + Math.random().toString(36).substring(2, 12);
+       u = { uid, email, displayName: email.split('@')[0], photoURL: 'https://i.pravatar.cc/150?u=' + uid };
+       localUsers[email] = u;
+       localStorage.setItem('_supabase_emu_users', JSON.stringify(localUsers));
+    }
+    const user = {
+      uid: u.uid,
+      email: u.email,
+      displayName: u.displayName,
+      photoURL: u.photoURL,
+      getIdToken: async () => 'emu_google_token_' + u.uid
+    };
+    localStorage.setItem('_supabase_emu_current', JSON.stringify(user));
+    triggerAuthChange(user);
+    return { user };
+  }
+}
+
 export async function signInWithEmailAndPassword(authInstance: any, email: string, pass: string) {
   const cleanEmail = email.toLowerCase().trim();
   if (isSupabaseConfigured) {

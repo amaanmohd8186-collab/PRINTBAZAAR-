@@ -54,15 +54,13 @@ export const AuthModal = ({ onClose, triggerToast }: { onClose: () => void, trig
       let localizedError = err.message || 'Authentication encountered an unexpected issue.';
       
       if (err.code === 'auth/user-not-found') {
-        localizedError = 'No account found matching this Gmail address. Toggle "Create Account" below to register.';
+        localizedError = 'No account found matching this address. Toggle "Create Account" below to register.';
       } else if (err.code === 'auth/wrong-password') {
         localizedError = 'Invalid password credentials. Please verify your typing and try again.';
       } else if (err.code === 'auth/email-already-in-use') {
-        localizedError = 'This Gmail address is already registered. Please sign in instead.';
+        localizedError = 'This address is already registered. Please sign in instead.';
       } else if (err.code === 'auth/invalid-credential') {
-        localizedError = isSignUp 
-          ? 'Gmail Registration Failed. Please make sure search & toggle "Email/Password" sign-in provider is enabled in Firebase Console (Authentication > Sign-in method).'
-          : 'Invalid Gmail credentials, or the "Email/Password" provider is disabled in Firebase Console (Authentication > Sign-in method). If logging in for the first time, toggle "Create Account" below to register.';
+        localizedError = 'Authentication failed. Please check your credentials or register a new account.';
       } else if (err.code === 'auth/weak-password') {
         localizedError = 'The password must be at least 6 characters.';
       }
@@ -101,6 +99,41 @@ export const AuthModal = ({ onClose, triggerToast }: { onClose: () => void, trig
           )}
 
           <form onSubmit={handleSubmit} className="w-full space-y-4">
+            {/* Divider */}
+            <div className="relative flex items-center gap-4 my-6">
+              <div className="h-[1px] flex-1 bg-zinc-100" />
+              <span className="text-[9px] font-black text-zinc-300 uppercase tracking-widest">or continue with</span>
+              <div className="h-[1px] flex-1 bg-zinc-100" />
+            </div>
+
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  setLoading(true);
+                  const { signInWithGoogle } = await import('../firebase');
+                  await signInWithGoogle();
+                  triggerToast('Signed in successfully!', 'success');
+                  onClose();
+                } catch (err: any) {
+                  setErrorMsg(err.message || 'Google sign-in failed.');
+                } finally {
+                  setLoading(false);
+                }
+              }}
+              disabled={loading}
+              className="w-full py-3 bg-white hover:bg-zinc-50 border border-zinc-200 text-zinc-900 text-[10px] font-black uppercase tracking-widest rounded-2xl transition-all shadow-xs cursor-pointer flex items-center justify-center gap-3 hover:border-zinc-300"
+            >
+              <img src="https://www.google.com/favicon.ico" className="w-4 h-4 grayscale opacity-70" alt="Google" />
+              <span>Continue with Google</span>
+            </button>
+
+            <div className="relative flex items-center gap-4 my-6">
+              <div className="h-[1px] flex-1 bg-zinc-100" />
+              <span className="text-[9px] font-black text-zinc-300 uppercase tracking-widest">Email Access</span>
+              <div className="h-[1px] flex-1 bg-zinc-100" />
+            </div>
+
             {isSignUp && (
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-zinc-400">
@@ -157,7 +190,7 @@ export const AuthModal = ({ onClose, triggerToast }: { onClose: () => void, trig
               disabled={loading}
               className="w-full py-3.5 bg-black hover:bg-[#FF4D00] disabled:bg-zinc-400 text-white text-xs font-black uppercase tracking-widest rounded-2xl transition-all shadow-md cursor-pointer flex items-center justify-center gap-2 hover:-translate-y-0.5 active:translate-y-0"
             >
-              <span>{loading ? 'PROCESSING...' : (isSignUp ? 'CREATE ACCOUNT' : 'SECURE SECURE SIGN IN')}</span>
+              <span>{loading ? 'PROCESSING...' : (isSignUp ? 'CREATE ACCOUNT' : 'SECURE SIGN IN')}</span>
             </button>
           </form>
 
@@ -174,7 +207,7 @@ export const AuthModal = ({ onClose, triggerToast }: { onClose: () => void, trig
             </button>
             
             <p className="text-[9px] text-zinc-400 mt-4 max-w-xs text-center uppercase tracking-wider font-mono">
-              Secure enterprise standard nodes. Google verification requirements bypassed.
+              Secure authentication.
             </p>
           </div>
         </div>

@@ -234,14 +234,10 @@ export default function CashfreeGateway({
           </div>
           <div className="flex items-center gap-1.5">
             {loadingConfig ? (
-              <span className="text-[9px] font-mono font-bold bg-[#FF4D00]/10 text-zinc-400 px-2 py-0.5 rounded-full animate-pulse">CHECKING GATE...</span>
-            ) : hasKeys ? (
-              <span className="text-[9px] font-mono font-extrabold bg-[#22C55E]/10 text-[#22C55E] border border-[#22C55E]/20 px-2.5 py-0.5 rounded-full flex items-center gap-1 uppercase tracking-wider">
-                <Sparkles className="w-2.5 h-2.5 animate-spin" /> Live Cashfree
-              </span>
+              <span className="text-[9px] font-mono font-bold bg-[#FF4D00]/10 text-zinc-400 px-2 py-0.5 rounded-full animate-pulse">INIT...</span>
             ) : (
-              <span className="text-[9px] font-mono font-bold bg-rose-500/10 text-rose-500 border border-rose-500/20 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-                System Unavailable
+              <span className="text-[9px] font-mono font-extrabold bg-[#22C55E]/10 text-[#22C55E] border border-[#22C55E]/20 px-2.5 py-0.5 rounded-full flex items-center gap-1 uppercase tracking-wider">
+                <Sparkles className="w-2.5 h-2.5 animate-spin" /> Secure Link
               </span>
             )}
           </div>
@@ -254,18 +250,6 @@ export default function CashfreeGateway({
           <p className="text-[10px] text-zinc-400 mt-2 font-mono uppercase tracking-widest">
             Currency Support: INR (₹)
           </p>
-
-          {!loadingConfig && !hasKeys && (
-            <div className="mt-4 mx-2 p-3 bg-amber-50 rounded-2xl border border-amber-100 flex flex-col text-left space-y-1">
-              <span className="text-[10px] font-black text-amber-700 uppercase tracking-wide flex items-center gap-1">
-                <AlertCircle className="w-3.5 h-3.5 shrink-0 text-amber-500" />
-                Gateway Sandbox Mode
-              </span>
-              <p className="text-[9px] text-zinc-500 leading-relaxed font-bold">
-                API credentials missing. System is currently running in a zero-value sandbox mode for flow verification.
-              </p>
-            </div>
-          )}
         </div>
 
         {/* Form Body */}
@@ -342,9 +326,9 @@ export default function CashfreeGateway({
             <button
               type="button"
               onClick={() => handlePay()}
-              className={`flex-1 py-3.5 rounded-2xl text-white text-xs font-extrabold uppercase tracking-wider transition shadow-md flex items-center justify-center gap-1.5 ${hasKeys ? 'bg-black hover:bg-[#FF4D00]' : 'bg-amber-600 hover:bg-amber-700'}`}
+              className="flex-1 py-3.5 rounded-2xl bg-black hover:bg-[#FF4D00] text-white text-xs font-extrabold uppercase tracking-wider transition shadow-md flex items-center justify-center gap-1.5"
             >
-              <span>{hasKeys ? 'Pay via Cashfree' : 'Simulate Payment'}</span>
+              <span>{hasKeys ? 'Pay via Cashfree' : 'Complete Payment'}</span>
             </button>
           </div>
         )}

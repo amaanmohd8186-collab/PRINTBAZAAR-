@@ -27,11 +27,11 @@ export default function PrintQualityAuditor({ imageUrl, onAuditComplete }: Print
 
   const performAudit = async (url: string) => {
     setAuditing(true);
-    // Simulate complex AI analysis
-    await new Promise(resolve => setTimeout(resolve, 1800));
+    // Simulate complex AI analysis across multiple layers
+    await new Promise(resolve => setTimeout(resolve, 2400));
 
     const mockAudit: ArtworkAudit = {
-      qualityScore: 85 + Math.floor(Math.random() * 10),
+      qualityScore: 92,
       dpi: 300,
       colorSpace: 'CMYK',
       bleedCheck: 'Passed',
@@ -40,12 +40,26 @@ export default function PrintQualityAuditor({ imageUrl, onAuditComplete }: Print
       warnings: []
     };
 
-    // Randomize some warnings for realism
-    if (Math.random() > 0.7) {
-      mockAudit.qualityScore -= 15;
-      mockAudit.safeMarginCheck = 'Warning';
-      mockAudit.warnings.push('Text is too close to the trim edge.');
-    }
+    // Advanced Checks Simulation
+    const checks = [
+      { condition: Math.random() > 0.8, warning: 'Font Missing: "Inter Black" not outlined. Might shift in production.', score: -10 },
+      { condition: Math.random() > 0.9, warning: 'Low-res Image detected in layout (Under 150 DPI).', score: -15 },
+      { condition: Math.random() > 0.85, warning: 'Transparency effects found. Flattening recommended for offset.', score: -5 },
+      { condition: Math.random() > 0.95, warning: 'Overprint settings detected on black text. Verify intent.', score: -2 },
+      { condition: Math.random() > 0.8, warning: 'Safe margin violation on left edge. Content might get clipped.', score: -12, margin: 'Warning' as const },
+      { condition: Math.random() > 0.9, warning: 'No Bleed detected. White borders possible after cutting.', score: -8, bleed: 'Warning' as const }
+    ];
+
+    checks.forEach(check => {
+      if (check.condition) {
+        mockAudit.warnings.push(check.warning);
+        mockAudit.qualityScore += check.score;
+        if (check.margin) mockAudit.safeMarginCheck = check.margin;
+        if (check.bleed) mockAudit.bleedCheck = check.bleed;
+      }
+    });
+
+    if (mockAudit.qualityScore < 0) mockAudit.qualityScore = 5;
 
     setAudit(mockAudit);
     setAuditing(false);
@@ -60,7 +74,7 @@ export default function PrintQualityAuditor({ imageUrl, onAuditComplete }: Print
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-5 h-5 text-emerald-500" />
-            <h4 className="text-[11px] font-black uppercase tracking-widest text-zinc-900">AI Print Production Audit</h4>
+            <h4 className="text-[11px] font-black uppercase tracking-widest text-zinc-900">Artwork Verification</h4>
           </div>
           {auditing && <Zap className="w-4 h-4 text-[#FF4D00] animate-pulse" />}
         </div>
@@ -77,7 +91,7 @@ export default function PrintQualityAuditor({ imageUrl, onAuditComplete }: Print
                 <div className="w-16 h-16 border-4 border-zinc-100 rounded-full" />
                 <div className="absolute inset-0 border-4 border-[#FF4D00] border-t-transparent rounded-full animate-spin" />
               </div>
-              <p className="text-[9px] font-black uppercase tracking-[0.3em] text-zinc-400 animate-pulse">Scanning Pixels & Vectors...</p>
+              <p className="text-[9px] font-black uppercase tracking-[0.3em] text-zinc-400 animate-pulse">Analyzing Artwork...</p>
             </motion.div>
           ) : audit ? (
             <motion.div
@@ -122,7 +136,7 @@ export default function PrintQualityAuditor({ imageUrl, onAuditComplete }: Print
                     <span className="text-[8px] font-black uppercase tracking-wider">Color Profile</span>
                   </div>
                   <p className="text-[10px] font-bold text-zinc-900">{audit.colorSpace} Detected</p>
-                  <p className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest">Printer Native Ready</p>
+                  <p className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest">Ready for Production</p>
                 </div>
               </div>
 

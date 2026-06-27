@@ -580,6 +580,48 @@ export interface UserStats extends UserStatsBase {
   };
 }
 
+export interface AppNotification {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  type: 'order' | 'promo' | 'system' | 'artwork';
+  isRead: boolean;
+  actionUrl?: string;
+  createdAt: string;
+}
+
+export interface SupportTicket {
+  id: string;
+  userId: string;
+  subject: string;
+  category: 'Order Issue' | 'Technical' | 'Payment' | 'Design Help' | 'Feedback' | 'General';
+  status: 'Open' | 'In Progress' | 'Resolved' | 'Closed';
+  priority: 'Low' | 'Medium' | 'High' | 'Urgent';
+  messages: {
+    sender: 'user' | 'agent';
+    text: string;
+    timestamp: string;
+    attachments?: string[];
+  }[];
+  orderId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Coupon {
+  id: string;
+  code: string;
+  discountType: 'percentage' | 'fixed';
+  discountValue: number;
+  minOrderAmount: number;
+  maxDiscount?: number;
+  expiryDate: string;
+  usageLimit?: number;
+  usedCount: number;
+  description: string;
+}
+
 export interface Achievement {
   id: string;
   title: string;
