@@ -6,20 +6,24 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Upload, CheckCircle2, AlertCircle, Sparkles, HelpCircle, FileText, Loader2, Share2, Download, Layers } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Product, SizeOption, MaterialOption, CartItem, CustomFile } from '../types';
+import { Product, SizeOption, MaterialOption, CartItem, CustomFile, ArtworkAudit } from '../types';
 import { calculateItemPrice, CATEGORY_DEFAULT_IMAGES } from '../data';
 import ProductPersonalization from './ProductPersonalization';
+import ShippingCheckCard from './ShippingCheckCard';
+import PrintQualityAuditor from './PrintQualityAuditor';
 
 interface CustomizeModalProps {
   product: Product;
   onClose: () => void;
   onAddToCart: (item: CartItem) => void;
+  settings?: any;
 }
 
 export default function CustomizeModal({
   product,
   onClose,
-  onAddToCart
+  onAddToCart,
+  settings
 }: CustomizeModalProps) {
   const allImages = [
     product.image || CATEGORY_DEFAULT_IMAGES[product.category] || CATEGORY_DEFAULT_IMAGES['Business Cards'],
@@ -212,6 +216,7 @@ export default function CustomizeModal({
   const [printWarnings, setPrintWarnings] = useState<string[]>([]);
   const [activeAITool, setActiveAITool] = useState<string | null>(null);
   const [isProofApproved, setIsProofApproved] = useState<boolean>(false);
+  const [artworkAudit, setArtworkAudit] = useState<ArtworkAudit | null>(null);
 
   const applyAITool = (toolName: string) => {
     setActiveAITool(toolName);
@@ -416,7 +421,9 @@ export default function CustomizeModal({
       itemTotal: finalPrice,
       advanceAmount: finalPrice,
       balanceAmount: 0,
-      productImage: product.image
+      productImage: product.image,
+      // @ts-ignore - added to custom logic
+      artworkAudit: artworkAudit || undefined
     };
 
     onAddToCart(cartItem);
@@ -792,105 +799,55 @@ export default function CustomizeModal({
               </div>
             </div>
 
-            {/* 4. DESIGN FILE UPLOADER (PDF, PNG, JPG, AI formats up to 50MB) */}
+            {/* 4. DESIGN FILE UPLOADER */}
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-micro text-gray-500 block">4. Upload Print-Ready Design File</span>
-                <span className="text-[10px] uppercase font-bold text-[#FF4D00] font-mono">Max: 50MB (.AI .PDF .PNG .JPG)</span>
-              </div>
+               <div className="flex items-center justify-between mb-2">
+                 <span className="font-micro text-gray-500 block">4. Upload & Audit Production File</span>
+                 <span className="text-[10px] uppercase font-bold text-[#FF4D00] font-mono">Max: 50MB (.AI .PDF .PNG .JPG)</span>
+               </div>
+               
+               <div
+                 onDragOver={handleDragOver}
+                 onDragLeave={handleDragLeave}
+                 onDrop={handleDrop}
+                 onClick={() => fileInputRef.current?.click()}
+                 className={`border-2 border-dashed rounded-[24px] p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center ${
+                   isDragging ? 'border-[#FF4D00] bg-[#fff5f0]' : designFile ? 'border-emerald-500 bg-emerald-50/10' : 'border-zinc-200 hover:bg-zinc-50'
+                 }`}
+               >
+                 <input type="file" ref={fileInputRef as any} onChange={handleFileSelect} accept=".ai,.pdf,.png,.jpg,.jpeg" multiple className="hidden" />
+                 
+                 {uploadProgress !== null ? (
+                   <div className="space-y-2 py-2">
+                     <Loader2 className="w-8 h-8 text-[#FF4D00] animate-spin mx-auto" />
+                     <p className="text-xs font-black text-zinc-700 font-mono text-center">PROCESSING: {uploadProgress}%</p>
+                   </div>
+                 ) : designFile ? (
+                   <div className="flex items-center gap-3 bg-zinc-50/50 p-3 rounded-2xl border border-zinc-150/60 w-full">
+                     <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                       {designFile.fileData ? <img src={designFile.fileData} className="w-full h-full object-cover rounded-xl" /> : <FileText />}
+                     </div>
+                     <div className="flex-1 min-w-0">
+                       <p className="text-[10px] font-black text-zinc-800 truncate uppercase">{designFile.name}</p>
+                       <p className="text-[8px] text-zinc-400 font-bold">READY FOR PRODUCTION AUDIT</p>
+                     </div>
+                   </div>
+                 ) : (
+                   <div className="space-y-2 py-2">
+                     <Upload className="w-8 h-8 text-zinc-400 mx-auto" />
+                     <p className="text-[10px] font-black uppercase text-zinc-500">Click or Drag Design Assets</p>
+                   </div>
+                 )}
+               </div>
+            </div>
 
-              {/* Drag Area */}
-              <div
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
-                className={`border-2 border-dashed rounded-[24px] p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center ${
-                  isDragging
-                    ? 'border-[#FF4D00] bg-[#fff5f0]'
-                    : designFile
-                    ? 'border-emerald-500 bg-emerald-50/10'
-                    : 'border-zinc-200 hover:bg-zinc-50'
-                }`}
-              >
-                <input
-                  type="file"
-                  ref={fileInputRef as any}
-                  onChange={handleFileSelect}
-                  accept=".ai,.pdf,.png,.jpg,.jpeg"
-                  multiple
-                  className="hidden"
-                />
-
-                {uploadProgress !== null ? (
-                  <div className="space-y-2 py-2">
-                    <Loader2 className="w-8 h-8 text-[#FF4D00] animate-spin mx-auto" />
-                    <p className="text-xs font-black text-zinc-700 font-mono text-center">PROCESSING FILES: {uploadProgress}%</p>
-                    <div className="w-48 h-1.5 bg-zinc-100 rounded-full overflow-hidden mx-auto">
-                      <div className="bg-[#FF4D00] h-full transition-all duration-155" style={{ width: `${uploadProgress}%` }} />
-                    </div>
-                  </div>
-                ) : designFile ? (
-                  <div className="space-y-3.5 w-full text-left py-1">
-                    {/* Primary File details */}
-                    <div className="flex items-center gap-3 bg-zinc-50/50 p-2.5 rounded-2xl border border-zinc-150/60 w-full">
-                      <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-200 shadow-3xs">
-                        {designFile.fileData ? (
-                          <img src={designFile.fileData} alt="Preview" className="w-full h-full object-cover rounded-xl" />
-                        ) : (
-                          <FileText className="w-5 h-5 text-emerald-500" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0 space-y-0.5">
-                        <p className="text-[11px] font-extrabold text-zinc-805 truncate font-mono uppercase tracking-wide">
-                          PRIMARY: {designFile.name}
-                        </p>
-                        <p className="text-[9px] text-zinc-450 font-mono font-bold">
-                          {(designFile.size / (1024 * 1024)).toFixed(2)} MB • MAIN ASSEMBLY FILE
-                        </p>
-                      </div>
-                      <span className="text-[9px] font-black bg-emerald-50 text-emerald-600 border border-emerald-150 px-2.5 py-0.5 rounded-full uppercase shrink-0">
-                        Primary OK
-                      </span>
-                    </div>
-
-                    {/* Variations list */}
-                    {designFile.variations && designFile.variations.length > 0 && (
-                      <div className="space-y-2 pl-3 border-l-2 border-dashed border-[#FF4D00]/30 mt-2">
-                        <p className="text-[9px] font-black text-[#FF4D00] tracking-widest uppercase font-mono mb-1.5 flex items-center gap-1">
-                          <Layers className="w-3 h-3 animate-pulse" />
-                          Design Variations Added ({designFile.variations.length})
-                        </p>
-                        <div className="grid grid-cols-1 gap-1.5 max-h-[140px] overflow-y-auto pr-1">
-                          {designFile.variations.map((v: any, idx: number) => (
-                            <div key={idx} className="flex items-center gap-2.5 bg-white p-2 rounded-xl border border-zinc-150/80 shadow-3xs" onClick={(e) => e.stopPropagation()}>
-                              <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 border border-indigo-100">
-                                {v.fileData ? (
-                                  <img src={v.fileData} alt="" className="w-full h-full object-cover rounded-lg" />
-                                ) : (
-                                  <FileText className="w-4 h-4 text-indigo-500" />
-                                )}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-[10px] font-bold text-zinc-700 truncate font-mono">Var #{idx+1}: {v.name}</p>
-                               <p className="text-[9px] text-zinc-400 font-mono uppercase font-semibold">{(v.size / (1024 * 1024)).toFixed(2)} MB • Batch asset</p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="space-y-2 py-3">
-                    <Upload className="w-8 h-8 text-zinc-450 mx-auto" />
-                    <div>
-                      <p className="text-xs font-heavy uppercase tracking-tight text-slate-800">Drag & drop design file here, or click to browse</p>
-                      <p className="text-[10px] text-zinc-400 mt-1 uppercase">Please ensure bleed guidelines are followed for best print result</p>
-                    </div>
-                  </div>
-                )}
-              </div>
+            {/* AI Print Production Auditor */}
+            {designFile && (
+              <PrintQualityAuditor 
+                imageUrl={designFile.fileData} 
+                onAuditComplete={setArtworkAudit} 
+              />
+            )}
 
               {fileError && (
                 <div className="mt-2.5 p-3 rounded-2xl bg-rose-50 text-rose-700 border border-rose-100 text-[10px] font-bold uppercase flex items-center gap-1.5 leading-snug">
@@ -956,13 +913,15 @@ export default function CustomizeModal({
                   )}
                 </div>
               )}
-            </div>
 
             {/* 4.5. PRE-PRESS INTERACTIVE CUSTOMIZER */}
             <ProductPersonalization 
               productName={product.name} 
               category={product.category} 
             />
+
+            {/* 4.6. SHIPROCKET SERVICEABILITY CHECKER */}
+            <ShippingCheckCard />
 
             {/* 5. GEMINI AI PRINT SPECIALIST ASSISTANT */}
             <div className="bg-gradient-to-br from-neutral-900 to-neutral-950 p-6 rounded-[32px] text-white border border-white/5 space-y-4 shadow-xl">
@@ -1066,14 +1025,18 @@ export default function CustomizeModal({
             <div className="bg-white rounded-[28px] p-5 border border-gray-150 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
               
               <div className="space-y-1">
-                <span className="font-micro text-gray-400 block">Dynamic Valuation</span>
                 <div className="flex items-baseline gap-2">
                   <span className="text-3xl font-heavy text-slate-900">₹{finalPrice.toLocaleString('en-IN')}</span>
-                  <span className="text-xs font-mono font-bold text-zinc-400">({quantity} PCS)</span>
+                  <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Total Inc. GST</span>
                 </div>
-                <div className="text-[10px] uppercase font-bold text-emerald-600 font-mono tracking-wider">
-                  Est. ₹{(finalPrice / quantity).toFixed(2)} per unit
+                <div className="flex items-center gap-3">
+                  <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-tight">
+                    Basic: ₹{Math.round(finalPrice / 1.18).toLocaleString('en-IN')} + GST (18%): ₹{Math.round(finalPrice - (finalPrice / 1.18)).toLocaleString('en-IN')}
+                  </p>
                 </div>
+                <p className="text-[9px] text-[#FF4D00] font-black uppercase tracking-widest mt-1">
+                  Est. Delivery: {new Date(Date.now() + (settings?.printingTimeDays + 3) * 24 * 60 * 60 * 1000).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                </p>
               </div>
 
               {/* 100% Upfront Secure indicator */}
@@ -1081,7 +1044,11 @@ export default function CustomizeModal({
                 <p className="text-[9px] text-[#FF4D00] font-black uppercase tracking-wider font-mono">SECURED TRANSACT PROTOCOL</p>
                 <p className="text-[11px] text-zinc-700 font-extrabold uppercase leading-tight">100% Full Payment Upfront</p>
               </div>
+            </div>
 
+            {/* Shiprocket Phase 1 Integration: Serviceability Check */}
+            <div className="pt-2">
+               <ShippingCheckCard settings={settings} />
             </div>
 
             {/* CTA action buttons */}

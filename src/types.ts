@@ -23,16 +23,114 @@ export type ProductCategory =
   | 'QR Cards'
   | 'NFC Cards';
 
+export interface ShippingRate {
+  id: string;
+  name: string;
+  carrier: string;
+  type: string;
+  rate: number;
+  tax: number;
+  total: number;
+  estimatedDays: string;
+}
+
+export interface PincodeInfo {
+  pincode: string;
+  city: string;
+  state: string;
+  district: string;
+}
+
+export interface ShippingServiceability {
+  isServiceable: boolean;
+  estimatedDays: string;
+  pincode: string;
+  city?: string;
+  state?: string;
+  printingTime?: string;
+  shippingTime?: string;
+  totalTime?: string;
+  expressAvailable?: boolean;
+  courierName?: string;
+  shippingRate?: number;
+  deliveryDate?: string;
+}
+
+export interface LogisticsSettings {
+  pickupPincode: string;
+  defaultWeight: number;
+  printingTimeDays: number;
+  packagingTimeDays: number;
+  dispatchCutoffTime: string;
+  freeShippingThreshold: number;
+  defaultCourier: string;
+  shippingMarginPercent: number;
+  expressPrintingEnabled: boolean;
+  shiprocketApiKey?: string;
+  shiprocketEmail?: string;
+  shiprocketPassword?: string;
+}
+
+export interface ShippingRateRequest {
+  pickupPincode: string;
+  deliveryPincode: string;
+  weight: number;
+  cod: boolean;
+}
+
+export interface ShippingOrderRequest {
+  orderId: string;
+  pickupPincode: string;
+  deliveryPincode: string;
+  customerName: string;
+  customerPhone: string;
+  customerAddress: string;
+  customerCity: string;
+  customerState: string;
+  weight: number;
+  dimensions: { length: number; width: number; height: number };
+  paymentMode: 'Prepaid' | 'COD';
+}
+
 export type OrderStatus = 
   | 'Pending Payment'
   | 'Order Received'
+  | 'Order Confirmed'
+  | 'Artwork Review'
   | 'Design Review'
+  | 'Preparing Design'
+  | 'Waiting for Customer'
   | 'Customer Approval'
+  | 'Customer Approved'
   | 'Printing'
+  | 'Lamination'
+  | 'Quality Check'
+  | 'Cutting'
   | 'Packing'
+  | 'Packed'
+  | 'Courier Pickup'
   | 'Shipped'
+  | 'Out For Delivery'
   | 'Delivered'
-  | 'Cancelled';
+  | 'Cancelled'
+  | 'Refunded';
+
+export interface ArtworkAudit {
+  qualityScore: number;
+  dpi: number;
+  colorSpace: 'CMYK' | 'RGB' | 'Unknown';
+  bleedCheck: 'Passed' | 'Warning' | 'Failed';
+  safeMarginCheck: 'Passed' | 'Warning' | 'Failed';
+  resolution: { width: number; height: number };
+  warnings: string[];
+}
+
+export interface ProductionLog {
+  stage: OrderStatus;
+  timestamp: string;
+  operator?: string;
+  notes?: string;
+}
 
 export interface Size {
   name: string;
@@ -111,13 +209,17 @@ export interface Order {
   customerEmail: string;
   items: CartItem[];
   totalAmount: number;
+  gstAmount?: number;
   advancePaid: boolean;
   balancePaid: boolean;
   payments: PaymentDetails[];
   status: OrderStatus;
+  productionTimeline?: ProductionLog[];
+  artworkAudit?: ArtworkAudit;
   trackingNumber?: string;
   courierName?: string;
   shippingAddress?: Address;
+  invoiceUrl?: string;
   notes?: string;
   createdAt: string;
   updatedAt: string;

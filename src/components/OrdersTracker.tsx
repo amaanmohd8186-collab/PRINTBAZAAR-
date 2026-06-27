@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Package, Truck, Calendar, Wallet, CheckCircle, Clock, AlertTriangle, ChevronDown, ChevronUp, FileSpreadsheet, ShieldAlert, Loader2, Download, FileText, RefreshCcw, Bell, BellRing, Info, Phone, MessageCircle, Star } from 'lucide-react';
+import { Package, Truck, Calendar, Wallet, CheckCircle, Clock, AlertTriangle, ChevronDown, ChevronUp, FileSpreadsheet, ShieldAlert, Loader2, Download, FileText, RefreshCcw, Bell, BellRing, Info, Phone, MessageCircle, Star, Box, MapPin } from 'lucide-react';
 import { motion } from 'motion/react';
 import { jsPDF } from 'jspdf';
 import { Order, OrderStatus, PaymentDetails } from '../types';
@@ -560,60 +560,95 @@ ${separator}
     {
       status: 'Order Received',
       label: 'Order Received',
-      desc: '100% Upfront payment verified. Handshake completed with print press node.'
+      desc: '100% Upfront payment verified. Booking production slot.'
     },
     {
-      status: 'Design Review',
-      label: 'Design & Pre-fight',
-      desc: 'Print press admin is auditing dimension safety, resolution, and bleed margins.'
+      status: 'Artwork Review',
+      label: 'Artwork Review',
+      desc: 'Pre-press layout mapping. AI & Human verification of design assets.'
     },
     {
       status: 'Customer Approval',
-      label: 'Customer Approval',
-      desc: 'Final design proof awaiting client seal. Production starts only after approval.'
+      label: 'Final Approval',
+      desc: 'Waiting for digital proof approval from customer for final run.'
     },
     {
       status: 'Printing',
-      label: 'Heavy Printing',
-      desc: 'Commercial press run initiated. Substrate is undergoing high-speed offset ink application.'
+      label: 'Printing Line',
+      desc: 'High-speed industrial ink application on premium substrate.'
+    },
+    {
+      status: 'Lamination',
+      label: 'Post-Press Finishing',
+      desc: 'Applying protective coatings (Gloss/Matte/Velvet) to the sheets.'
+    },
+    {
+      status: 'Cutting',
+      label: 'Precision Cutting',
+      desc: 'Industrial shearing for exact dimensions and edge finishing.'
     },
     {
       status: 'Packing',
-      label: 'Quality & Packing',
-      desc: 'Post-press finishing, cutting, and industrial logistics bubble wrapping.'
+      label: 'Secure Packing',
+      desc: 'Heavy-duty bubble wrap and reinforced outer box protection.'
+    },
+    {
+      status: 'Courier Pickup',
+      label: 'Manifest Ready',
+      desc: 'Awaiting courier partner for collection at factory dock.'
     },
     {
       status: 'Shipped',
-      label: 'Shipped (In Transit)',
-      desc: 'Goods handed over to courier. Waybill telemetry active.'
+      label: 'In Transit',
+      desc: 'Consignment is in transit to the destination delivery hub.'
     },
     {
       status: 'Delivered',
-      label: 'Consignment Delivered',
-      desc: 'Package successfully delivered and verified at destination.'
+      label: 'Delivered',
+      desc: 'Job successfully delivered and signed off.'
     }
   ];
 
   const getStageIndex = (status: OrderStatus): number => {
-    return STAGES.findIndex((st) => st.status === status);
+    let currentStatus: OrderStatus = status;
+    // Map legacy statuses to new ones if needed
+    if (status === 'Order Confirmed') currentStatus = 'Order Received';
+    if (status === 'Design Review') currentStatus = 'Artwork Review';
+    if (status === 'Preparing Design') currentStatus = 'Artwork Review';
+    if (status === 'Packed') currentStatus = 'Packing';
+    if (status === 'Out For Delivery') currentStatus = 'Shipped';
+    
+    const index = STAGES.findIndex((st) => st.status === currentStatus);
+    return index === -1 ? 0 : index;
   };
 
   const getStatusColor = (status: OrderStatus) => {
     switch (status) {
       case 'Order Received':
+      case 'Order Confirmed':
         return 'bg-blue-50 text-blue-700 border-blue-200';
       case 'Design Review':
+      case 'Preparing Design':
+      case 'Artwork Review':
         return 'bg-amber-50 text-amber-700 border-amber-200';
       case 'Customer Approval':
+      case 'Waiting for Customer':
         return 'bg-purple-50 text-purple-700 border-purple-200';
       case 'Printing':
         return 'bg-orange-50 text-orange-700 border-orange-200';
+      case 'Lamination':
+      case 'Cutting':
+        return 'bg-zinc-50 text-zinc-700 border-zinc-200';
       case 'Packing':
+      case 'Packed':
         return 'bg-indigo-50 text-indigo-700 border-indigo-200';
+      case 'Courier Pickup':
+        return 'bg-emerald-50 text-emerald-700 border-emerald-200';
       case 'Shipped':
-        return 'bg-emerald-50 text-emerald-800 border-emerald-200';
+      case 'Out For Delivery':
+        return 'bg-sky-50 text-sky-700 border-sky-200';
       case 'Delivered':
-        return 'bg-zinc-100 text-zinc-800 border-zinc-200';
+        return 'bg-emerald-50 text-emerald-800 border-emerald-200';
       default:
         return 'bg-zinc-100 text-zinc-800 border-zinc-200';
     }
@@ -898,8 +933,8 @@ ${separator}
                         </motion.div>
                       </div>
 
-                      {/* Six Milestones Grid */}
-                      <div className="grid grid-cols-1 md:grid-cols-6 gap-6 md:gap-4 relative select-none">
+                      {/* Milestones Grid */}
+                      <div className="grid grid-cols-1 md:grid-cols-9 gap-6 md:gap-2 relative select-none">
                         {STAGES.map((step, idx) => {
                           const isCompleted = idx <= currentStageIdx;
                           const isCurrent = idx === currentStageIdx;
@@ -907,11 +942,14 @@ ${separator}
                           // Match specific icons for phases
                           let StepIcon = Clock;
                           if (idx === 0) StepIcon = Package;
-                          if (idx === 1) StepIcon = FileSpreadsheet;
+                          if (idx === 1) StepIcon = FileText;
                           if (idx === 2) StepIcon = Loader2; // Running loader representing Printing
                           if (idx === 3) StepIcon = CheckCircle;
-                          if (idx === 4) StepIcon = Truck;
-                          if (idx === 5) StepIcon = CheckCircle;
+                          if (idx === 4) StepIcon = Box;
+                          if (idx === 5) StepIcon = Truck;
+                          if (idx === 6) StepIcon = Truck;
+                          if (idx === 7) StepIcon = MapPin;
+                          if (idx === 8) StepIcon = CheckCircle;
 
                           return (
                             <motion.div

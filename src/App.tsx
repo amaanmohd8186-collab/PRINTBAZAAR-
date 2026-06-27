@@ -81,6 +81,8 @@ import {
   Timestamp,
   serverTimestamp
 } from './firebase';
+import { DEFAULT_LOGISTICS_SETTINGS } from './lib/shipping';
+import { LogisticsSettings } from './types';
 type FirebaseUser = any;
 import CustomizeModal from './components/CustomizeModal';
 import CartView from './components/CartView';
@@ -91,8 +93,6 @@ const CommunityFeed = React.lazy(() => import('./components/CommunityFeed'));
 import PrintQualitySlider from './components/PrintQualitySlider';
 import SplashPreview from './components/SplashPreview';
 import MobileDebugPanel from './components/MobileDebugPanel';
-import SellerVerificationSystem from './components/SellerVerificationSystem';
-import SellerDashboard from './components/SellerDashboard';
 import { FirebaseDiagnosticsPanel } from './components/FirebaseDiagnostics';
 import BannerManager from './components/BannerManager';
 import BulkQuoteGenerator from './components/BulkQuoteGenerator';
@@ -115,6 +115,8 @@ import PushNotificationManager from './components/PushNotificationManager';
 import CreatorProfileView from './components/CreatorProfileView';
 import TrendingExplorer from './components/TrendingExplorer';
 import DesignShowcaseModal from './components/DesignShowcaseModal';
+import ProductPriceTrendChart from './components/ProductPriceTrendChart';
+import OrderSuccessExperience from './components/OrderSuccessExperience';
 import { AnimatePresence, motion } from 'motion/react';
 
 // Helper to recursively remove undefined fields so Firestore doesn't reject writes
@@ -284,6 +286,23 @@ export default function App() {
   const { theme, setTheme } = useTheme();
   const [showSplash, setShowSplash] = useState(true);
   const [isAppReady, setIsAppReady] = useState(false);
+  const [platformSettings, setPlatformSettings] = useState<LogisticsSettings>(DEFAULT_LOGISTICS_SETTINGS);
+
+  // Synchronize Global Platform Settings
+  useEffect(() => {
+    if (!db) {
+       const local = localStorage.getItem('pb_platform_settings');
+       if (local) setPlatformSettings(JSON.parse(local));
+       return;
+    }
+    const settingsRef = doc(db, 'platform_settings', 'main');
+    const unsubscribe = onSnapshot(settingsRef, (snap) => {
+      if (snap.exists()) {
+        setPlatformSettings(prev => ({ ...prev, ...snap.data() }));
+      }
+    });
+    return () => unsubscribe();
+  }, []);
   const [startupLogs, setStartupLogs] = useState<string[]>(['INITIALIZING SECURE ENVIRONMENT...']);
   
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -291,6 +310,7 @@ export default function App() {
   // 1. Core State shifted to Firestore only
   const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [successOrder, setSuccessOrder] = useState<Order | null>(null);
   const [cartItems, setCartItems] = useState<CartItem[]>(() => 
     getLocalStorageData<CartItem[]>('pb_cart', [])
   );
@@ -1245,13 +1265,13 @@ export default function App() {
       });
 
       triggerToast(`🎉 Order ${placedOrder.id} successfully created! Admin is review design bleeds.`, 'success');
-      setCustomerActiveTab('status');
+      setSuccessOrder(placedOrder);
     } catch (e: any) {
       console.error("Checkout failed:", e);
       // Fallback local persistence state
       setOrders((prev) => [placedOrder, ...prev]);
       triggerToast(`🎉 Order ${placedOrder.id} successfully created locally! (Database offline)`, 'success');
-      setCustomerActiveTab('status');
+      setSuccessOrder(placedOrder);
     }
   };
 
@@ -1811,21 +1831,6 @@ export default function App() {
                 )}
               </button>
 
-              {(dbIsSeller || dbOnboardingCompleted) && (
-                <button
-                  type="button"
-                  onClick={() => setEnterprisePortal('seller-dashboard')}
-                  className={`py-2 px-4.5 rounded-2xl text-xs font-heavy uppercase tracking-wider transition flex items-center gap-1.5 border border-transparent cursor-pointer ${
-                    enterprisePortal === 'seller-dashboard'
-                      ? 'bg-amber-600 text-white shadow-md'
-                      : 'text-amber-600 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 border-amber-200'
-                  }`}
-                >
-                  <Briefcase className="w-4 h-4" />
-                  <span>Seller Studio</span>
-                </button>
-              )}
-
               <button
                 type="button"
                 onClick={() => setCustomerActiveTab('aistudio')}
@@ -2059,26 +2064,7 @@ export default function App() {
                   </button>
                 </div>
 
-                {(enterprisePortal === 'seller' || enterprisePortal === 'seller-dashboard') && (
-                  <div className="w-full">
-                    {(dbIsSeller || dbOnboardingCompleted || enterprisePortal === 'seller-dashboard') ? (
-                      <SellerDashboard
-                        userId={user?.uid || 'cust-current'}
-                        userEmail={session.email}
-                        triggerToast={triggerToast}
-                        onExit={() => setEnterprisePortal('none')}
-                      />
-                    ) : (
-                      <SellerVerificationSystem 
-                        isAdminMode={(roleMode as string) === 'admin'} 
-                        triggerToast={triggerToast}
-                        onVerificationComplete={(profile) => {
-                          setEnterprisePortal('seller-dashboard');
-                        }}
-                      />
-                    )}
-                  </div>
-                )}
+
 
                 {enterprisePortal === 'banners' && session?.role === 'admin' && (
                   <BannerManager />
@@ -2459,6 +2445,8 @@ export default function App() {
                               <span>{p.dispatchLeadTime || 'Same Day'}</span>
                             </span>
                           </div>
+                          
+                          <ProductPriceTrendChart product={p} />
                         </div>
 
                         <div className="border-t border-gray-150 pt-5 mt-5 flex items-center justify-between gap-1">
@@ -2545,6 +2533,7 @@ export default function App() {
                 onCheckoutSuccess={handleCheckoutSuccess}
                 onClearCart={() => setCartItems([])}
                 onBulkAddItems={(items) => setCartItems(prev => [...prev, ...items])}
+                settings={platformSettings}
               />
             )}
 
@@ -2637,18 +2626,6 @@ export default function App() {
                 {/* ENTERPRISE SYSTEMS AND FRAUD VERIFICATIONS CONNECTORS */}
                 <div className="border-t border-dashed border-zinc-200 pt-4 space-y-2">
                   <span className="text-[9px] font-black uppercase tracking-wider font-mono text-[#FF4D00] block text-left">Enterprise Services Pool</span>
-                  
-                  <button
-                    type="button"
-                    onClick={() => setEnterprisePortal(dbIsSeller || dbOnboardingCompleted ? 'seller-dashboard' : 'seller')}
-                    className="w-full py-3.5 px-4 text-left text-xs font-bold uppercase tracking-wider text-zinc-950 bg-zinc-50 hover:bg-zinc-100 flex items-center justify-between rounded-xl transition border border-zinc-200 cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-amber-500">{dbIsSeller || dbOnboardingCompleted ? '💼' : '🔐'}</span>
-                      <span>{dbIsSeller || dbOnboardingCompleted ? 'Seller Studio & Dashboard' : 'Seller Onboarding'}</span>
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-zinc-400" />
-                  </button>
 
                   <button
                     type="button"
@@ -2920,6 +2897,7 @@ export default function App() {
           product={focusConfigProduct}
           onClose={() => setFocusConfigProduct(null)}
           onAddToCart={handleAddToCart}
+          settings={platformSettings}
         />
       )}
 
@@ -3408,6 +3386,21 @@ export default function App() {
         <AuthModal 
           onClose={() => setShowAuthModal(false)} 
           triggerToast={triggerToast} 
+        />
+      )}
+
+      {/* Order Success Animated Experience */}
+      {successOrder && (
+        <OrderSuccessExperience
+          order={successOrder}
+          onContinueShopping={() => {
+            setSuccessOrder(null);
+            setCustomerActiveTab('home');
+          }}
+          onTrackOrder={() => {
+            setSuccessOrder(null);
+            setCustomerActiveTab('status');
+          }}
         />
       )}
 

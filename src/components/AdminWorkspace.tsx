@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
-import { LayoutDashboard, ShoppingBag, FolderEdit, Check, Eye, Trash, Plus, FileText, ArrowRight, Truck, TrendingUp, Receipt, AlertCircle, Sparkles, RefreshCw, X, Wallet, ShieldCheck, Settings, CreditCard, AlertTriangle, Activity, ShieldAlert } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { LayoutDashboard, ShoppingBag, FolderEdit, Check, Eye, Trash, Plus, FileText, ArrowRight, Truck, TrendingUp, Receipt, AlertCircle, Sparkles, RefreshCw, X, Wallet, ShieldCheck, Settings, CreditCard, AlertTriangle, Activity, ShieldAlert, MapPin, Clock, Zap, Printer } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
 import { parseISO, format } from 'date-fns';
 import { Order, Product, ProductCategory, OrderStatus, SizeOption, MaterialOption, QuantitySlab } from '../types';
@@ -12,6 +12,7 @@ import { CATEGORIES, CATEGORY_DEFAULT_IMAGES } from '../data';
 import { getAuthHeaders, db, collection, onSnapshot, query, setDoc, doc, updateDoc, increment, getDoc, runTransaction } from '../firebase';
 import SecureUploadSystem from './SecureUploadSystem';
 import DiagnosticsPanel from './DiagnosticsPanel';
+import PrintProductionDashboard from './PrintProductionDashboard';
 
 interface AdminWorkspaceProps {
   orders: Order[];
@@ -30,7 +31,7 @@ export default function AdminWorkspace({
   onDeleteProduct,
   onShowAudit
 }: AdminWorkspaceProps) {
-  const [activeTab, setActiveTab ] = useState<'insights' | 'incoming' | 'products' | 'diagnostics' | 'users' | 'platform' | 'low-inventory' | 'sellers' | 'withdrawals'>('insights');
+  const [activeTab, setActiveTab ] = useState<'insights' | 'incoming' | 'products' | 'diagnostics' | 'users' | 'platform' | 'low-inventory' | 'production'>('insights');
   const [dbSellers, setDbSellers] = useState<any[]>([]);
   const [dbWithdrawals, setDbWithdrawals] = useState<any[]>([]);
   const [isProcessingAction, setIsProcessingAction] = useState(false);
@@ -182,15 +183,61 @@ export default function AdminWorkspace({
   const [showAddProductModal, setShowAddProductModal] = useState(false);
   const [showDesignModal, setShowDesignModal] = useState<{ name: string; type: string; data?: string } | null>(null);
   // Multi-state platform settings
-  const [activeSettingsGroup, setActiveSettingsGroup] = useState<'cashfree' | 'ai' | 'policies'>('cashfree');
+  const [activeSettingsGroup, setActiveSettingsGroup] = useState<'cashfree' | 'ai' | 'logistics' | 'policies'>('cashfree');
   const [platformSettings, setPlatformSettings] = useState({
     cashfreeEnv: 'TEST',
     aiModerationEnabled: true,
     autoApproveSellers: false,
-    maintenanceMode: false
+    maintenanceMode: false,
+    pickupPincode: '110001',
+    defaultWeight: 0.5,
+    printingTimeDays: 1,
+    packagingTimeDays: 1,
+    dispatchCutoffTime: '18:00',
+    freeShippingThreshold: 999,
+    defaultCourier: 'Delhivery',
+    shippingMarginPercent: 5,
+    expressPrintingEnabled: true,
+    shiprocketEmail: '',
+    shiprocketPassword: '',
+    shiprocketApiKey: ''
   });
 
-  // New product editing state
+  // Save logic for platform settings
+  const handleSavePlatformSettings = async () => {
+    try {
+      const settingsRef = doc(db, 'platform_settings', 'main');
+      await setDoc(settingsRef, platformSettings);
+      alert('✅ Platform settings updated and synchronized across nodes.');
+    } catch (err) {
+      console.error('Save failed:', err);
+      // Fallback for local sandbox
+      localStorage.setItem('pb_platform_settings', JSON.stringify(platformSettings));
+      alert('✅ Settings saved to local buffer (Sandbox Mode).');
+    }
+  };
+
+  useEffect(() => {
+    // Load existing settings
+    const loadSettings = async () => {
+      try {
+        const settingsRef = doc(db, 'platform_settings', 'main');
+        const snap = await getDoc(settingsRef);
+        if (snap.exists()) {
+          setPlatformSettings(p => ({ ...p, ...snap.data() }));
+        } else {
+          // Check local fallback
+          const local = localStorage.getItem('pb_platform_settings');
+          if (local) setPlatformSettings(p => ({ ...p, ...JSON.parse(local) }));
+        }
+      } catch (err) {
+        console.error('Load failed:', err);
+        const local = localStorage.getItem('pb_platform_settings');
+        if (local) setPlatformSettings(p => ({ ...p, ...JSON.parse(local) }));
+      }
+    };
+    loadSettings();
+  }, []);
   const [newProdName, setNewProdName] = useState('');
   const [newProdCategory, setNewProdCategory] = useState<ProductCategory>('Business Cards');
   const [newProdDesc, setNewProdDesc] = useState('');
@@ -597,6 +644,17 @@ export default function AdminWorkspace({
 
           <button
             type="button"
+            onClick={() => setActiveTab('production')}
+            className={`py-2 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition flex items-center gap-2 ${
+              activeTab === 'production' ? 'bg-[#FF4D00] text-white shadow-xs' : 'text-zinc-400 hover:text-white'
+            }`}
+          >
+            <Printer className="w-4 h-4" />
+            <span>Production</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab('low-inventory')}
             className={`py-2 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition flex items-center gap-2 relative ${
               activeTab === 'low-inventory' ? 'bg-rose-600 text-white shadow-xs' : 'text-zinc-400 hover:text-white'
@@ -643,42 +701,16 @@ export default function AdminWorkspace({
             <Settings className="w-4 h-4" />
             <span>Controls</span>
           </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('sellers')}
-            className={`py-2 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition flex items-center gap-2 relative ${
-              activeTab === 'sellers' ? 'bg-[#FF4D00] text-white shadow-xs' : 'text-zinc-400 hover:text-white'
-            }`}
-          >
-            <ShieldCheck className="w-4 h-4" />
-            <span>Sellers</span>
-            {dbSellers.filter(s => s.status === 'Draft' || s.status === 'Pending').length > 0 && (
-              <span className="absolute -top-1 -right-1 bg-rose-500 text-white font-mono font-black text-[9px] w-5 h-5 rounded-full flex items-center justify-center border border-white">
-                {dbSellers.filter(s => s.status === 'Draft' || s.status === 'Pending').length}
-              </span>
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('withdrawals')}
-            className={`py-2 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition flex items-center gap-2 relative ${
-              activeTab === 'withdrawals' ? 'bg-[#FF4D00] text-white shadow-xs' : 'text-zinc-400 hover:text-white'
-            }`}
-          >
-            <Wallet className="w-4 h-4" />
-            <span>Payouts</span>
-            {dbWithdrawals.filter(w => w.status === 'Pending').length > 0 && (
-              <span className="absolute -top-1 -right-1 bg-emerald-500 text-white font-mono font-black text-[9px] w-5 h-5 rounded-full flex items-center justify-center border border-white">
-                {dbWithdrawals.filter(w => w.status === 'Pending').length}
-              </span>
-            )}
-          </button>
         </div>
       </div>
 
       {/* TAB 1: DASHBOARD METRICS */}
+      {activeTab === 'production' && (
+        <div className="h-[calc(100vh-200px)] -mx-1 border border-zinc-200 rounded-[40px] overflow-hidden bg-white">
+          <PrintProductionDashboard />
+        </div>
+      )}
+
       {activeTab === 'insights' && (
         <div className="space-y-6">
           {/* Key Stat Cards */}
@@ -910,11 +942,15 @@ export default function AdminWorkspace({
                     className="flex-1 px-2.5 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-[11px] font-semibold text-white focus:outline-hidden focus:ring-1 focus:ring-[#FF4D00] bg-white cursor-pointer"
                   >
                     <option value="All">All Statuses</option>
-                    <option value="Order Received">Order Received</option>
-                    <option value="Design Review">Design Review</option>
+                    <option value="Order Confirmed">Order Confirmed</option>
+                    <option value="Order Received">Order Received (Legacy)</option>
+                    <option value="Preparing Design">Preparing Design</option>
+                    <option value="Design Review">Design Review (Legacy)</option>
                     <option value="Printing">Printing</option>
-                    <option value="Packing">Packing</option>
+                    <option value="Quality Check">Quality Check</option>
+                    <option value="Packing">Packing/Packed</option>
                     <option value="Shipped">Shipped</option>
+                    <option value="Out For Delivery">Out For Delivery</option>
                     <option value="Delivered">Delivered</option>
                   </select>
                   
@@ -1107,26 +1143,26 @@ export default function AdminWorkspace({
                   </div>
 
                   {/* Context status based buttons */}
-                  {selectedOrder.status === 'Order Received' && (
+                  {(selectedOrder.status === 'Order Confirmed' || selectedOrder.status === 'Order Received') && (
                     <div className="space-y-3">
                       <p className="text-[11px] text-zinc-400 leading-relaxed font-bold uppercase tracking-wide">
-                        100% secure upfront checkout payment has been confirmed. Conduct layout safety bleed review.
+                        Order confirmation has been verified. Conduct layout design setup.
                       </p>
                       <button
                         type="button"
-                        onClick={() => onUpdateOrderStatus(selectedOrder.id, 'Design Review')}
+                        onClick={() => onUpdateOrderStatus(selectedOrder.id, 'Preparing Design')}
                         className="w-full py-4 bg-amber-500 hover:bg-white hover:text-black text-black font-heavy text-xs uppercase tracking-wider rounded-2xl transition flex items-center justify-center gap-2 cursor-pointer font-mono"
                       >
-                        <span>Approve design & launch design checkpoint</span>
+                        <span>Advance to Preparing Design</span>
                         <ArrowRight className="w-4 h-4" />
                       </button>
                     </div>
                   )}
 
-                  {selectedOrder.status === 'Design Review' && (
+                  {(selectedOrder.status === 'Preparing Design' || selectedOrder.status === 'Design Review' || selectedOrder.status === 'Customer Approval') && (
                     <div className="space-y-3">
                       <p className="text-[11px] text-zinc-400 leading-relaxed font-bold uppercase tracking-wide">
-                        Bleeds, margins, vector overlays guidelines check out. Release items to factory presses.
+                        Bleeds, safety margins, and resolutions checked. Send to physical press runs.
                       </p>
                       <button
                         type="button"
@@ -1142,38 +1178,54 @@ export default function AdminWorkspace({
                   {selectedOrder.status === 'Printing' && (
                     <div className="space-y-3">
                       <p className="text-[11px] text-zinc-400 leading-relaxed font-bold uppercase tracking-wide">
-                        Die cuts, stack slicing, velocity lamination runs completed. Deliver release notification.
+                        Offset ink runs completed. Advance to post-press quality calibration checks.
                       </p>
                       <button
                         type="button"
-                        onClick={() => onUpdateOrderStatus(selectedOrder.id, 'Packing')}
-                        className="w-full py-4 bg-[#FF4D00] hover:bg-white hover:text-black text-white font-heavy text-xs uppercase tracking-wider rounded-2xl transition flex items-center justify-center gap-2 cursor-pointer font-mono"
+                        onClick={() => onUpdateOrderStatus(selectedOrder.id, 'Quality Check')}
+                        className="w-full py-4 bg-orange-500 hover:bg-white hover:text-black text-white font-heavy text-xs uppercase tracking-wider rounded-2xl transition flex items-center justify-center gap-2 cursor-pointer font-mono"
                       >
-                        <span>Declare Production Completed</span>
+                        <span>Advance to Quality Check</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+
+                  {selectedOrder.status === 'Quality Check' && (
+                    <div className="space-y-3">
+                      <p className="text-[11px] text-zinc-400 leading-relaxed font-bold uppercase tracking-wide">
+                        Physical checkouts, blade shears, and dimensions audits successfully completed. Pack order.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => onUpdateOrderStatus(selectedOrder.id, 'Packed')}
+                        className="w-full py-4 bg-indigo-600 hover:bg-white hover:text-black text-white font-heavy text-xs uppercase tracking-wider rounded-2xl transition flex items-center justify-center gap-2 cursor-pointer font-mono"
+                      >
+                        <span>Mark Order as Packed & Sealed</span>
                         <Check className="w-4 h-4" />
                       </button>
                     </div>
                   )}
 
-                  {selectedOrder.status === 'Packing' && (
+                  {(selectedOrder.status === 'Packed' || selectedOrder.status === 'Packing') && (
                     <div className="space-y-4">
                       <div className="p-4 rounded-[20px] border bg-zinc-900 border-zinc-800 space-y-2.5">
                         <div className="flex justify-between items-baseline">
-                          <span className="text-[10px] text-zinc-400 uppercase tracking-widest font-black">Invoice accounts status:</span>
+                          <span className="text-[10px] text-zinc-400 uppercase tracking-widest font-black">Invoice status:</span>
                           <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2.5 py-1 rounded-md uppercase font-black tracking-wide border border-emerald-500/30">
-                            100% SETTLED IN FULL
+                            100% SETTLED
                           </span>
                         </div>
                         <p className="text-[11px] text-emerald-400/90 leading-relaxed font-bold uppercase tracking-wide font-mono">
-                          *INVOICE CLEARANCE CONFIRMED. Logistics waybill dispatch can be initialized immediately below:
+                          *SHIPPING BOOKINGS CAN BE DECLARED BELOW:
                         </p>
                       </div>
 
                       <div className="space-y-4 bg-zinc-900 p-5 rounded-2xl border border-zinc-800">
-                        <p className="text-[10px] text-[#FF4D00] font-black uppercase tracking-wider font-mono">Verify courier dispatchWaybill parameters:</p>
+                        <p className="text-[10px] text-[#FF4D00] font-black uppercase tracking-wider font-mono">Courier Dispatch Details:</p>
                         <div className="grid grid-cols-2 gap-4">
                           <div>
-                            <label className="block text-[9px] text-zinc-400 uppercase font-black tracking-wider mb-2">Logistics Carrier Network:</label>
+                            <label className="block text-[9px] text-zinc-400 uppercase font-black tracking-wider mb-2">Logistics Carrier:</label>
                             <input
                               type="text"
                               value={courierNameInput}
@@ -1182,7 +1234,7 @@ export default function AdminWorkspace({
                             />
                           </div>
                           <div>
-                            <label className="block text-[9px] text-zinc-400 uppercase font-black tracking-wider mb-2">Docket/Tracking Identification:</label>
+                            <label className="block text-[9px] text-zinc-400 uppercase font-black tracking-wider mb-2">Docket / Tracking ID:</label>
                             <input
                               type="text"
                               value={trackingIdInput}
@@ -1199,7 +1251,7 @@ export default function AdminWorkspace({
                           onClick={() => onUpdateOrderStatus(selectedOrder.id, 'Shipped', trackingIdInput, courierNameInput)}
                           className={`w-full py-3.5 font-heavy text-xs uppercase tracking-wider rounded-xl transition flex items-center justify-center gap-2 ${
                             trackingIdInput
-                              ? 'bg-[#FF4D00] hover:bg-white hover:text-black text-white cursor-pointer shadow-lg shadow-sky-600/10'
+                              ? 'bg-[#FF4D00] hover:bg-white hover:text-black text-white cursor-pointer shadow-lg shadow-[#FF4D00]/10'
                               : 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-850'
                           }`}
                         >
@@ -1213,7 +1265,23 @@ export default function AdminWorkspace({
                   {selectedOrder.status === 'Shipped' && (
                     <div className="space-y-3">
                       <p className="text-[11px] text-zinc-400 leading-relaxed font-bold uppercase tracking-wide">
-                        Shipment logged under <strong className="text-white font-black">{selectedOrder.courierName}</strong> with docket tracing code: <strong className="text-[#FF4D00] font-mono">{selectedOrder.trackingNumber}</strong>.
+                        Shipment dispatched under <strong className="text-white font-black">{selectedOrder.courierName}</strong> (Docket: <strong className="text-[#FF4D00] font-mono">{selectedOrder.trackingNumber}</strong>).
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => onUpdateOrderStatus(selectedOrder.id, 'Out For Delivery')}
+                        className="w-full py-4 bg-sky-600 hover:bg-white hover:text-black text-white font-heavy text-xs uppercase tracking-wider rounded-2xl transition flex items-center justify-center gap-2 cursor-pointer font-mono"
+                      >
+                        <span>Dispatch Out For Delivery</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+
+                  {selectedOrder.status === 'Out For Delivery' && (
+                    <div className="space-y-3">
+                      <p className="text-[11px] text-zinc-400 leading-relaxed font-bold uppercase tracking-wide">
+                        Consignment is with local delivery carrier, out for doorstep delivery today.
                       </p>
                       <button
                         type="button"
@@ -1357,6 +1425,12 @@ export default function AdminWorkspace({
               AI Moderation
             </button>
             <button 
+              onClick={() => setActiveSettingsGroup('logistics')}
+              className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all ${activeSettingsGroup === 'logistics' ? 'bg-[#FF4D00] text-white shadow-lg' : 'bg-white text-zinc-500 hover:bg-zinc-50'}`}
+            >
+              Logistics
+            </button>
+            <button 
               onClick={() => setActiveSettingsGroup('policies')}
               className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all ${activeSettingsGroup === 'policies' ? 'bg-[#FF4D00] text-white shadow-lg' : 'bg-white text-zinc-500 hover:bg-zinc-50'}`}
             >
@@ -1458,6 +1532,232 @@ export default function AdminWorkspace({
                     <p className="text-[10px] font-black uppercase text-zinc-800">Prompt Filter</p>
                   </div>
                   <p className="text-[10px] text-zinc-500 leading-relaxed font-medium">Restricts generation of sensitive names or addresses in AI text layers.</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeSettingsGroup === 'logistics' && (
+            <div className="bg-white p-8 rounded-[40px] border border-zinc-200 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 bg-zinc-900 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-black/10">
+                    <Truck className="w-7 h-7" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-heavy uppercase tracking-tight text-zinc-900">Shiprocket Logistics Core</h3>
+                    <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mt-1">Configure automated shipment fulfillment & pre-press dispatch logic</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                   <div className="px-4 py-2 bg-zinc-100 rounded-xl flex items-center gap-2">
+                      <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-zinc-600">Phase 1 Active</span>
+                   </div>
+                   <button 
+                     onClick={handleSavePlatformSettings}
+                     className="px-6 py-2.5 bg-[#FF4D00] text-white rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-black transition-all shadow-lg shadow-[#FF4D00]/20"
+                   >
+                      Sync All Nodes
+                   </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Left Column: Origin & Warehousing */}
+                <div className="space-y-6">
+                  <div className="p-6 bg-zinc-50 rounded-3xl border border-zinc-100 space-y-6">
+                    <div className="flex items-center gap-2 border-b border-zinc-200 pb-3">
+                      <MapPin className="w-4 h-4 text-[#FF4D00]" />
+                      <p className="text-[11px] font-black uppercase text-zinc-900">Warehouse Origin</p>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest ml-1">Master Pickup PIN Code</label>
+                        <input
+                          type="text"
+                          maxLength={6}
+                          value={platformSettings.pickupPincode}
+                          onChange={(e) => setPlatformSettings({...platformSettings, pickupPincode: e.target.value.replace(/\D/g, '')})}
+                          className="w-full h-12 bg-white border-2 border-zinc-200 rounded-xl px-4 text-xs font-bold tracking-widest focus:outline-hidden focus:border-zinc-900 transition-all"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest ml-1">Dispatch Cutoff Time</label>
+                        <div className="relative">
+                          <Clock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+                          <input
+                            type="time"
+                            value={platformSettings.dispatchCutoffTime}
+                            onChange={(e) => setPlatformSettings({...platformSettings, dispatchCutoffTime: e.target.value})}
+                            className="w-full h-12 bg-white border-2 border-zinc-200 rounded-xl pl-11 pr-4 text-xs font-bold tracking-widest focus:outline-hidden focus:border-zinc-900 transition-all"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-6 bg-zinc-50 rounded-3xl border border-zinc-100 space-y-6">
+                    <div className="flex items-center gap-2 border-b border-zinc-200 pb-3">
+                      <Settings className="w-4 h-4 text-zinc-400" />
+                      <p className="text-[11px] font-black uppercase text-zinc-900">Printing & Packaging</p>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest ml-1">Printing (Days)</label>
+                        <input
+                          type="number"
+                          value={platformSettings.printingTimeDays}
+                          onChange={(e) => setPlatformSettings({...platformSettings, printingTimeDays: parseInt(e.target.value) || 0})}
+                          className="w-full h-12 bg-white border-2 border-zinc-200 rounded-xl px-4 text-xs font-bold tracking-widest focus:outline-hidden focus:border-zinc-900 transition-all"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest ml-1">Packaging (Days)</label>
+                        <input
+                          type="number"
+                          value={platformSettings.packagingTimeDays}
+                          onChange={(e) => setPlatformSettings({...platformSettings, packagingTimeDays: parseInt(e.target.value) || 0})}
+                          className="w-full h-12 bg-white border-2 border-zinc-200 rounded-xl px-4 text-xs font-bold tracking-widest focus:outline-hidden focus:border-zinc-900 transition-all"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 bg-white rounded-2xl border border-zinc-200">
+                      <div>
+                        <p className="text-[10px] font-black text-zinc-900 uppercase">Express Printing</p>
+                        <p className="text-[8px] text-zinc-400 font-bold uppercase mt-0.5">Enable 24h Rush Pre-Press</p>
+                      </div>
+                      <button 
+                        onClick={() => setPlatformSettings({...platformSettings, expressPrintingEnabled: !platformSettings.expressPrintingEnabled})}
+                        className={`w-10 h-5 rounded-full transition-all relative ${platformSettings.expressPrintingEnabled ? 'bg-emerald-500' : 'bg-zinc-200'}`}
+                      >
+                        <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${platformSettings.expressPrintingEnabled ? 'right-0.5' : 'left-0.5'}`} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Center Column: Economics & Carriers */}
+                <div className="space-y-6">
+                  <div className="p-6 bg-zinc-50 rounded-3xl border border-zinc-100 space-y-6">
+                    <div className="flex items-center gap-2 border-b border-zinc-200 pb-3">
+                      <CreditCard className="w-4 h-4 text-zinc-400" />
+                      <p className="text-[11px] font-black uppercase text-zinc-900">Revenue & Thresholds</p>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest ml-1">Free Shipping Min (₹)</label>
+                        <input
+                          type="number"
+                          value={platformSettings.freeShippingThreshold}
+                          onChange={(e) => setPlatformSettings({...platformSettings, freeShippingThreshold: parseInt(e.target.value) || 0})}
+                          className="w-full h-12 bg-white border-2 border-zinc-200 rounded-xl px-4 text-xs font-bold tracking-widest focus:outline-hidden focus:border-zinc-900 transition-all"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest ml-1">Shipping Margin (%)</label>
+                        <input
+                          type="number"
+                          value={platformSettings.shippingMarginPercent}
+                          onChange={(e) => setPlatformSettings({...platformSettings, shippingMarginPercent: parseInt(e.target.value) || 0})}
+                          className="w-full h-12 bg-white border-2 border-zinc-200 rounded-xl px-4 text-xs font-bold tracking-widest focus:outline-hidden focus:border-zinc-900 transition-all"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-6 bg-zinc-50 rounded-3xl border border-zinc-100 space-y-6">
+                    <div className="flex items-center gap-2 border-b border-zinc-200 pb-3">
+                      <TrendingUp className="w-4 h-4 text-zinc-400" />
+                      <p className="text-[11px] font-black uppercase text-zinc-900">Courier Recommendation</p>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest ml-1">Default Courier Partner</label>
+                        <select
+                          value={platformSettings.defaultCourier}
+                          onChange={(e) => setPlatformSettings({...platformSettings, defaultCourier: e.target.value})}
+                          className="w-full h-12 bg-white border-2 border-zinc-200 rounded-xl px-4 text-xs font-bold tracking-widest focus:outline-hidden focus:border-zinc-900 transition-all appearance-none"
+                        >
+                          <option value="Delhivery">Delhivery Premium</option>
+                          <option value="BlueDart">BlueDart Express</option>
+                          <option value="EcomExpress">Ecom Express</option>
+                          <option value="XpressBees">XpressBees</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest ml-1">Default Package Weight (kg)</label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={platformSettings.defaultWeight}
+                          onChange={(e) => setPlatformSettings({...platformSettings, defaultWeight: parseFloat(e.target.value) || 0.5})}
+                          className="w-full h-12 bg-white border-2 border-zinc-200 rounded-xl px-4 text-xs font-bold tracking-widest focus:outline-hidden focus:border-zinc-900 transition-all"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Column: Shiprocket API Credentials */}
+                <div className="p-8 bg-zinc-900 rounded-[32px] border border-zinc-800 space-y-8 flex flex-col justify-between">
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-3">
+                       <div className="w-10 h-10 bg-[#FF4D00]/20 rounded-xl flex items-center justify-center">
+                          <Zap className="w-5 h-5 text-[#FF4D00]" />
+                       </div>
+                       <div>
+                          <h4 className="text-white text-xs font-black uppercase tracking-widest">Shiprocket Phase 2</h4>
+                          <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider mt-0.5">Automated Pre-Press to Dispatch</p>
+                       </div>
+                    </div>
+
+                    <div className="space-y-4">
+                       <div className="space-y-1.5">
+                          <label className="text-[8px] font-black text-zinc-500 uppercase tracking-[0.2em] ml-1">Shiprocket Email</label>
+                          <input
+                            type="email"
+                            value={platformSettings.shiprocketEmail}
+                            onChange={(e) => setPlatformSettings({...platformSettings, shiprocketEmail: e.target.value})}
+                            className="w-full h-12 bg-zinc-800/50 border border-zinc-700 rounded-xl px-4 text-[11px] font-bold text-white focus:outline-hidden focus:border-[#FF4D00] transition-all"
+                            placeholder="api@yourstore.com"
+                          />
+                       </div>
+                       <div className="space-y-1.5">
+                          <label className="text-[8px] font-black text-zinc-500 uppercase tracking-[0.2em] ml-1">API Password</label>
+                          <input
+                            type="password"
+                            value={platformSettings.shiprocketPassword}
+                            onChange={(e) => setPlatformSettings({...platformSettings, shiprocketPassword: e.target.value})}
+                            className="w-full h-12 bg-zinc-800/50 border border-zinc-700 rounded-xl px-4 text-[11px] font-bold text-white focus:outline-hidden focus:border-[#FF4D00] transition-all"
+                            placeholder="••••••••••••"
+                          />
+                       </div>
+                    </div>
+                    
+                    <div className="p-4 bg-zinc-800/30 rounded-2xl border border-zinc-700/50">
+                       <div className="flex items-center gap-2 mb-2">
+                          <ShieldCheck className="w-3.5 h-3.5 text-zinc-500" />
+                          <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Security Audit</span>
+                       </div>
+                       <p className="text-[9px] text-zinc-500 leading-relaxed font-medium">
+                          Credentials are encrypted at rest. Phase 2 will enable real-time AWB generation and courier pickup requests upon ڈیزائن verification.
+                       </p>
+                    </div>
+                  </div>
+
+                  <button className="w-full py-4 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 border border-zinc-700">
+                    <RefreshCw className="w-4 h-4" />
+                    Verify API Node
+                  </button>
                 </div>
               </div>
             </div>
@@ -1767,81 +2067,6 @@ export default function AdminWorkspace({
                 )}
               </tbody>
             </table>
-          </div>
-        </div>
-      )}
-
-      {/* TAB: SELLERS */}
-      {activeTab === 'sellers' && (
-        <div className="bg-white rounded-[32px] p-8 border border-zinc-200/80 shadow-md space-y-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-150 pb-5">
-            <div>
-              <h3 className="text-xl md:text-2xl font-heavy text-slate-900 uppercase tracking-tight">Seller Verification & Management</h3>
-              <p className="text-xs text-zinc-500 font-bold uppercase tracking-wider mt-0.5">Approve, reject, or block merchant accounts</p>
-            </div>
-          </div>
-          <div className="space-y-4">
-            {dbSellers.length === 0 ? (
-              <p className="text-zinc-400 font-bold uppercase text-[10px] tracking-wider py-8 text-center bg-zinc-50 rounded-2xl border border-zinc-150">No sellers registered.</p>
-            ) : dbSellers.map(seller => (
-              <div key={seller.id} className="bg-zinc-50 border border-zinc-200 p-5 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                  <h4 className="text-sm font-black text-slate-900 uppercase">{seller.storeName || 'Unnamed Store'} <span className="text-xs text-zinc-500 lowercase font-normal">({seller.email})</span></h4>
-                  <div className="text-[10px] font-bold text-zinc-500 uppercase flex gap-4 mt-2">
-                    <span>PAN: <span className="text-zinc-800">{seller.documents?.panNumber || 'N/A'}</span></span>
-                    <span>Aadhaar: <span className="text-zinc-800">{seller.documents?.aadhaarNumber || 'N/A'}</span></span>
-                    <span>Status: <span className={`px-2 py-0.5 rounded-full ${seller.status === 'Verified' ? 'bg-emerald-100 text-emerald-700' : seller.status === 'Rejected' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>{seller.status}</span></span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {seller.status !== 'Verified' && (
-                    <button disabled={isProcessingAction} onClick={() => handleApproveSeller(seller.id)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-[10px] rounded-lg tracking-widest transition disabled:opacity-50">Approve</button>
-                  )}
-                  {seller.status !== 'Rejected' && (
-                    <button disabled={isProcessingAction} onClick={() => handleRejectSeller(seller.id)} className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-black uppercase text-[10px] rounded-lg tracking-widest transition disabled:opacity-50">Reject</button>
-                  )}
-                  {seller.status !== 'Blocked' && (
-                    <button disabled={isProcessingAction} onClick={() => handleBlockSeller(seller.id)} className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-black uppercase text-[10px] rounded-lg tracking-widest transition disabled:opacity-50">Block</button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* TAB: WITHDRAWALS */}
-      {activeTab === 'withdrawals' && (
-        <div className="bg-white rounded-[32px] p-8 border border-zinc-200/80 shadow-md space-y-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-150 pb-5">
-            <div>
-              <h3 className="text-xl md:text-2xl font-heavy text-slate-900 uppercase tracking-tight">Withdrawal Requests & Payouts</h3>
-              <p className="text-xs text-zinc-500 font-bold uppercase tracking-wider mt-0.5">Manage and release funds to sellers</p>
-            </div>
-          </div>
-          <div className="space-y-4">
-            {dbWithdrawals.length === 0 ? (
-              <p className="text-zinc-400 font-bold uppercase text-[10px] tracking-wider py-8 text-center bg-zinc-50 rounded-2xl border border-zinc-150">No withdrawal requests.</p>
-            ) : dbWithdrawals.map(w => (
-              <div key={w.id} className="bg-zinc-50 border border-zinc-200 p-5 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                  <h4 className="text-sm font-black text-slate-900 uppercase">Amount: <span className="text-emerald-600">₹{w.amount}</span></h4>
-                  <div className="text-[10px] font-bold text-zinc-500 uppercase flex flex-col gap-1 mt-2">
-                    <span>Seller ID: <span className="text-zinc-800">{w.sellerId}</span></span>
-                    <span>Bank: <span className="text-zinc-800">{w.bankDetails?.bankName}</span> | A/C: <span className="text-zinc-800">{w.bankDetails?.accountNumber}</span> | IFSC: <span className="text-zinc-800">{w.bankDetails?.ifsc}</span></span>
-                    <span>Status: <span className={`px-2 py-0.5 inline-block mt-1 rounded-full ${w.status === 'Paid' ? 'bg-emerald-100 text-emerald-700' : w.status === 'Rejected' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>{w.status}</span></span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {w.status === 'Pending' && (
-                    <>
-                      <button disabled={isProcessingAction} onClick={() => handleReleaseFunds(w)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-[10px] rounded-lg tracking-widest transition disabled:opacity-50">Release Funds</button>
-                      <button disabled={isProcessingAction} onClick={() => handleRejectWithdrawal(w)} className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-black uppercase text-[10px] rounded-lg tracking-widest transition disabled:opacity-50">Reject</button>
-                    </>
-                  )}
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       )}

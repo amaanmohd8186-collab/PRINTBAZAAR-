@@ -6,9 +6,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ShoppingBag, Trash2, FileCode, Landmark, ShieldCheck, ArrowRight, Wallet, CheckCircle2, AlertTriangle, AlertCircle, Truck, Sparkles, Loader2, Eye, Check, RotateCcw, FileText, Maximize2, X } from 'lucide-react';
-import { CartItem, PaymentDetails, Order } from '../types';
+import { CartItem, PaymentDetails, Order, ShippingRate, PincodeInfo } from '../types';
 import CashfreeGateway from './CashfreeGateway';
-import { lookupPincode, calculateShippingRates, ShippingRate, PincodeInfo } from '../lib/shipping';
+import { lookupPincode, calculateShippingRates } from '../lib/shipping';
 
 // Dynamic print validation audit rules
 export function getItemValidationWarnings(item: CartItem): string[] {
@@ -43,6 +43,7 @@ interface CartViewProps {
   onCheckoutSuccess: (placedOrder: Order) => void;
   onClearCart: () => void;
   onBulkAddItems?: (items: CartItem[]) => void;
+  settings?: any;
 }
 
 export default function CartView({
@@ -52,7 +53,8 @@ export default function CartView({
   onRemoveItem,
   onCheckoutSuccess,
   onClearCart,
-  onBulkAddItems
+  onBulkAddItems,
+  settings
 }: CartViewProps) {
   const [showPayment, setShowPayment] = useState(false);
   const [selectedPreviewItem, setSelectedPreviewItem] = useState<CartItem | null>(null);
@@ -126,7 +128,7 @@ export default function CartView({
             setCity(info.city);
             setState(info.state);
             
-            const rates = calculateShippingRates(info, totalCartWeightKg);
+            const rates = calculateShippingRates(info, totalCartWeightKg, settings);
             setShippingRates(rates);
             // Default to first carrier (usually Delhivery or lowest cost)
             setSelectedRate(rates[0]);
@@ -231,7 +233,7 @@ export default function CartView({
       advancePaid: true,
       balancePaid: true,
       payments: [payment],
-      status: 'Order Received',
+      status: 'Order Confirmed',
       notes: notes.trim() || undefined,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -622,6 +624,25 @@ export default function CartView({
                         <p className="text-[11px] font-bold text-zinc-200">Est. {rate.estimatedDays} Days</p>
                         <p className="text-[10px] font-mono text-zinc-400 mt-0.5">₹{rate.total}</p>
                       </div>
+                      
+                      {selectedRate?.carrier === rate.carrier && (
+                        <div className="mt-3 pt-3 border-t border-[#FF4D00]/20 space-y-2">
+                          <div className="flex justify-between text-[9px] uppercase tracking-wider">
+                            <span className="text-zinc-500">Printing Time</span>
+                            <span className="text-white font-bold">{settings?.printingTimeDays || 1} Days</span>
+                          </div>
+                          <div className="flex justify-between text-[9px] uppercase tracking-wider">
+                            <span className="text-zinc-500">Shipping Time</span>
+                            <span className="text-white font-bold">{rate.estimatedDays} Days</span>
+                          </div>
+                          <div className="flex justify-between text-[9px] uppercase tracking-wider pt-1 border-t border-white/5">
+                            <span className="text-[#FF4D00] font-black">Express Print</span>
+                            <span className={settings?.expressPrintingEnabled ? "text-emerald-400 font-bold" : "text-zinc-500"}>
+                              {settings?.expressPrintingEnabled ? "AVAILABLE" : "N/A"}
+                            </span>
+                          </div>
+                        </div>
+                      )}
                     </button>
                   ))
                 ) : (
