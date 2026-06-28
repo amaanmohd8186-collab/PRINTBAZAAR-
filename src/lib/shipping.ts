@@ -12,7 +12,7 @@ import { ShippingServiceability, ShippingRateRequest, ShippingOrderRequest, Ship
  */
 
 export const DEFAULT_LOGISTICS_SETTINGS: LogisticsSettings = {
-  pickupPincode: '110001',
+  pickupPincode: '207401',
   defaultWeight: 0.5,
   printingTimeDays: 1,
   packagingTimeDays: 1,
@@ -66,9 +66,6 @@ export const checkServiceability = async (
   deliveryPincode: string,
   settings: LogisticsSettings = DEFAULT_LOGISTICS_SETTINGS
 ): Promise<ShippingServiceability> => {
-  // Simulate network latency
-  await new Promise(resolve => setTimeout(resolve, 600));
-
   if (!isValidIndianPincode(deliveryPincode)) {
     return {
       isServiceable: false,
@@ -77,39 +74,46 @@ export const checkServiceability = async (
     };
   }
 
-  // Cache it for the user
   cachePincode(deliveryPincode);
 
-  // Phase 2 Mock Logic
-  const isServiceable = !deliveryPincode.startsWith('000') && !deliveryPincode.startsWith('999');
-  
-  if (!isServiceable) {
-    return { isServiceable: false, estimatedDays: 'N/A', pincode: deliveryPincode };
+  try {
+    const res = await fetch(`/api/shipping/estimate?destination=${deliveryPincode}`);
+    if (!res.ok) throw new Error("API Error");
+    const data = await res.json();
+    if (!data.success) {
+      throw new Error(data.message || "Failed");
+    }
+    
+    return {
+      isServiceable: true,
+      pincode: deliveryPincode,
+      city: data.city || 'Unknown',
+      state: data.state || 'Unknown',
+      printingTime: `${settings.printingTimeDays} Day${settings.printingTimeDays > 1 ? 's' : ''}`,
+      shippingTime: data.shippingTime || 'Unknown',
+      totalTime: data.totalTime || 'Unknown',
+      estimatedDays: data.totalTime || 'Unknown',
+      deliveryDate: data.deliveryDate || 'Unknown',
+      expressAvailable: settings.expressPrintingEnabled,
+      courierName: data.courierName || 'Shiprocket Partner'
+    };
+  } catch (err) {
+    // If Shiprocket API is not connected or fails
+    return {
+      isServiceable: false,
+      estimatedDays: 'Delivery estimate unavailable.',
+      pincode: deliveryPincode,
+      city: 'Unknown',
+      state: 'Unknown',
+      printingTime: 'N/A',
+      shippingTime: 'Delivery estimate unavailable.',
+      totalTime: 'Delivery estimate unavailable.',
+      deliveryDate: 'Delivery estimate unavailable.',
+      expressAvailable: false,
+      courierName: 'N/A',
+      error: 'Delivery estimate unavailable.'
+    };
   }
-
-  // Calculate timelines
-  const printingDays = settings.printingTimeDays;
-  const shippingDays = 2 + Math.floor(Math.random() * 2); // 2-3 days mock
-  const totalDays = printingDays + shippingDays;
-
-  const now = new Date();
-  const deliveryDate = addDays(now, totalDays);
-
-  const info = await lookupPincode(deliveryPincode);
-
-  return {
-    isServiceable: true,
-    pincode: deliveryPincode,
-    city: info?.city || 'New Delhi',
-    state: info?.state || 'Delhi',
-    printingTime: `${printingDays} Day${printingDays > 1 ? 's' : ''}`,
-    shippingTime: `${shippingDays} Day${shippingDays > 1 ? 's' : ''}`,
-    totalTime: `${totalDays} Day${totalDays > 1 ? 's' : ''}`,
-    estimatedDays: `${totalDays} Days`,
-    deliveryDate: formatDate(deliveryDate),
-    expressAvailable: settings.expressPrintingEnabled,
-    courierName: settings.defaultCourier
-  };
 };
 
 /**

@@ -1110,43 +1110,50 @@ export default function AiStudioWorkspace() {
                 active={activeTool === "background"}
                 onClick={() => setActiveTool("background")}
                 icon={<Trash2 />}
-                label="Background Remove"
+                label="Coming Soon"
+                disabled={true}
               />
               <ToolButton
                 active={activeTool === "bg-change"}
                 onClick={() => setActiveTool("bg-change")}
                 icon={<ImageIcon />}
-                label="Background Replace"
+                label="Coming Soon"
+                disabled={true}
               />
               <ToolButton
                 active={activeTool === "object-remove"}
                 onClick={() => setActiveTool("object-remove")}
                 icon={<BoxSelect />}
-                label="Object Remover"
+                label="Coming Soon"
+                disabled={true}
               />
               <ToolButton
                 active={activeTool === "magic-eraser"}
                 onClick={() => setActiveTool("magic-eraser")}
                 icon={<Brush />}
-                label="Magic Eraser"
+                label="Coming Soon"
+                disabled={true}
               />
               <ToolButton
                 active={activeTool === "inpaint"}
                 onClick={() => setActiveTool("inpaint")}
                 icon={<Paintbrush />}
-                label="Smart Inpainting"
+                label="Coming Soon"
+                disabled={true}
               />
               <ToolButton
                 active={activeTool === "outpaint"}
                 onClick={() => setActiveTool("outpaint")}
                 icon={<Maximize />}
-                label="Smart Outpainting"
+                label="Coming Soon"
+                disabled={true}
               />
               <ToolButton
                 active={activeTool === "watermark"}
                 onClick={() => setActiveTool("watermark")}
                 icon={<Droplet />}
-                label="Watermark Removal"
+                label="Coming Soon"
+                disabled={true}
               />
             </ToolGroup>
 
@@ -1155,31 +1162,36 @@ export default function AiStudioWorkspace() {
                 active={activeTool === "enhancement"}
                 onClick={() => setActiveTool("enhancement")}
                 icon={<Wand2 />}
-                label="Auto Enhance"
+                label="Coming Soon"
+                disabled={true}
               />
               <ToolButton
                 active={activeTool === "upscale"}
                 onClick={() => setActiveTool("upscale")}
                 icon={<ZoomIn />}
-                label="Resolution Upscale"
+                label="Coming Soon"
+                disabled={true}
               />
               <ToolButton
                 active={activeTool === "face-restore"}
                 onClick={() => setActiveTool("face-restore")}
                 icon={<Smile />}
-                label="Face Restore"
+                label="Coming Soon"
+                disabled={true}
               />
               <ToolButton
                 active={activeTool === "portrait"}
                 onClick={() => setActiveTool("portrait")}
                 icon={<User />}
-                label="AI Portrait Enhance"
+                label="Coming Soon"
+                disabled={true}
               />
               <ToolButton
                 active={activeTool === "logo-upscale"}
                 onClick={() => setActiveTool("logo-upscale")}
                 icon={<Cpu />}
-                label="AI Logo Upscaler"
+                label="Coming Soon"
+                disabled={true}
               />
             </ToolGroup>
 
@@ -1188,13 +1200,15 @@ export default function AiStudioWorkspace() {
                 active={activeTool === "print-valid"}
                 onClick={() => setActiveTool("print-valid")}
                 icon={<CheckCircle2 />}
-                label="AI Print Validator"
+                label="Coming Soon"
+                disabled={true}
               />
               <ToolButton
                 active={activeTool === "spell-check"}
                 onClick={() => setActiveTool("spell-check")}
                 icon={<SpellCheck />}
-                label="AI Spell Check"
+                label="Coming Soon"
+                disabled={true}
               />
               <ToolButton
                 active={activeTool === "crop"}
@@ -1212,7 +1226,8 @@ export default function AiStudioWorkspace() {
                 active={activeTool === "resize"}
                 onClick={() => setActiveTool("resize")}
                 icon={<Shrink />}
-                label="Resize & DPI Presets"
+                label="Coming Soon"
+                disabled={true}
               />
             </ToolGroup>
 
@@ -1221,19 +1236,22 @@ export default function AiStudioWorkspace() {
                 active={activeTool === "image-gen"}
                 onClick={() => setActiveTool("image-gen")}
                 icon={<Wand2 />}
-                label="AI Image Generator"
+                label="Coming Soon"
+                disabled={true}
               />
               <ToolButton
                 active={activeTool === "template-gen"}
                 onClick={() => setActiveTool("template-gen")}
                 icon={<LayoutTemplate />}
-                label="AI Template Generator"
+                label="Coming Soon"
+                disabled={true}
               />
               <ToolButton
                 active={activeTool === "qr"}
                 onClick={() => setActiveTool("qr")}
                 icon={<Grid3X3 />}
-                label="AI QR Generator"
+                label="Coming Soon"
+                disabled={true}
               />
             </ToolGroup>
           </div>
@@ -2218,16 +2236,19 @@ function ToolButton({
   onClick,
   icon,
   label,
+  disabled
 }: {
   active: boolean;
   onClick: () => void;
   icon: React.ReactNode;
   label: string;
+  disabled?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center py-2.5 px-3 rounded-xl transition cursor-pointer text-left ${active ? "bg-indigo-50 text-indigo-600 font-bold" : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 font-medium"}`}
+      disabled={disabled}
+      className={`w-full flex items-center py-2.5 px-3 rounded-xl transition cursor-pointer text-left ${active ? "bg-indigo-50 text-indigo-600 font-bold" : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 font-medium"} ${disabled ? "opacity-50 cursor-not-allowed grayscale" : ""}`}
     >
       <div
         className={`w-5 h-5 shrink-0 flex items-center justify-center ${active ? "text-indigo-600" : "text-zinc-400"}`}

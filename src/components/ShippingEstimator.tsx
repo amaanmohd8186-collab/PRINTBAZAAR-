@@ -7,27 +7,38 @@ import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Truck, MapPin, Search, ChevronRight, Package, ShieldCheck, Clock } from 'lucide-react';
 
+import { checkServiceability } from '../lib/shipping';
+
 export default function ShippingEstimator() {
   const [pincode, setPincode] = useState('');
   const [estimating, setEstimating] = useState(false);
   const [estimate, setEstimate] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleEstimate = () => {
+  const handleEstimate = async () => {
     if (pincode.length !== 6) return;
     setEstimating(true);
     setEstimate(null);
+    setError(null);
     
-    // Simulate Shiprocket API call
-    setTimeout(() => {
-      setEstimate({
-        courier: 'Delhivery / BlueDart',
-        estimatedDays: 3,
-        cost: 0, // Free for professional orders
-        status: 'Servicable',
-        tracking: 'Real-time via SMS'
-      });
+    try {
+      const res = await checkServiceability(pincode);
+      if (res.isServiceable) {
+        setEstimate({
+          courier: res.courierName || 'Partner Courier',
+          estimatedDays: res.estimatedDays,
+          cost: 0,
+          status: 'Servicable',
+          tracking: 'Real-time via SMS'
+        });
+      } else {
+        setError(res.estimatedDays || res.error || "Delivery estimate unavailable.");
+      }
+    } catch (err: any) {
+       setError(err.message || "Delivery estimate unavailable.");
+    } finally {
       setEstimating(false);
-    }, 1200);
+    }
   };
 
   return (
@@ -62,6 +73,24 @@ export default function ShippingEstimator() {
            {estimating ? 'Checking...' : 'Check Availability'}
          </button>
       </div>
+
+      {error && (
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-6 bg-rose-50 border border-rose-100 rounded-3xl space-y-4"
+        >
+           <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                 <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                 <span className="text-[9px] font-black uppercase tracking-widest text-rose-600">Delivery Unavailable</span>
+              </div>
+           </div>
+           <p className="text-[10px] font-bold text-zinc-600 uppercase leading-relaxed">
+              {error}
+           </p>
+        </motion.div>
+      )}
 
       {estimate && (
         <motion.div 

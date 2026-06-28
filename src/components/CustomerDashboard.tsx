@@ -55,7 +55,7 @@ export default function CustomerDashboard({
   onEditAddress,
   onAddAddress
 }: CustomerDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'profile' | 'orders' | 'designs' | 'addresses' | 'wallet' | 'support' | 'notifications' | 'wishlist'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'orders' | 'designs' | 'addresses' | 'wallet' | 'support' | 'notifications' | 'wishlist' | 'brandkit'>('profile');
   const [orders, setOrders] = useState<Order[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [tickets, setTickets] = useState<SupportTicket[]>([]);

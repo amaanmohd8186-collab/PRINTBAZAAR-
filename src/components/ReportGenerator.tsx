@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { 
   TrendingUp, 
@@ -27,26 +27,14 @@ import {
   PieChart as RePie,
   Pie
 } from 'recharts';
-import { BusinessReportType } from '../types';
+import { BusinessReportType, Order } from '../types';
+import { format, subDays } from 'date-fns';
 
-const MOCK_DATA = [
-  { name: 'Mon', sales: 45000, profit: 12000, orders: 12 },
-  { name: 'Tue', sales: 52000, profit: 15000, orders: 15 },
-  { name: 'Wed', sales: 38000, profit: 10000, orders: 10 },
-  { name: 'Thu', sales: 65000, profit: 22000, orders: 18 },
-  { name: 'Fri', sales: 48000, profit: 14000, orders: 14 },
-  { name: 'Sat', sales: 72000, profit: 28000, orders: 22 },
-  { name: 'Sun', sales: 32000, profit: 8000, orders: 8 },
-];
+interface Props {
+  orders: Order[];
+}
 
-const CATEGORY_DATA = [
-  { name: 'Banners', value: 400, color: '#FF4D00' },
-  { name: 'Business Cards', value: 300, color: '#0F172A' },
-  { name: 'Wedding Cards', value: 300, color: '#6366f1' },
-  { name: 'Packaging', value: 200, color: '#10b981' },
-];
-
-const ReportGenerator: React.FC = () => {
+const ReportGenerator: React.FC<Props> = ({ orders }) => {
   const [reportType, setReportType] = useState<BusinessReportType>('Daily');
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -54,6 +42,43 @@ const ReportGenerator: React.FC = () => {
     setIsGenerating(true);
     setTimeout(() => setIsGenerating(false), 1500);
   };
+
+  const chartData = useMemo(() => {
+    const data = [];
+    for (let i = 6; i >= 0; i--) {
+      const date = subDays(new Date(), i);
+      const dateStr = format(date, 'yyyy-MM-dd');
+      const dayName = format(date, 'EEE');
+      
+      const dayOrders = orders.filter(o => o.createdAt?.startsWith(dateStr) || false);
+      const sales = dayOrders.reduce((sum, o) => sum + o.totalAmount, 0);
+      const profit = sales * 0.25; // Estimate 25% profit
+      
+      data.push({
+        name: dayName,
+        sales,
+        profit,
+        orders: dayOrders.length
+      });
+    }
+    return data;
+  }, [orders]);
+
+  const categoryData = useMemo(() => {
+    const cats: Record<string, number> = {};
+    orders.forEach(o => {
+      o.items.forEach(item => {
+        cats[item.productCategory] = (cats[item.productCategory] || 0) + item.itemTotal;
+      });
+    });
+    
+    const colors = ['#FF4D00', '#0F172A', '#6366f1', '#10b981', '#f59e0b', '#3b82f6'];
+    return Object.entries(cats).map(([name, value], i) => ({
+      name,
+      value,
+      color: colors[i % colors.length]
+    }));
+  }, [orders]);
 
   return (
     <div className="space-y-8">
@@ -142,7 +167,7 @@ const ReportGenerator: React.FC = () => {
            </div>
            <div className="h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={MOCK_DATA}>
+                <AreaChart data={chartData}>
                   <defs>
                     <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#FF4D00" stopOpacity={0.1}/>
@@ -186,13 +211,13 @@ const ReportGenerator: React.FC = () => {
               <ResponsiveContainer width="100%" height="100%">
                  <RePie>
                     <Pie
-                      data={CATEGORY_DATA}
+                      data={categoryData}
                       innerRadius={60}
                       outerRadius={80}
                       paddingAngle={5}
                       dataKey="value"
                     >
-                      {CATEGORY_DATA.map((entry, index) => (
+                      {categoryData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
@@ -205,15 +230,17 @@ const ReportGenerator: React.FC = () => {
               </div>
            </div>
            <div className="mt-8 space-y-3">
-              {CATEGORY_DATA.map(item => (
+              {categoryData.map(item => {
+                const totalCats = categoryData.reduce((sum, c) => sum + c.value, 0) || 1;
+                return (
                 <div key={item.name} className="flex items-center justify-between">
                    <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
                       <span className="text-[10px] font-bold text-zinc-600 uppercase">{item.name}</span>
                    </div>
-                   <span className="text-[10px] font-black text-slate-950">{(item.value / 1200 * 100).toFixed(0)}%</span>
+                   <span className="text-[10px] font-black text-slate-950">{((item.value / totalCats) * 100).toFixed(0)}%</span>
                 </div>
-              ))}
+              )})}
            </div>
         </div>
       </div>

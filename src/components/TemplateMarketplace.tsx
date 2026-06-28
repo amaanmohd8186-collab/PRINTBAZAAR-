@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Search, 
@@ -12,6 +12,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { ProductCategory } from '../types';
+import { db, collection, onSnapshot, query, where } from '../firebase';
 
 const CATEGORIES: string[] = [
   'All', 'Business', 'Wedding', 'Invitation', 'Islamic', 'School', 'College', 
@@ -32,15 +33,6 @@ interface Template {
   uses: number;
 }
 
-const MOCK_TEMPLATES: Template[] = [
-  { id: '1', name: 'Premium Corporate Card', category: 'Corporate', preview: 'https://images.unsplash.com/photo-1572044162444-ad60f128bde7?auto=format&fit=crop&q=80&w=400', premium: true, rating: 4.9, uses: 1200 },
-  { id: '2', name: 'Royal Wedding Invite', category: 'Wedding', preview: 'https://images.unsplash.com/photo-1607190074257-dd4b7af0309f?auto=format&fit=crop&q=80&w=400', premium: true, rating: 4.8, uses: 850 },
-  { id: '3', name: 'Minimalist Menu', category: 'Restaurant', preview: 'https://images.unsplash.com/photo-1546197147-36e7884c0628?auto=format&fit=crop&q=80&w=400', premium: false, rating: 4.7, uses: 2300 },
-  { id: '4', name: 'Social Media Banner', category: 'Instagram', preview: 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?auto=format&fit=crop&q=80&w=400', premium: false, rating: 4.5, uses: 4500 },
-  { id: '5', name: 'Medical Conference Poster', category: 'Medical', preview: 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&q=80&w=400', premium: true, rating: 4.9, uses: 320 },
-  { id: '6', name: 'Real Estate Flyer', category: 'Real Estate', preview: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&q=80&w=400', premium: false, rating: 4.6, uses: 1500 },
-];
-
 interface Props {
   onSelect: (template: any) => void;
   onPreview: (template: any) => void;
@@ -50,8 +42,23 @@ const TemplateMarketplace: React.FC<Props> = ({ onSelect, onPreview }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredTemplates = MOCK_TEMPLATES.filter(t => {
+  useEffect(() => {
+    const q = query(collection(db, 'templates'), where('published', '==', true));
+    const unsubscribe = onSnapshot(q, (snap) => {
+      const fetched = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Template));
+      setTemplates(fetched);
+      setLoading(false);
+    }, (err) => {
+      console.warn("Failed to fetch templates:", err);
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const filteredTemplates = templates.filter(t => {
     const matchesSearch = t.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === 'All' || t.category === selectedCategory;
     return matchesSearch && matchesCategory;

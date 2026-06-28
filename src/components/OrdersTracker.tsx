@@ -183,7 +183,7 @@ export default function OrdersTracker({
   onUpdateOrder,
   onReorder,
   userRole = 'customer',
-  userEmail = 'amaanmohd8681@gmail.com'
+  userEmail = ''
 }: OrdersTrackerProps) {
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [expandedSpecs, setExpandedSpecs] = useState<Set<string>>(new Set());

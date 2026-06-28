@@ -54,6 +54,7 @@ export interface ShippingServiceability {
   courierName?: string;
   shippingRate?: number;
   deliveryDate?: string;
+  error?: string;
 }
 
 export interface LogisticsSettings {
@@ -129,6 +130,8 @@ export interface StaffMember {
   email: string;
   role: StaffRole;
   active: boolean;
+  status?: 'Active' | 'On Leave' | 'Busy';
+  assignedTasks?: number;
   permissions: string[];
   joinedAt: string;
 }

@@ -66,7 +66,8 @@ import {
   Magnet,
   ShieldCheck,
   Search,
-  ShoppingCart
+  ShoppingCart,
+  Activity
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { jsPDF } from 'jspdf';
@@ -1949,7 +1950,7 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
                 height: `${CANVAS_HEIGHT + 20}px`
               }}
             >
-              <div ref={canvasContainerRef} style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }} />
+              <div ref={canvasContainerRef} className="touch-none" style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }} />
             
             {/* Active tool overlay or isProcessing state */}
             <AnimatePresence>
@@ -2193,11 +2194,12 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
                 className="w-full h-24 bg-zinc-900 border border-zinc-800 rounded-xl p-3.5 text-xs text-zinc-100 placeholder-zinc-500 resize-none outline-none focus:border-emerald-500 transition"
               />
               <button 
-                onClick={() => processAI('creative-gen')}
-                className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition shadow-xl shadow-emerald-600/10"
+                onClick={() => {}}
+                disabled={true}
+                className="w-full py-3.5 bg-emerald-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition shadow-xl shadow-emerald-600/10 opacity-50 cursor-not-allowed grayscale"
               >
                 <Zap className="w-3.5 h-3.5" />
-                Compile Creative (25 Cr)
+                Coming Soon
               </button>
             </div>
 
@@ -2207,18 +2209,20 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
                <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-widest font-mono">Advanced Utilities</span>
                <div className="grid grid-cols-2 gap-2">
                   <button 
-                    onClick={() => processAI('vector-conversion')}
-                    className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center space-y-1 hover:border-zinc-600 transition"
+                    onClick={() => {}}
+                    disabled={true}
+                    className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center space-y-1 opacity-50 cursor-not-allowed grayscale"
                   >
                     <RefreshCw className="w-4 h-4 text-emerald-400 mx-auto" />
-                    <span className="text-[9px] font-black uppercase text-zinc-300 block">PNG → SVG</span>
+                    <span className="text-[9px] font-black uppercase text-zinc-300 block">Coming Soon</span>
                   </button>
                   <button 
-                    onClick={() => processAI('background-removal')}
-                    className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center space-y-1 hover:border-zinc-600 transition"
+                    onClick={() => {}}
+                    disabled={true}
+                    className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center space-y-1 opacity-50 cursor-not-allowed grayscale"
                   >
                     <Eraser className="w-4 h-4 text-emerald-400 mx-auto" />
-                    <span className="text-[9px] font-black uppercase text-zinc-300 block">Eraser AI</span>
+                    <span className="text-[9px] font-black uppercase text-zinc-300 block">Coming Soon</span>
                   </button>
                </div>
             </div>
@@ -2291,12 +2295,12 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
                 className="w-full h-24 bg-zinc-900 border border-zinc-800 rounded-xl p-3.5 text-xs text-zinc-100 placeholder-zinc-500 resize-none outline-none focus:border-purple-650"
               />
               <button 
-                onClick={() => processAI('template-gen')}
-                disabled={!aiPrompt.trim() || isProcessing}
+                onClick={() => {}}
+                disabled={true}
                 className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-[11px] uppercase tracking-wider flex items-center justify-center gap-2 transition disabled:opacity-50 cursor-pointer shadow-md shadow-purple-600/10"
               >
                 <Wand2 className="w-3.5 h-3.5" />
-                <span>Generate Template (15 Cr)</span>
+                <span>Coming Soon</span>
               </button>
             </div>
 
@@ -2307,30 +2311,30 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
               <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest font-mono">Generative Co-pilot Tools</span>
               <div className="grid grid-cols-2 gap-2">
                 <button 
-                  onClick={() => processAI('background-removal')}
-                  disabled={isProcessing}
-                  className="flex flex-col items-center justify-center gap-2 p-3 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 rounded-2xl text-center transition cursor-pointer"
+                  onClick={() => {}}
+                  disabled={true}
+                  className="flex flex-col items-center justify-center gap-2 p-3 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 rounded-2xl text-center transition cursor-pointer disabled:opacity-50"
                 >
                   <Eraser className="w-4 h-4 text-purple-400" />
-                  <span className="text-[10px] font-bold uppercase text-zinc-300">Cut BG (5 Cr)</span>
+                  <span className="text-[10px] font-bold uppercase text-zinc-300">Coming Soon</span>
                 </button>
 
                 <button 
-                  onClick={() => processAI('upscale')}
-                  disabled={isProcessing}
-                  className="flex flex-col items-center justify-center gap-2 p-3 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 rounded-2xl text-center transition cursor-pointer"
+                  onClick={() => {}}
+                  disabled={true}
+                  className="flex flex-col items-center justify-center gap-2 p-3 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 rounded-2xl text-center transition cursor-pointer disabled:opacity-50"
                 >
                   <Maximize2 className="w-4 h-4 text-indigo-400" />
-                  <span className="text-[10px] font-bold uppercase text-zinc-300">Upscale 4x (5 Cr)</span>
+                  <span className="text-[10px] font-bold uppercase text-zinc-300">Coming Soon</span>
                 </button>
               </div>
 
               <button 
-                onClick={() => processAI('enhancement')}
-                disabled={isProcessing}
-                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold uppercase tracking-wider rounded-xl transition cursor-pointer"
+                onClick={() => {}}
+                disabled={true}
+                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold uppercase tracking-wider rounded-xl transition cursor-pointer disabled:opacity-50"
               >
-                Calibrate Studio Colors (5 Cr)
+                Coming Soon
               </button>
             </div>
 
@@ -2500,21 +2504,12 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
             <div className="pt-2">
               <button
                 type="button"
-                onClick={processAdobeAI}
-                disabled={isProcessing}
+                onClick={() => {}}
+                disabled={true}
                 className="w-full py-3 bg-[#FF4D00] hover:bg-[#E03E00] text-white rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition disabled:opacity-50 cursor-pointer shadow-lg shadow-[#FF4D00]/10"
               >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>Processing Adobe Layer...</span>
-                  </>
-                ) : (
-                  <>
-                    <PenTool className="w-3.5 h-3.5" />
-                    <span>Generate Adobe Diff ({getToolCost(adobeSelectedTool)} Cr)</span>
-                  </>
-                )}
+                <PenTool className="w-3.5 h-3.5" />
+                <span>Coming Soon</span>
               </button>
             </div>
 
@@ -2892,7 +2887,7 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
                                   left: 100,
                                   top: 100,
                                   fontSize: 20,
-                                  fontFamily: brandKit.favoriteFonts?.[0] || 'Inter',
+                                  fontFamily: brandKit.fonts?.[0] || 'Inter',
                                   fill: brandKit.colors?.[0] || '#000000'
                                 });
                                 fabricCanvas.current?.add(text);
@@ -2919,10 +2914,13 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
                   </h3>
                </div>
                <div className="p-2 h-full overflow-hidden">
-                 <TemplateMarketplace onSelectTemplate={(tpl) => {
-                   applyTemplate(tpl);
-                   showStatus('success', `Imported ${tpl.name} from marketplace!`);
-                 }} />
+                 <TemplateMarketplace 
+                   onSelect={(tpl) => {
+                     applyTemplate(tpl);
+                     showStatus('success', `Imported ${tpl.name} from marketplace!`);
+                   }}
+                   onPreview={(tpl) => {}}
+                 />
                </div>
             </div>
           )}

@@ -195,12 +195,27 @@ export default function CartView({
     return null;
   };
 
-  const handleProceedToPay = () => {
+  const handleProceedToPay = async () => {
     const errorMsg = validateCheckout();
     if (errorMsg) {
       setShippingError(errorMsg);
       return;
     }
+    
+    setShippingError('Verifying serviceability...');
+    try {
+      const { checkServiceability } = await import('../lib/shipping');
+      const serviceability = await checkServiceability(pincode);
+      
+      if (!serviceability.isServiceable) {
+         setShippingError(serviceability.error || 'Delivery estimate unavailable for this Pincode.');
+         return;
+      }
+    } catch (e) {
+      setShippingError('Delivery estimate unavailable.');
+      return;
+    }
+
     setShippingError('');
     setShowPayment(true);
   };

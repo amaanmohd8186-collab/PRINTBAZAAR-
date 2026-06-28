@@ -21,6 +21,9 @@ body {
   overflow-x: hidden;
   width: 100%;
   max-width: 100vw;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: none;
+  touch-action: manipulation;
 }
 
 /* Global Dark Mode Overrides */

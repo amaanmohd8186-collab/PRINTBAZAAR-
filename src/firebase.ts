@@ -38,6 +38,7 @@ import {
   Timestamp as fbTimestamp
 } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import { getMessaging, getToken as fbGetToken, isSupported as fbIsSupported } from 'firebase/messaging';
 import config from '../firebase-applet-config.json';
 
 // Initialize Firebase
@@ -46,6 +47,17 @@ const app = initializeApp(config);
 export const auth = getAuth(app);
 export const db = getFirestore(app, config.firestoreDatabaseId);
 export const storage = getStorage(app);
+let messagingInstance: any = null;
+const initMessaging = async () => {
+  if (await fbIsSupported()) {
+    messagingInstance = getMessaging(app);
+  }
+};
+initMessaging();
+
+export const getMessagingService = () => messagingInstance;
+export const getToken = fbGetToken;
+export const isSupported = fbIsSupported;
 const googleProvider = new GoogleAuthProvider();
 
 // Auth Helpers

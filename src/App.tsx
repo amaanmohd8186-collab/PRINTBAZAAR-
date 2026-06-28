@@ -331,22 +331,6 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Fetch real orders from Firestore for current user
-  useEffect(() => {
-    if (!user) {
-      setOrders([]);
-      return;
-    }
-    const q = query(collection(db, 'orders'), where('userId', '==', user.uid), orderBy('createdAt', 'desc'));
-    const unsubscribe = onSnapshot(q, (snap) => {
-      const ords = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
-      setOrders(ords);
-    }, (err) => {
-      console.warn("Orders fetch restricted (Rules):", err);
-    });
-    return () => unsubscribe();
-  }, [user]);
-
   const [successOrder, setSuccessOrder] = useState<Order | null>(null);
   const [cartItems, setCartItems] = useState<CartItem[]>(() => 
     getLocalStorageData<CartItem[]>('pb_cart', [])
@@ -383,6 +367,22 @@ export default function App() {
   });
 
   const [user, setUser] = useState<FirebaseUser | null>(null);
+
+  // Fetch real orders from Firestore for current user
+  useEffect(() => {
+    if (!user) {
+      setOrders([]);
+      return;
+    }
+    const q = query(collection(db, 'orders'), where('userId', '==', user.uid), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snap) => {
+      const ords = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
+      setOrders(ords);
+    }, (err) => {
+      console.warn("Orders fetch restricted (Rules):", err);
+    });
+    return () => unsubscribe();
+  }, [user]);
   const [focusConfigProduct, setFocusConfigProduct] = useState<Product | null>(null);
   const [showFaqModal, setShowFaqModal] = useState(false);
   const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'warn'; text: string } | null>(null);
@@ -708,24 +708,8 @@ export default function App() {
 
   // Automatically correct dummy placeholder images to category-specific real images
   useEffect(() => {
-    // Seed social data if collection is empty
-    const seedSocial = async () => {
-      if (!db) return;
-      try {
-        const postsSnap = await getDocs(query(collection(db, 'posts'), limit(1)));
-        // Only attempt to seed if signed in as admin (to avoid random users seeding posts)
-        if (postsSnap.empty && user && session.role === 'admin') {
-          for (const post of INITIAL_SOCIAL_POSTS) {
-            await addDoc(collection(db, 'posts'), {
-              ...post,
-              createdAt: serverTimestamp()
-            });
-          }
-        }
-      } catch (e) {
-        console.warn("Failed to seed social posts:", e);
-      }
-    };
+    // Seed social data disabled as per user instruction.
+    const seedSocial = async () => {};
     if (user) {
       seedSocial();
     }
@@ -868,7 +852,7 @@ export default function App() {
         name: 'quick_buy_draft.pdf',
         size: 1024 * 1024 * 1.5,
         type: 'application/pdf',
-        fileData: 'MOCK_PDF_BASE64'
+        fileData: ''
       },
       itemTotal,
       advanceAmount: itemTotal, 
@@ -1067,9 +1051,9 @@ export default function App() {
       } else {
         setUser(null);
         setSession({
-          id: 'cust-current',
-          name: 'Amaan Mohd',
-          email: 'amaanmohd8186@gmail.com',
+          id: '',
+          name: '',
+          email: '',
           role: 'customer'
         });
         
@@ -1132,22 +1116,22 @@ export default function App() {
   // Real-time Firestore synchronizer for Products catalog
   useEffect(() => {
     if (!db) {
-      console.warn("Firestore not initialized. Using initial products mock.");
-      setProducts(INITIAL_PRODUCTS);
+      console.warn("Firestore not initialized.");
+      setProducts([]);
       return;
     }
     const q = query(collection(db, 'products'));
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
       if (snapshot.empty) {
-        setProducts(INITIAL_PRODUCTS);
+        setProducts([]);
       } else {
         const productsList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as unknown as Product[];
         setProducts(productsList);
       }
     }, (error) => {
       console.error("Products fetch failed:", error);
-      setProducts(INITIAL_PRODUCTS);
+      setProducts([]);
     });
 
     return () => unsubscribe();
@@ -1156,12 +1140,12 @@ export default function App() {
   // Real-time Firestore synchronizer for Orders
   useEffect(() => {
     if (!user) {
-      setOrders(INITIAL_ORDERS);
+      setOrders([]);
       return;
     }
     if (!db) {
-       console.warn("Firestore not initialized. Using initial orders mock.");
-       setOrders(INITIAL_ORDERS);
+       console.warn("Firestore not initialized.");
+       setOrders([]);
        return;
     }
 

@@ -343,7 +343,6 @@ export default function AdminWorkspace({
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [validationScore, setValidationScore] = useState(0);
-  const isAdminVerified = true; // Admin verification mock
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [previewDevice, setPreviewDevice] = useState<'Desktop'|'Tablet'|'Mobile'>('Desktop');
 
@@ -586,11 +585,6 @@ export default function AdminWorkspace({
       // Proceeding with warning
     }
 
-    if (!isAdminVerified) {
-      alert('🔐 Unauthorized: Only verified admins can publish new products.');
-      return;
-    }
-
     const primaryImage = uploadedImages[0].url;
     const gallery = uploadedImages.slice(1).map(img => img.url);
 
@@ -787,7 +781,7 @@ export default function AdminWorkspace({
       )}
 
       {activeTab === 'reports' && (
-        <ReportGenerator />
+        <ReportGenerator orders={orders} />
       )}
 
       {activeTab === 'staff' && (
