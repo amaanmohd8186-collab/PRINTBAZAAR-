@@ -374,6 +374,11 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
   useEffect(() => {
     if (!canvasContainerRef.current) return;
 
+    // Lock body scrolling to prevent gestures from scrolling the preview frame / window
+    const originalBodyOverflow = document.body.style.overflow;
+    const originalBodyPosition = document.body.style.position;
+    document.body.style.overflow = 'hidden';
+
     let active = true;
     let canvasInstance: any = null;
 
@@ -390,7 +395,7 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
         width: CANVAS_WIDTH,
         height: CANVAS_HEIGHT,
         backgroundColor: '#f8fafc',
-        allowTouchScrolling: true,
+        allowTouchScrolling: false,
       });
       canvasInstance = c;
       fabricCanvas.current = c;
@@ -591,6 +596,10 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
       active = false;
       fabricCanvas.current = null;
       canvasRef.current = null;
+
+      // Restore original body scroll styles
+      document.body.style.overflow = originalBodyOverflow;
+      document.body.style.position = originalBodyPosition;
 
       if (canvasInstance) {
         try {
@@ -1992,7 +2001,7 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
             }}
           >
             <div 
-              className="relative shadow-2xl bg-[#f8fafc] p-2.5 rounded-2xl border border-zinc-800 transition-all origin-center select-none"
+              className="relative shadow-2xl bg-[#f8fafc] p-2.5 rounded-2xl border border-zinc-800 transition-all origin-center select-none touch-none"
               style={{ 
                 opacity: activeTool === 'easy' ? 0 : 1, 
                 pointerEvents: activeTool === 'easy' ? 'none' : 'auto',
