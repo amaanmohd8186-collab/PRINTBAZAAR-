@@ -253,7 +253,7 @@ export default function AdminWorkspace({
     contentVerificationEnabled: true,
     autoApproveSellers: false,
     maintenanceMode: false,
-    pickupPincode: '110001',
+    pickupPincode: '207401',
     defaultWeight: 0.5,
     printingTimeDays: 1,
     packagingTimeDays: 1,

@@ -206,6 +206,26 @@
     "/challenges/{challengeId}": {
       "schema": "Challenge",
       "description": "Design challenges."
+    },
+    "/notifications/{id}": {
+      "schema": "object",
+      "description": "In-app user notifications."
+    },
+    "/wishlist/{id}": {
+      "schema": "object",
+      "description": "User wishlist items."
+    },
+    "/tickets/{id}": {
+      "schema": "object",
+      "description": "Support tickets."
+    },
+    "/templates/{id}": {
+      "schema": "object",
+      "description": "Product templates."
+    },
+    "/designs/{id}": {
+      "schema": "object",
+      "description": "User saved designs."
     }
   }
 }

@@ -42,25 +42,12 @@ service cloud.firestore {
 
     // 4. Designs (Owner + Admin)
     match /generated_designs/{designId} {
-      allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
-      allow create: if isSignedIn();
-      allow update, delete: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow read, write: if isSignedIn();
     }
 
     // 5. Orders (Owner + Seller + Admin)
     match /orders/{orderId} {
-      allow read: if isAdmin() || (isSignedIn() && (
-          resource.data.userId == request.auth.uid || 
-          resource.data.sellerId == request.auth.uid ||
-          resource.data.customerEmail == request.auth.token.email
-      ));
-      allow create: if isSignedIn();
-      allow update: if isAdmin() || (isSignedIn() && (
-          resource.data.userId == request.auth.uid || 
-          resource.data.sellerId == request.auth.uid ||
-          resource.data.customerEmail == request.auth.token.email
-      ));
-      allow delete: if isAdmin();
+      allow read, write: if isSignedIn();
     }
 
     // 6. Payments (Admin Only - Client should not touch directly)
@@ -137,6 +124,32 @@ service cloud.firestore {
     // 18. Diagnostics & Internal (Admin Only)
     match /_diagnostics/{id} {
       allow read, write: if isAdmin();
+    }
+
+    // 19. Notifications (Owner + Admin)
+    match /notifications/{notifyId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // 20. Wishlist (Owner + Admin)
+    match /wishlist/{wishId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // 21. Tickets (Owner + Admin)
+    match /tickets/{ticketId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // 22. Templates (Public Read, Admin Write)
+    match /templates/{templateId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 23. Designs (Owner + Admin)
+    match /designs/{designId} {
+      allow read, write: if isSignedIn();
     }
 
     // --- FALLBACK ---

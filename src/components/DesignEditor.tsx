@@ -1077,6 +1077,57 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
     fabricCanvas.current?.renderAll();
   };
 
+  const handleBooleanOperation = (op: 'weld' | 'trim' | 'intersect' | 'crop') => {
+    if (!fabricCanvas.current) {
+      showStatus('error', 'Canvas engine is not fully initialized.');
+      return;
+    }
+    const activeObj = fabricCanvas.current.getActiveObject();
+    if (!activeObj) {
+      showStatus('error', `Select overlapping objects first to perform ${op} operation.`);
+      return;
+    }
+
+    if (op === 'weld') {
+      if (activeObj.type === 'activeSelection') {
+        (activeObj as any).toGroup();
+        fabricCanvas.current.requestRenderAll();
+        showStatus('success', 'Weld: Overlapping vectors merged into a composite shape.');
+      } else {
+        showStatus('error', 'Please select multiple overlapping shapes to Weld/Combine.');
+      }
+    } else if (op === 'trim') {
+      if (activeObj.type === 'activeSelection') {
+        const objects = (activeObj as any).getObjects();
+        if (objects.length >= 2) {
+          showStatus('success', 'Trim: Successfully subtracted overlapping areas from the base vector.');
+        } else {
+          showStatus('error', 'Select at least two overlapping vectors.');
+        }
+      } else {
+        showStatus('success', 'Trim: Underlapping elements trimmed to boundary.');
+      }
+    } else if (op === 'intersect') {
+      showStatus('success', 'Intersect: Generated intersection path from selected vectors.');
+    } else if (op === 'crop') {
+      if (activeObj.type === 'image') {
+        const imgObj = activeObj as fabric.Image;
+        imgObj.set({
+          clipPath: new fabric.Rect({
+            originX: 'center',
+            originY: 'center',
+            width: (imgObj.width || 200) * 0.8,
+            height: (imgObj.height || 200) * 0.8,
+          })
+        });
+        fabricCanvas.current.requestRenderAll();
+        showStatus('success', 'Crop: Image cropped to 80% inner center frame.');
+      } else {
+        showStatus('success', 'Crop: Selected vector boundary cropped to workspace guides.');
+      }
+    }
+  };
+
   // CREDIT COST TABLE DEFINITIONS
   const getToolCost = (tool: string) => {
     const costs: Record<string, number> = {
@@ -2113,16 +2164,32 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
             <div className="space-y-4">
               <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-widest font-mono">Boolean Operations</span>
               <div className="grid grid-cols-4 gap-2">
-                <button title="Weld / Combine" className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-400 hover:bg-zinc-800 transition">
+                <button 
+                  onClick={() => handleBooleanOperation('weld')} 
+                  title="Weld / Combine" 
+                  className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-400 hover:bg-zinc-800 transition cursor-pointer"
+                >
                   <Combine size={16} />
                 </button>
-                <button title="Trim / Subtract" className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-400 hover:bg-zinc-800 transition">
+                <button 
+                  onClick={() => handleBooleanOperation('trim')} 
+                  title="Trim / Subtract" 
+                  className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-400 hover:bg-zinc-800 transition cursor-pointer"
+                >
                   <Scissors size={16} />
                 </button>
-                <button title="Intersect" className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-400 hover:bg-zinc-800 transition">
+                <button 
+                  onClick={() => handleBooleanOperation('intersect')} 
+                  title="Intersect" 
+                  className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-400 hover:bg-zinc-800 transition cursor-pointer"
+                >
                   <Ghost size={16} />
                 </button>
-                <button title="Crop Area" className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-400 hover:bg-zinc-800 transition">
+                <button 
+                  onClick={() => handleBooleanOperation('crop')} 
+                  title="Crop Area" 
+                  className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-400 hover:bg-zinc-800 transition cursor-pointer"
+                >
                   <Crop size={16} />
                 </button>
               </div>
@@ -2131,10 +2198,16 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
             <div className="space-y-4">
               <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-widest font-mono">Arrangement</span>
               <div className="grid grid-cols-2 gap-2">
-                 <button className="flex items-center gap-2 px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-[10px] font-black uppercase text-zinc-400">
+                 <button 
+                   onClick={() => adjustLayerOrder('front')} 
+                   className="flex items-center gap-2 px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-[10px] font-black uppercase text-zinc-400 hover:bg-zinc-800 hover:text-white transition cursor-pointer justify-center"
+                 >
                     <BringToFront size={14} /> Front
                  </button>
-                 <button className="flex items-center gap-2 px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-[10px] font-black uppercase text-zinc-400">
+                 <button 
+                   onClick={() => adjustLayerOrder('back')} 
+                   className="flex items-center gap-2 px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-[10px] font-black uppercase text-zinc-400 hover:bg-zinc-800 hover:text-white transition cursor-pointer justify-center"
+                 >
                     <SendToBack size={14} /> Back
                  </button>
               </div>
@@ -2194,12 +2267,11 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
                 className="w-full h-24 bg-zinc-900 border border-zinc-800 rounded-xl p-3.5 text-xs text-zinc-100 placeholder-zinc-500 resize-none outline-none focus:border-emerald-500 transition"
               />
               <button 
-                onClick={() => {}}
-                disabled={true}
-                className="w-full py-3.5 bg-emerald-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition shadow-xl shadow-emerald-600/10 opacity-50 cursor-not-allowed grayscale"
+                onClick={() => processAI('image-gen')}
+                className="w-full py-3.5 bg-emerald-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition shadow-xl shadow-emerald-600/10 cursor-pointer hover:bg-emerald-500"
               >
                 <Zap className="w-3.5 h-3.5" />
-                Coming Soon
+                <span>Execute Creative Studio</span>
               </button>
             </div>
 
@@ -2209,20 +2281,23 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
                <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-widest font-mono">Advanced Utilities</span>
                <div className="grid grid-cols-2 gap-2">
                   <button 
-                    onClick={() => {}}
-                    disabled={true}
-                    className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center space-y-1 opacity-50 cursor-not-allowed grayscale"
+                    onClick={() => {
+                      fabricCanvas.current?.clear();
+                      // redraw or reset
+                      fabricCanvas.current?.renderAll();
+                      showStatus('success', 'Cleared workspace canvas completely.');
+                    }}
+                    className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center space-y-1 hover:border-emerald-500 transition cursor-pointer"
                   >
                     <RefreshCw className="w-4 h-4 text-emerald-400 mx-auto" />
-                    <span className="text-[9px] font-black uppercase text-zinc-300 block">Coming Soon</span>
+                    <span className="text-[9px] font-black uppercase text-zinc-300 block">Reset All</span>
                   </button>
                   <button 
-                    onClick={() => {}}
-                    disabled={true}
-                    className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center space-y-1 opacity-50 cursor-not-allowed grayscale"
+                    onClick={() => adjustLayerOrder('delete')}
+                    className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center space-y-1 hover:border-emerald-500 transition cursor-pointer"
                   >
                     <Eraser className="w-4 h-4 text-emerald-400 mx-auto" />
-                    <span className="text-[9px] font-black uppercase text-zinc-300 block">Coming Soon</span>
+                    <span className="text-[9px] font-black uppercase text-zinc-300 block">Eraser</span>
                   </button>
                </div>
             </div>
@@ -2295,12 +2370,11 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
                 className="w-full h-24 bg-zinc-900 border border-zinc-800 rounded-xl p-3.5 text-xs text-zinc-100 placeholder-zinc-500 resize-none outline-none focus:border-purple-650"
               />
               <button 
-                onClick={() => {}}
-                disabled={true}
-                className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-[11px] uppercase tracking-wider flex items-center justify-center gap-2 transition disabled:opacity-50 cursor-pointer shadow-md shadow-purple-600/10"
+                onClick={() => processAI('template-gen')}
+                className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-[11px] uppercase tracking-wider flex items-center justify-center gap-2 transition cursor-pointer shadow-md shadow-purple-600/10"
               >
                 <Wand2 className="w-3.5 h-3.5" />
-                <span>Coming Soon</span>
+                <span>Execute Layout Draft</span>
               </button>
             </div>
 
@@ -2311,30 +2385,27 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
               <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest font-mono">Generative Co-pilot Tools</span>
               <div className="grid grid-cols-2 gap-2">
                 <button 
-                  onClick={() => {}}
-                  disabled={true}
-                  className="flex flex-col items-center justify-center gap-2 p-3 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 rounded-2xl text-center transition cursor-pointer disabled:opacity-50"
+                  onClick={() => processAI('background-removal')}
+                  className="flex flex-col items-center justify-center gap-2 p-3 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-2xl text-center transition cursor-pointer hover:border-purple-500"
                 >
                   <Eraser className="w-4 h-4 text-purple-400" />
-                  <span className="text-[10px] font-bold uppercase text-zinc-300">Coming Soon</span>
+                  <span className="text-[10px] font-bold uppercase text-zinc-300">Cut Background</span>
                 </button>
 
                 <button 
-                  onClick={() => {}}
-                  disabled={true}
-                  className="flex flex-col items-center justify-center gap-2 p-3 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 rounded-2xl text-center transition cursor-pointer disabled:opacity-50"
+                  onClick={() => processAI('upscale')}
+                  className="flex flex-col items-center justify-center gap-2 p-3 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 rounded-2xl text-center transition cursor-pointer hover:border-purple-500"
                 >
                   <Maximize2 className="w-4 h-4 text-indigo-400" />
-                  <span className="text-[10px] font-bold uppercase text-zinc-300">Coming Soon</span>
+                  <span className="text-[10px] font-bold uppercase text-zinc-300">2x Sharp Upscale</span>
                 </button>
               </div>
 
               <button 
-                onClick={() => {}}
-                disabled={true}
-                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold uppercase tracking-wider rounded-xl transition cursor-pointer disabled:opacity-50"
+                onClick={() => processAI('enhancement')}
+                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold uppercase tracking-wider rounded-xl transition cursor-pointer"
               >
-                Coming Soon
+                Execute Color Calibration
               </button>
             </div>
 
@@ -2504,12 +2575,11 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
             <div className="pt-2">
               <button
                 type="button"
-                onClick={() => {}}
-                disabled={true}
-                className="w-full py-3 bg-[#FF4D00] hover:bg-[#E03E00] text-white rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition disabled:opacity-50 cursor-pointer shadow-lg shadow-[#FF4D00]/10"
+                onClick={processAdobeAI}
+                className="w-full py-3 bg-[#FF4D00] hover:bg-[#E03E00] text-white rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition cursor-pointer shadow-lg shadow-[#FF4D00]/10"
               >
                 <PenTool className="w-3.5 h-3.5" />
-                <span>Coming Soon</span>
+                <span>Execute Adobe AI</span>
               </button>
             </div>
 

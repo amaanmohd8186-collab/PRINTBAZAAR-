@@ -1692,6 +1692,160 @@ Customer's custom requirements or idea prompt: "${prompt}"`;
     }
   });
 
+  app.get("/api/shipping/estimate", async (req, res) => {
+    try {
+      const { destination } = req.query;
+      if (!destination || typeof destination !== 'string') {
+        return res.status(400).json({ success: false, message: "Destination PIN code is required" });
+      }
+
+      const pincode = destination.trim();
+      if (!/^[1-9][0-9]{5}$/.test(pincode)) {
+        return res.status(400).json({ success: false, message: "Invalid Indian PIN code format" });
+      }
+
+      // Origin PIN: 207401 (Marehra, Kasganj, Uttar Pradesh)
+      const originPincode = "207401";
+      const originCity = "Marehra";
+      const originState = "Uttar Pradesh";
+
+      // 1. Determine region, state and city based on PIN digits
+      const firstDigit = pincode[0];
+      const prefix2 = pincode.substring(0, 2);
+      const prefix3 = pincode.substring(0, 3);
+
+      let city = "Unknown City";
+      let state = "Unknown State";
+      let region = "National Zone";
+      let shippingDays = 3;
+      let courierName = "Delhivery Surface";
+      let distanceKm = 650;
+
+      switch (firstDigit) {
+        case '1':
+          region = "Northern India";
+          shippingDays = 2;
+          courierName = "Delhivery Standard";
+          distanceKm = 280;
+          if (pincode.startsWith("110")) { city = "New Delhi"; state = "Delhi"; distanceKm = 210; }
+          else if (pincode.startsWith("122")) { city = "Gurugram"; state = "Haryana"; distanceKm = 240; }
+          else if (pincode.startsWith("141")) { city = "Ludhiana"; state = "Punjab"; distanceKm = 520; }
+          else { city = "Ambala"; state = "Haryana"; }
+          break;
+        case '2':
+          region = "Home State / Local Region";
+          shippingDays = 1;
+          courierName = "Delhivery Express Local";
+          distanceKm = 150;
+          if (pincode === originPincode) {
+            city = "Marehra (Kasganj)";
+            state = "Uttar Pradesh";
+            shippingDays = 1;
+            distanceKm = 0;
+            courierName = "PrintBazaar Local Dispatch";
+          } else if (pincode.startsWith("201")) { city = "Noida"; state = "Uttar Pradesh"; distanceKm = 180; }
+          else if (pincode.startsWith("226")) { city = "Lucknow"; state = "Uttar Pradesh"; distanceKm = 330; }
+          else if (pincode.startsWith("248")) { city = "Dehradun"; state = "Uttarakhand"; distanceKm = 390; }
+          else { city = "Kasganj"; state = "Uttar Pradesh"; }
+          break;
+        case '3':
+          region = "Western India";
+          shippingDays = 3;
+          courierName = "Xpressbees Air";
+          distanceKm = 780;
+          if (pincode.startsWith("302")) { city = "Jaipur"; state = "Rajasthan"; distanceKm = 350; }
+          else if (pincode.startsWith("380")) { city = "Ahmedabad"; state = "Gujarat"; distanceKm = 820; }
+          else { city = "Jodhpur"; state = "Rajasthan"; }
+          break;
+        case '4':
+          region = "Western-Central India";
+          shippingDays = 3;
+          courierName = "Delhivery Priority";
+          distanceKm = 950;
+          if (pincode.startsWith("400")) { city = "Mumbai"; state = "Maharashtra"; distanceKm = 1250; }
+          else if (pincode.startsWith("452")) { city = "Indore"; state = "Madhya Pradesh"; distanceKm = 680; }
+          else { city = "Nagpur"; state = "Maharashtra"; }
+          break;
+        case '5':
+          region = "Southern India";
+          shippingDays = 4;
+          courierName = "BlueDart Air Cargo";
+          distanceKm = 1600;
+          if (pincode.startsWith("500")) { city = "Hyderabad"; state = "Telangana"; distanceKm = 1350; }
+          else if (pincode.startsWith("560")) { city = "Bengaluru"; state = "Karnataka"; distanceKm = 1750; }
+          else { city = "Vijayawada"; state = "Andhra Pradesh"; }
+          break;
+        case '6':
+          region = "Southern India (Deep South)";
+          shippingDays = 4;
+          courierName = "BlueDart Priority Air";
+          distanceKm = 1950;
+          if (pincode.startsWith("600")) { city = "Chennai"; state = "Tamil Nadu"; distanceKm = 1850; }
+          else if (pincode.startsWith("682")) { city = "Kochi"; state = "Kerala"; distanceKm = 2300; }
+          else { city = "Coimbatore"; state = "Tamil Nadu"; }
+          break;
+        case '7':
+          region = "Eastern & North-Eastern India";
+          shippingDays = 4;
+          courierName = "Delhivery Air Express";
+          distanceKm = 1450;
+          if (pincode.startsWith("700")) { city = "Kolkata"; state = "West Bengal"; distanceKm = 1250; }
+          else if (pincode.startsWith("751")) { city = "Bhubaneswar"; state = "Odisha"; distanceKm = 1320; }
+          else { city = "Guwahati"; state = "Assam"; distanceKm = 1780; }
+          break;
+        case '8':
+          region = "East-Central India";
+          shippingDays = 3;
+          courierName = "Xpressbees Standard";
+          distanceKm = 850;
+          if (pincode.startsWith("800")) { city = "Patna"; state = "Bihar"; distanceKm = 780; }
+          else if (pincode.startsWith("834")) { city = "Ranchi"; state = "Jharkhand"; distanceKm = 980; }
+          else { city = "Gaya"; state = "Bihar"; }
+          break;
+        default:
+          region = "All India Grid";
+          shippingDays = 4;
+          courierName = "Delhivery Surface";
+          distanceKm = 1000;
+      }
+
+      // 2. Compute timeline
+      // Printing = 1 day, Packaging = 1 day, Shipping = shippingDays
+      const totalDays = 1 + 1 + shippingDays;
+      const today = new Date();
+      const deliveryDateObj = new Date(today.getTime() + totalDays * 24 * 60 * 60 * 1000);
+      
+      const formattedDeliveryDate = deliveryDateObj.toLocaleDateString('en-IN', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long'
+      });
+
+      return res.json({
+        success: true,
+        pincode,
+        city,
+        state,
+        region,
+        origin: {
+          pincode: originPincode,
+          city: originCity,
+          state: originState
+        },
+        distanceKm,
+        shippingTime: `${shippingDays} Day${shippingDays > 1 ? 's' : ''}`,
+        totalTime: `${totalDays} Day${totalDays > 1 ? 's' : ''}`,
+        deliveryDate: formattedDeliveryDate,
+        courierName,
+        routeInfo: `${originCity} (${originPincode}) → Kasganj Sorting Facility → ${city} Hub`
+      });
+
+    } catch (err: any) {
+      console.error("[SHIPPING-ESTIMATE-API] Failed:", err);
+      return res.status(500).json({ success: false, message: err.message });
+    }
+  });
+
   app.get("/api/cashfree/config", configHandler);
 
   app.post("/api/cashfree/create-order", createOrderHandler);
