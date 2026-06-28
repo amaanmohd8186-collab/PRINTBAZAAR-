@@ -30,11 +30,13 @@ import {
   ShieldCheck,
   Headphones,
   Trash2,
-  ArrowRight
+  ArrowRight,
+  Briefcase
 } from 'lucide-react';
-import { db, auth, collection, onSnapshot, query, where, orderBy, doc, updateDoc } from '../firebase';
-import { Order, UserStats, Address, SavedDesign, AppNotification, SupportTicket, Coupon } from '../types';
+import { db, auth, collection, onSnapshot, query, where, orderBy, doc, updateDoc, setDoc } from '../firebase';
+import { Order, UserStats, Address, SavedDesign, AppNotification, SupportTicket, Coupon, BrandKit } from '../types';
 import { format } from 'date-fns';
+import BrandKitManager from './BrandKitManager';
 
 interface CustomerDashboardProps {
   user: { id: string; name: string; email: string };
@@ -59,9 +61,18 @@ export default function CustomerDashboard({
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [savedDesigns, setSavedDesigns] = useState<SavedDesign[]>([]);
   const [wishlist, setWishlist] = useState<any[]>([]);
+  const [brandKit, setBrandKit] = useState<BrandKit | null>(null);
 
   useEffect(() => {
     if (!user.id) return;
+
+    // Listen to Brand Kit
+    const brandKitRef = doc(db, 'brandKits', user.id);
+    const unsubBrandKit = onSnapshot(brandKitRef, (snap) => {
+      if (snap.exists()) {
+        setBrandKit(snap.data() as BrandKit);
+      }
+    });
 
     // Listen to orders
     const ordersRef = collection(db, 'orders');
@@ -96,17 +107,32 @@ export default function CustomerDashboard({
       unsubNotify();
       unsubDesigns();
       unsubWishlist();
+      unsubBrandKit();
     };
   }, [user.id]);
 
+  const handleUpdateBrandKit = async (kit: BrandKit) => {
+    if (!user.id) return;
+    try {
+      await setDoc(doc(db, 'brandKits', user.id), {
+        ...kit,
+        userId: user.id,
+        updatedAt: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Error updating brand kit:', error);
+    }
+  };
+
   const tabs = [
     { id: 'profile', label: 'My Profile', icon: User },
+    { id: 'brandkit', label: 'Brand Kit', icon: Briefcase },
     { id: 'orders', label: 'My Orders', icon: ShoppingBag },
     { id: 'designs', label: 'My Designs', icon: Layout },
     { id: 'wishlist', label: 'Wishlist', icon: Heart },
     { id: 'addresses', label: 'Addresses', icon: MapPin },
     { id: 'wallet', label: 'Wallet & Rewards', icon: Wallet },
-    { id: 'support', label: 'Support Center', icon: Headphones },
+    { id: 'support', label: 'Help Center', icon: Headphones },
     { id: 'notifications', label: 'Alerts', icon: Bell, badge: notifications.filter(n => !n.isRead).length },
   ];
 
@@ -167,13 +193,13 @@ export default function CustomerDashboard({
         </nav>
 
         <div className="p-4 mt-auto border-t border-zinc-100">
-          <button 
-            onClick={onLogout}
-            className="w-full flex items-center gap-3 px-4 py-3.5 text-rose-600 text-[10px] font-black uppercase tracking-widest hover:bg-rose-50 rounded-xl transition"
-          >
-            <LogOut className="w-4 h-4" />
-            Sign Out Securely
-          </button>
+            <button 
+              onClick={onLogout}
+              className="w-full flex items-center gap-3 px-4 py-3.5 text-rose-600 text-[10px] font-black uppercase tracking-widest hover:bg-rose-50 rounded-xl transition"
+            >
+              <LogOut className="w-4 h-4" />
+              Sign Out
+            </button>
         </div>
       </div>
 
@@ -194,6 +220,24 @@ export default function CustomerDashboard({
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-white border border-zinc-200 rounded-[32px] p-8 space-y-6">
+                   <div className="flex items-center gap-3">
+                      <div className="p-2.5 bg-[#FF4D00]/5 rounded-2xl">
+                        <Briefcase className="w-5 h-5 text-[#FF4D00]" />
+                      </div>
+                      <h3 className="text-xs font-black uppercase tracking-widest">Enterprise Identity</h3>
+                   </div>
+                   <p className="text-[10px] text-zinc-500 font-bold leading-relaxed uppercase">
+                     Setup your Brand Kit to automatically apply logos, colors, and business details to all your future designs.
+                   </p>
+                   <button 
+                    onClick={() => setActiveTab('brandkit')}
+                    className="w-full py-3.5 bg-slate-950 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-[#FF4D00] transition shadow-lg"
+                   >
+                     Manage Brand Kit
+                   </button>
+                </div>
+
                 <div className="bg-white border border-zinc-200 rounded-[32px] p-8 space-y-6">
                    <div className="flex items-center gap-3">
                       <div className="p-2.5 bg-zinc-100 rounded-2xl">
@@ -218,7 +262,7 @@ export default function CustomerDashboard({
                    </div>
 
                    <button className="w-full py-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-100 transition">
-                     Update Identity
+                     Update Profile
                    </button>
                 </div>
 
@@ -227,7 +271,7 @@ export default function CustomerDashboard({
                       <div className="p-2.5 bg-amber-50 rounded-2xl">
                         <Star className="w-5 h-5 text-amber-500 fill-amber-500" />
                       </div>
-                      <h3 className="text-xs font-black uppercase tracking-widest">Membership Tier</h3>
+                      <h3 className="text-xs font-black uppercase tracking-widest">Membership</h3>
                    </div>
 
                    <div className="p-6 bg-zinc-900 rounded-3xl text-white relative overflow-hidden">
@@ -236,7 +280,7 @@ export default function CustomerDashboard({
                         <h4 className="text-2xl font-black uppercase italic tracking-tighter">{stats.subscriptionTier}</h4>
                         <div className="flex items-center gap-2">
                            <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                           <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">Enterprise Security Active</span>
+                           <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">Verified Account</span>
                         </div>
                       </div>
                       <div className="absolute -right-8 -bottom-8 opacity-10">
@@ -286,6 +330,18 @@ export default function CustomerDashboard({
             </motion.div>
           )}
 
+          {activeTab === 'brandkit' && (
+            <motion.div
+              key="brandkit"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="max-w-4xl"
+            >
+              <BrandKitManager brandKit={brandKit} onUpdate={handleUpdateBrandKit} />
+            </motion.div>
+          )}
+
           {activeTab === 'orders' && (
             <motion.div
               key="orders"
@@ -315,7 +371,7 @@ export default function CustomerDashboard({
                       <ShoppingBag className="w-10 h-10 text-zinc-100" />
                    </div>
                    <div className="space-y-1">
-                      <h3 className="text-sm font-black text-zinc-900 uppercase tracking-widest">No Active Jobs</h3>
+                      <h3 className="text-sm font-black text-zinc-900 uppercase tracking-widest">No Orders</h3>
                       <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Start your first high-fidelity print project today</p>
                    </div>
                    <button className="px-8 py-3.5 bg-black text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800 transition">
@@ -420,7 +476,7 @@ export default function CustomerDashboard({
             >
               <div className="flex items-center justify-between">
                 <div className="space-y-2">
-                  <h1 className="text-2xl font-black text-zinc-900 uppercase tracking-tight">Delivery Hubs</h1>
+                  <h1 className="text-2xl font-black text-zinc-900 uppercase tracking-tight">Addresses</h1>
                   <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Manage your shipping destinations and billing addresses</p>
                 </div>
                 <button 
@@ -428,7 +484,7 @@ export default function CustomerDashboard({
                   className="flex items-center gap-2 px-6 py-3 bg-black text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800 transition shadow-lg shadow-black/10"
                 >
                   <Plus className="w-4 h-4" />
-                  Add New Hub
+                  Add Address
                 </button>
               </div>
 
@@ -460,7 +516,7 @@ export default function CustomerDashboard({
                           onClick={() => onEditAddress(addr)}
                           className="text-[10px] font-black uppercase tracking-widest text-[#FF4D00] hover:underline"
                         >
-                          Modify Hub
+                          Modify Address
                         </button>
                         <span className="text-zinc-200">|</span>
                         <button className="text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-rose-500">
@@ -474,7 +530,7 @@ export default function CustomerDashboard({
                    <div className="md:col-span-2 bg-zinc-50 border-2 border-dashed border-zinc-200 rounded-[40px] p-20 text-center space-y-4">
                       <MapPin className="w-12 h-12 text-zinc-200 mx-auto" />
                       <div className="space-y-1">
-                        <h3 className="text-sm font-black text-zinc-900 uppercase tracking-widest">No Saved Destinations</h3>
+                        <h3 className="text-sm font-black text-zinc-900 uppercase tracking-widest">No saved addresses</h3>
                         <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Your saved addresses will appear here for faster checkout</p>
                       </div>
                    </div>
@@ -492,7 +548,7 @@ export default function CustomerDashboard({
               className="max-w-4xl space-y-8"
             >
               <div className="space-y-2">
-                <h1 className="text-2xl font-black text-zinc-900 uppercase tracking-tight">Fintech & Rewards</h1>
+                <h1 className="text-2xl font-black text-zinc-900 uppercase tracking-tight">Wallet & Rewards</h1>
                 <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Manage your digital wallet, rewards points, and active coupons</p>
               </div>
 
@@ -543,7 +599,7 @@ export default function CustomerDashboard({
               {/* Recent Transactions */}
               <div className="bg-white border border-zinc-200 rounded-[40px] overflow-hidden shadow-sm">
                  <div className="p-8 border-b border-zinc-100 flex items-center justify-between">
-                    <h3 className="text-xs font-black uppercase tracking-widest text-zinc-900">Transaction Pulse</h3>
+                    <h3 className="text-xs font-black uppercase tracking-widest text-zinc-900">Transaction History</h3>
                     <button className="text-[10px] font-black uppercase text-[#FF4D00] hover:underline">Download Statement</button>
                  </div>
                  <div className="p-4 text-center py-20 text-zinc-400 space-y-3">
@@ -564,12 +620,12 @@ export default function CustomerDashboard({
             >
               <div className="flex items-center justify-between">
                 <div className="space-y-2">
-                  <h1 className="text-2xl font-black text-zinc-900 uppercase tracking-tight">Design Vault</h1>
-                  <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Your cloud-synced design files and custom creations</p>
+                  <h1 className="text-2xl font-black text-zinc-900 uppercase tracking-tight">My Designs</h1>
+                  <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Your saved design files and custom creations</p>
                 </div>
                 <button className="flex items-center gap-2 px-6 py-3 bg-zinc-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition">
                   <Layout className="w-4 h-4" />
-                  Launch Studio
+                  Design Now
                 </button>
               </div>
 
@@ -579,7 +635,7 @@ export default function CustomerDashboard({
                       <Layout className="w-10 h-10 text-zinc-100" />
                    </div>
                    <div className="space-y-1">
-                      <h3 className="text-sm font-black text-zinc-900 uppercase tracking-widest">Empty Vault</h3>
+                      <h3 className="text-sm font-black text-zinc-900 uppercase tracking-widest">No designs found</h3>
                       <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Save your designs from the studio to access them later</p>
                    </div>
                 </div>
@@ -630,7 +686,7 @@ export default function CustomerDashboard({
             >
               <div className="flex items-center justify-between">
                 <div className="space-y-2">
-                  <h1 className="text-2xl font-black text-zinc-900 uppercase tracking-tight">Mission Control Alerts</h1>
+                  <h1 className="text-2xl font-black text-zinc-900 uppercase tracking-tight">Notifications</h1>
                   <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Real-time status updates on your orders and account</p>
                 </div>
                 <button className="text-[10px] font-black uppercase text-[#FF4D00] hover:underline">Mark all as read</button>
@@ -684,17 +740,17 @@ export default function CustomerDashboard({
             >
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div className="space-y-2">
-                  <h1 className="text-2xl font-black text-zinc-900 uppercase tracking-tight">Support Intelligence</h1>
-                  <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Get expert assistance for your print projects</p>
+                  <h1 className="text-2xl font-black text-zinc-900 uppercase tracking-tight">Help & Support</h1>
+                  <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">How can we help with your projects?</p>
                 </div>
                 <div className="flex items-center gap-3">
                   <button className="px-6 py-3 bg-[#25D366] text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:shadow-lg transition flex items-center gap-2">
                     <MessageSquare className="w-4 h-4" />
                     WhatsApp Support
                   </button>
-                  <button className="px-6 py-3 bg-black text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:shadow-lg transition flex items-center gap-2">
+                    <button className="px-6 py-3 bg-black text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:shadow-lg transition flex items-center gap-2">
                     <Plus className="w-4 h-4" />
-                    New Ticket
+                    New Inquiry
                   </button>
                 </div>
               </div>
@@ -705,7 +761,7 @@ export default function CustomerDashboard({
                        <div className="p-2.5 bg-zinc-900 rounded-2xl">
                          <MessageSquare className="w-5 h-5 text-white" />
                        </div>
-                       <h3 className="text-xs font-black uppercase tracking-widest">Active Tickets</h3>
+                       <h3 className="text-xs font-black uppercase tracking-widest">Open Inquiries</h3>
                     </div>
                     
                     <div className="space-y-4">
@@ -732,15 +788,15 @@ export default function CustomerDashboard({
                        <div className="p-2.5 bg-blue-50 rounded-2xl">
                          <FileText className="w-5 h-5 text-blue-600" />
                        </div>
-                       <h3 className="text-xs font-black uppercase tracking-widest">Knowledge Base</h3>
+                       <h3 className="text-xs font-black uppercase tracking-widest">Guides & FAQs</h3>
                     </div>
 
                     <div className="space-y-2">
                        {[
-                         'Artwork Setup Guidelines',
-                         'GST Billing & Tax FAQs',
-                         'Shipping & Logistics Intelligence',
-                         'Refund & Reprint Protocols'
+                         'Artwork Guides',
+                         'Billing & Invoicing',
+                         'Shipping Info',
+                         'Returns & Refunds'
                        ].map((item, i) => (
                          <button key={i} className="w-full text-left p-4 bg-zinc-50 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-100 transition flex items-center justify-between group">
                            {item}

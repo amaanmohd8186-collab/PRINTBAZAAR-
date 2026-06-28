@@ -44,7 +44,7 @@ export default function AICredits({ stats, userId, onUpdateStats, onBack }: AICr
           ...stats,
           aiCredits: stats.aiCredits + selectedPlan.credits
         });
-        alert(`🎉 Successfully purchased ${selectedPlan.credits} AI Credits through Cashfree!`);
+        alert(`🎉 Successfully purchased ${selectedPlan.credits} Credits!`);
       } else {
         throw new Error(data.error || 'Failed to sync credits');
       }
@@ -68,8 +68,8 @@ export default function AICredits({ stats, userId, onUpdateStats, onBack }: AICr
             <Sparkles className="w-6 h-6" />
           </div>
           <div>
-            <h3 className="text-xl font-heavy text-slate-900 uppercase tracking-tight">AI Credits Center</h3>
-            <p className="text-[10px] font-mono text-zinc-500 font-bold uppercase mt-0.5">Manage generation & design tokens</p>
+            <h3 className="text-xl font-heavy text-slate-900 uppercase tracking-tight">Design Credits</h3>
+            <p className="text-[10px] font-mono text-zinc-500 font-bold uppercase mt-0.5">Manage design and production tokens</p>
           </div>
         </div>
 
@@ -90,21 +90,19 @@ export default function AICredits({ stats, userId, onUpdateStats, onBack }: AICr
                   <span className="block text-sm font-black mt-0.5">{stats.usedCredits}</span>
                 </div>
                 <div className="bg-white/5 p-3 rounded-2xl border border-white/10">
-                  <span className="block text-[9px] uppercase font-bold text-zinc-400">Free Tier</span>
-                  <span className="block text-sm font-black mt-0.5 text-emerald-400">Active</span>
+                  <span className="block text-[9px] uppercase font-bold text-zinc-400">Account Type</span>
+                  <span className="block text-sm font-black mt-0.5 text-emerald-400">Standard</span>
                 </div>
               </div>
             </div>
 
-            <div className="bg-zinc-50 border border-zinc-200 rounded-[20px] p-5 space-y-3">
-              <h4 className="text-[10px] font-black uppercase text-zinc-800">What costs credits?</h4>
+              <h4 className="text-[10px] font-black uppercase text-zinc-800">Usage Guide</h4>
               <ul className="space-y-2 text-[11px] font-medium text-zinc-600">
-                <li className="flex items-center gap-2"><ImageIcon className="w-3.5 h-3.5 text-blue-500" /> BG Removal (2 🎇)</li>
-                <li className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 text-orange-500" /> HD Upscale (5 🎇)</li>
-                <li className="flex items-center gap-2"><Sparkles className="w-3.5 h-3.5 text-amber-500" /> AI Logo / Card (10 🎇)</li>
-                <li className="flex items-center gap-2"><FileText className="w-3.5 h-3.5 text-emerald-500" /> Wedding Cards (15 🎇)</li>
+                <li className="flex items-center gap-2"><ImageIcon className="w-3.5 h-3.5 text-blue-500" /> Background Removal (2 🎇)</li>
+                <li className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 text-orange-500" /> Image Enhancement (5 🎇)</li>
+                <li className="flex items-center gap-2"><Sparkles className="w-3.5 h-3.5 text-amber-500" /> Personalized Templates (10 🎇)</li>
+                <li className="flex items-center gap-2"><FileText className="w-3.5 h-3.5 text-emerald-500" /> Professional Layouts (15 🎇)</li>
               </ul>
-            </div>
 
           </div>
 
@@ -141,7 +139,7 @@ export default function AICredits({ stats, userId, onUpdateStats, onBack }: AICr
               <div className="p-3 bg-white rounded-2xl shrink-0"><CheckCircle2 className="w-5 h-5 text-emerald-500" /></div>
               <div>
                 <h5 className="text-[11px] font-bold text-slate-900 uppercase">Earn Free Credits</h5>
-                <p className="text-[10px] text-zinc-600 mt-0.5 max-w-[300px]">Review an order or refer a friend to instantly receive 200 free AI Credits to your account.</p>
+                <p className="text-[10px] text-zinc-600 mt-0.5 max-w-[300px]">Review an order or refer a friend to instantly receive 200 free Credits to your account.</p>
               </div>
             </div>
 
@@ -152,7 +150,7 @@ export default function AICredits({ stats, userId, onUpdateStats, onBack }: AICr
       {showPayment && selectedPlan && (
         <CashfreeGateway
           amount={selectedPlan.plan}
-          paymentTypeLabel={`Recharge: ${selectedPlan.credits} AI Credits`}
+          paymentTypeLabel={`Recharge: ${selectedPlan.credits} Credits`}
           onSuccess={handlePaymentSuccess}
           onCancel={() => { setShowPayment(false); setSelectedPlan(null); }}
         />

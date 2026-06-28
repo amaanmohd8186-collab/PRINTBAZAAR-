@@ -93,13 +93,13 @@ const DesignEditor = React.lazy(() => import('./components/DesignEditor').then(m
 const CommunityFeed = React.lazy(() => import('./components/CommunityFeed'));
 import PrintQualitySlider from './components/PrintQualitySlider';
 import SplashPreview from './components/SplashPreview';
-// Removed debug panels for production polish
+import { VerificationAuditDashboard } from './components/VerificationAuditDashboard';
 import BannerManager from './components/BannerManager';
 import BulkQuoteGenerator from './components/BulkQuoteGenerator';
 import FranchiseModule from './components/FranchiseModule';
 import AiCustomerAssistant from './components/AiCustomerAssistant';
 import { Skeleton, CardSkeleton } from './components/Skeleton';
-import EmptyState from './components/EmptyState';
+import { EmptyState } from './components/EmptyState';
 import NotificationCenter from './components/NotificationCenter';
 import CustomerDashboard from './components/CustomerDashboard';
 import SupportCenter from './components/SupportCenter';
@@ -857,7 +857,7 @@ export default function App() {
     async function testConnection() {
       try {
         setStartupLogs(prev => [...prev, 'ESTABLISHING FIREBASE CONNECTION...']);
-        console.log("✓ Firebase instance active");
+        // Firebase log removed
         setTimeout(() => {
           setStartupLogs(prev => [...prev, 'CLOUD BACKEND SYNCHRONIZATION COMPLETE.']);
         }, 300);
@@ -1272,9 +1272,9 @@ export default function App() {
       })
       .then(data => {
         if (data.success) {
-          console.log("Order confirmation email action response:", data.message);
+          // Email log removed
         } else {
-          console.warn("Order confirmation email logic message:", data.error);
+          // Email log removed
         }
       })
       .catch(err => {
@@ -1545,7 +1545,7 @@ export default function App() {
                 <h1 className="text-2xl font-heavy tracking-tight text-[#0F172A] leading-none uppercase">
                   PRINT<span className="text-[#FF4D00]">BAZAAR</span>
                 </h1>
-                <p className="font-micro text-gray-400 mt-1">Premium Press Hub</p>
+                <p className="font-micro text-gray-400 mt-1">Premium Design Hub</p>
               </motion.div>
             </div>
 
@@ -1593,7 +1593,7 @@ export default function App() {
                               <span className="text-xs font-black text-emerald-600 font-mono">₹{userStats.walletBalance}</span>
                             </button>
                             <button onClick={() => requireUserAuthAction(() => { setProfileDropdownOpen(false); setProfilePortal('credits'); setCustomerActiveTab('profile'); })} className="flex justify-between items-center hover:bg-zinc-100 p-1 -mx-1 rounded transition cursor-pointer">
-                              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">AI Credits</span>
+                              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Design Credits</span>
                               <span className="text-xs font-black text-[#FF4D00] font-mono">{userStats.aiCredits} 🎇</span>
                             </button>
                           </div>
@@ -1633,7 +1633,7 @@ export default function App() {
                             className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-[#FF4D00] hover:bg-[#FF4D00]/5 flex items-center gap-2 transition-colors cursor-pointer"
                           >
                             <Wand2 className="w-3.5 h-3.5" />
-                            AI Design Studio
+                            Creative Studio
                           </button>
 
                           <button
@@ -1768,7 +1768,7 @@ export default function App() {
                 }`}
               >
                 <Sparkles className="w-4 h-4" />
-                <span>AI Editor</span>
+                <span>Creative Studio</span>
               </button>
 
               <button
@@ -2360,7 +2360,7 @@ export default function App() {
                     </div>
                     <div>
                       <h2 className="text-xl font-heavy text-slate-950 uppercase tracking-tight">Your Wishlist ({wishlistProducts.length})</h2>
-                      <p className="text-[10px] text-zinc-400 font-mono font-bold uppercase mt-0.5">Automated high-volume custom items saved for pipeline pre-press production</p>
+                      <p className="text-[10px] text-zinc-400 font-mono font-bold uppercase mt-0.5">High-volume custom items saved for future production</p>
                     </div>
                   </div>
                 )}

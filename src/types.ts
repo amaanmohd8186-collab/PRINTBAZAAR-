@@ -92,22 +92,78 @@ export interface ShippingOrderRequest {
   paymentMode: 'Prepaid' | 'COD';
 }
 
+export interface BrandKit {
+  userId: string;
+  logoUrl?: string;
+  companyName?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  website?: string;
+  gstNumber?: string;
+  colors: string[];
+  fonts: string[];
+  qrCodeUrl?: string;
+  barcodeUrl?: string;
+  socialLinks?: {
+    instagram?: string;
+    facebook?: string;
+    twitter?: string;
+    linkedin?: string;
+  };
+  updatedAt: string;
+}
+
+export type StaffRole = 
+  | 'Production Manager'
+  | 'Designer'
+  | 'Operator'
+  | 'Packing Staff'
+  | 'Delivery Staff'
+  | 'Customer Support'
+  | 'Admin';
+
+export interface StaffMember {
+  id: string;
+  name: string;
+  email: string;
+  role: StaffRole;
+  active: boolean;
+  permissions: string[];
+  joinedAt: string;
+}
+
+export type BusinessReportType = 
+  | 'Daily'
+  | 'Weekly'
+  | 'Monthly'
+  | 'Yearly'
+  | 'GST'
+  | 'Profit'
+  | 'Sales'
+  | 'Customer'
+  | 'Top Product'
+  | 'Top Category';
+
+export interface BusinessReport {
+  id: string;
+  type: BusinessReportType;
+  title: string;
+  startDate: string;
+  endDate: string;
+  data: any;
+  exportUrl?: string;
+  createdAt: string;
+}
+
 export type OrderStatus = 
-  | 'Pending Payment'
   | 'Order Received'
-  | 'Order Confirmed'
   | 'Artwork Review'
-  | 'Design Review'
-  | 'Preparing Design'
-  | 'Waiting for Customer'
   | 'Customer Approval'
-  | 'Customer Approved'
   | 'Printing'
   | 'Lamination'
-  | 'Quality Check'
   | 'Cutting'
   | 'Packing'
-  | 'Packed'
   | 'Courier Pickup'
   | 'Shipped'
   | 'Out For Delivery'

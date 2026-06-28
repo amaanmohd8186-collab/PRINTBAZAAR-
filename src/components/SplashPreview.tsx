@@ -58,33 +58,38 @@ const HoloIcon = ({ Icon, top, left, delay, color = "#00F0FF" }: any) => (
 );
 
 export default function SplashPreview({ onFinish, isAppReady, startupLogs }: SplashPreviewProps) {
-  const [phase, setPhase] = useState<number>(0);
-  const [showRetry, setShowRetry] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('Initializing Workspace');
+  const [startupIndex, setStartupIndex] = useState(0);
+  const startupSteps = [
+    'Starting...',
+    'Loading Studio...',
+    'Verifying...',
+    'Preparing...',
+    'Launching...'
+  ];
 
   useEffect(() => {
-    // Failsafe if not ready within 5s
-    let retryTimer: ReturnType<typeof setTimeout>;
-    
-    if (!isAppReady) {
-      retryTimer = setTimeout(() => {
-        setShowRetry(true);
-      }, 5000);
-    } else {
-      setShowRetry(false);
-    }
-    
-    return () => clearTimeout(retryTimer);
-  }, [isAppReady]);
+    const interval = setInterval(() => {
+      setStartupIndex(prev => {
+        if (prev < startupSteps.length - 1) return prev + 1;
+        return prev;
+      });
+    }, 800);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
-    if (isAppReady) {
+    setStatusMessage(startupSteps[startupIndex]);
+  }, [startupIndex]);
+
+  useEffect(() => {
+    if (isAppReady && startupIndex === startupSteps.length - 1) {
       const t = setTimeout(() => {
-        setPhase(2); 
-        setTimeout(onFinish, 1200);
-      }, 2000); // Wait 2s to show off the premium 3D scene before exiting
+        onFinish();
+      }, 1000);
       return () => clearTimeout(t);
     }
-  }, [isAppReady, onFinish]);
+  }, [isAppReady, startupIndex, onFinish]);
 
   // Prevent early unmount / flashes
   return (
@@ -186,7 +191,7 @@ export default function SplashPreview({ onFinish, isAppReady, startupLogs }: Spl
             
             <div className="mt-4 flex items-center justify-center gap-2 text-[8px] md:text-[10px] font-mono tracking-widest text-white/50 uppercase">
               <span className="h-[1px] w-8 bg-gradient-to-r from-transparent to-[#FFD700]/50" />
-              Powered by <span className="text-[#FFD700] font-bold">AI</span> Printing Technology
+              Empowering Creative Expression
               <span className="h-[1px] w-8 bg-gradient-to-l from-transparent to-[#FFD700]/50" />
             </div>
           </motion.div>
@@ -213,77 +218,48 @@ export default function SplashPreview({ onFinish, isAppReady, startupLogs }: Spl
           transition={{ duration: 1, delay: 1.2 }}
           className="absolute bottom-6 md:bottom-12 w-[90%] md:w-[600px] flex flex-col items-center gap-6 z-30"
         >
-          {showRetry ? (
-             <div className="text-xs font-mono text-[#FF6A00] tracking-widest text-center flex flex-col items-center gap-4">
-               <span>Preparing PrintBazaar...</span>
-               <span className="opacity-60 text-[10px]">Connecting to servers</span>
-               <button
-                 type="button"
-                 onClick={onFinish}
-                 className="mt-2 px-6 py-2.5 bg-[#FF6A00] hover:bg-white hover:text-black text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg shadow-[#FF6A00]/20 transition-all cursor-pointer pointer-events-auto z-50 hover:scale-105 active:scale-95"
-               >
-                 Skip & Enter Local Mode
-               </button>
-             </div>
-           ) : (
-             <div className="w-full flex flex-col items-center gap-4">
-               <div className="text-[10px] md:text-xs font-mono tracking-widest text-white/80 uppercase">
-                 Loading...
-               </div>
-               
-               {/* Animated Gold Loading Bar */}
-               <div className="w-full md:w-[400px] h-[2px] bg-white/10 rounded-full relative overflow-hidden">
-                 <motion.div 
-                   className="absolute top-0 left-0 bottom-0 bg-gradient-to-r from-transparent via-[#FFD700] to-transparent shadow-[0_0_10px_#FFD700]"
-                   animate={{ 
-                     left: ["-100%", "100%"] 
-                   }}
-                   transition={{ 
-                     duration: 1.5, 
-                     repeat: Infinity, 
-                     ease: "linear" 
-                   }}
-                   style={{ width: "100%" }}
-                 />
-                 <motion.div 
-                   className="absolute top-0 left-0 bottom-0 bg-[#FF6A00]"
-                   initial={{ width: "0%" }}
-                   animate={{ width: "100%" }}
-                   transition={{ duration: 4, ease: "easeInOut" }}
-                 />
-               </div>
+          <div className="w-full flex flex-col items-center gap-4">
+            <div className="text-[10px] md:text-xs font-mono tracking-widest text-white/80 uppercase">
+              {statusMessage}
+            </div>
+            
+            {/* Animated Gold Loading Bar */}
+            <div className="w-full md:w-[400px] h-[2px] bg-white/10 rounded-full relative overflow-hidden">
+              <motion.div 
+                className="absolute top-0 left-0 bottom-0 bg-gradient-to-r from-transparent via-[#FFD700] to-transparent shadow-[0_0_10px_#FFD700]"
+                animate={{ 
+                  left: ["-100%", "100%"] 
+                }}
+                transition={{ 
+                  duration: 1.5, 
+                  repeat: Infinity, 
+                  ease: "linear" 
+                }}
+                style={{ width: "100%" }}
+              />
+              <motion.div 
+                className="absolute top-0 left-0 bottom-0 bg-[#FF6A00]"
+                initial={{ width: "0%" }}
+                animate={{ width: `${(startupIndex + 1) * 20}%` }}
+                transition={{ duration: 0.8, ease: "easeInOut" }}
+              />
+            </div>
 
-               {/* Step Icons */}
-               <div className="flex w-full md:w-[400px] justify-between px-2">
-                 {[
-                   { icon: PenTool, label: 'DESIGN' },
-                   { icon: Printer, label: 'PRINT' },
-                   { icon: Truck, label: 'DELIVER' },
-                   { icon: BadgeCheck, label: 'QUALITY' }
-                 ].map((step, i) => (
-                   <div key={i} className="flex flex-col items-center gap-2 opacity-70">
-                     <step.icon className="w-5 h-5 md:w-6 md:h-6 text-[#FF6A00]" />
-                     <span className="text-[8px] md:text-[10px] font-bold tracking-widest text-white uppercase">{step.label}</span>
-                   </div>
-                 ))}
-               </div>
-               
-               {/* Diagnostic Logs */}
-               <div className="h-4 overflow-hidden w-full text-center mt-2">
-                 <AnimatePresence mode="wait">
-                   <motion.div
-                     key={startupLogs[startupLogs.length - 1] || 'init'}
-                     initial={{ y: 10, opacity: 0 }}
-                     animate={{ y: 0, opacity: 0.5 }}
-                     exit={{ y: -10, opacity: 0 }}
-                     className="text-[8px] md:text-[9px] font-mono tracking-widest text-white/40 uppercase"
-                   >
-                     {startupLogs[startupLogs.length - 1] || 'INITIALIZING SECURE ENVIRONMENT...'}
-                   </motion.div>
-                 </AnimatePresence>
-               </div>
-             </div>
-           )}
+            {/* Step Icons */}
+            <div className="flex w-full md:w-[400px] justify-between px-2">
+              {[
+                { icon: PenTool, label: 'DESIGN' },
+                { icon: Printer, label: 'PRINT' },
+                { icon: Truck, label: 'DELIVER' },
+                { icon: BadgeCheck, label: 'QUALITY' }
+              ].map((step, i) => (
+                <div key={i} className="flex flex-col items-center gap-2 transition-opacity duration-500" style={{ opacity: startupIndex >= i ? 1 : 0.3 }}>
+                  <step.icon className="w-5 h-5 md:w-6 md:h-6 text-[#FF6A00]" />
+                  <span className="text-[8px] md:text-[10px] font-bold tracking-widest text-white uppercase">{step.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </motion.div>
 
       </motion.div>

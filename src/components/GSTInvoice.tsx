@@ -169,6 +169,5 @@ export default function GSTInvoice({ order, companyDetails }: GSTInvoiceProps) {
 
 // Helper for number to words (Simplified)
 function numberToWords(num: number): string {
-  // Simple mock for now
-  return "One Hundred and Twenty Three";
+  return "Rupees " + num.toLocaleString('en-IN');
 }

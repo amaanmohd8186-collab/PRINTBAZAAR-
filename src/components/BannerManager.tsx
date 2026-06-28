@@ -141,7 +141,7 @@ export default function BannerManager() {
       setSelectedBannerId(newB.id);
       setIsGeneratingAi(false);
       setAiPrompt('');
-      alert('✨ Google Gemini AI successfully preflighted and generated CMYK promotional web asset banner!');
+      alert('Banner generated successfully!');
     }, 2000);
   };
 
@@ -164,7 +164,7 @@ export default function BannerManager() {
     <div className="bg-white rounded-[32px] border border-zinc-200/60 p-6 shadow-sm text-left space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-100 pb-5">
         <div>
-          <h3 className="text-xl font-heavy text-slate-900 uppercase tracking-tight">Vanguard Smart Banner Management</h3>
+          <h3 className="text-xl font-heavy text-slate-900 uppercase tracking-tight">Banner Management</h3>
           <p className="text-xs text-zinc-500 font-mono mt-1 font-bold">Configure active sliders, schedule campaigns, and track real-time click-through metrics.</p>
         </div>
         <div className="flex items-center bg-[#0F172A] p-1 rounded-2xl">
@@ -205,7 +205,7 @@ export default function BannerManager() {
           <div className="space-y-2">
             <span className="text-[10px] font-black uppercase tracking-widest text-[#FF4D00] font-mono flex items-center gap-1">
               <Eye className="w-3.5 h-3.5" />
-              <span>Rotator Visual Live Sandbox Preview ({previewDevice.toUpperCase()})</span>
+              <span>Rotator Visual Live Preview ({previewDevice.toUpperCase()})</span>
             </span>
             
             {activeBanner && (
@@ -266,8 +266,8 @@ export default function BannerManager() {
                 <Sparkles className="w-5 h-5" />
               </div>
               <div>
-                <h4 className="text-base font-black uppercase tracking-tight">Gemini Offset Campaign Asset Constructor</h4>
-                <p className="text-[10px] text-zinc-400 font-mono">Input campaign prompts to render professional vector flex assets.</p>
+                <h4 className="text-base font-black uppercase tracking-tight">Smart Banner Assistant</h4>
+                <p className="text-[10px] text-zinc-400 font-mono">Describe your campaign to generate promotional banners.</p>
               </div>
             </div>
 
@@ -286,7 +286,7 @@ export default function BannerManager() {
                 className="py-2.5 px-5 bg-[#FF4D00] hover:bg-[#E03E00] text-white text-xs font-black uppercase rounded-[18px] transition flex items-center gap-1 shrink-0 cursor-pointer"
               >
                 {isGeneratingAi ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                <span>{isGeneratingAi ? 'Synthesizing...' : 'Build AI'}</span>
+                <span>{isGeneratingAi ? 'Generating...' : 'Generate'}</span>
               </button>
             </div>
           </div>

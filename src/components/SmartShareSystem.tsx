@@ -53,7 +53,7 @@ export const SmartShareSystem: React.FC<SmartShareSystemProps> = ({
   // Fallbacks
   const sizeName = selectedSize?.name || product.sizes[0]?.name || 'Standard';
   const materialName = selectedMaterial?.name || product.materials[0]?.name || 'Standard Matte';
-  const deliveryEstimate = product.estimatedProductionTime || '3-5 Action Days';
+  const deliveryEstimate = product.estimatedProductionTime || '3-5 Business Days';
   const shareUrl = `${window.location.origin}/?product=${product.id}`;
 
   const ratingStars = '⭐⭐⭐⭐⭐';
@@ -99,11 +99,11 @@ export const SmartShareSystem: React.FC<SmartShareSystemProps> = ({
         });
       } catch (err: any) {
         if (err.name !== 'AbortError') {
-          triggerAlert(`Native share error: ${err.message}`);
+          triggerAlert(`Share error: Please try again.`);
         }
       }
     } else {
-      triggerAlert("Web Share API not supported on this browser. We've copied the share link to your clipboard so you can paste it anywhere!");
+      triggerAlert("Sharing service not supported on this browser. We've copied the share link to your clipboard so you can paste it anywhere!");
       handleCopyLink();
     }
   };
@@ -149,7 +149,7 @@ export const SmartShareSystem: React.FC<SmartShareSystemProps> = ({
   };
 
   const handleNearbyShare = () => {
-    triggerAlert("Nearby Share requested! Connecting with neighboring Android/Windows hosts in secure range...");
+    triggerAlert("Searching for local devices...");
   };
 
   // GENERATE & DOWNLOAD PRODUCT FLYER CARD IMAGE (HTML CANVAS DRAWING)
@@ -183,11 +183,11 @@ export const SmartShareSystem: React.FC<SmartShareSystemProps> = ({
     ctx.fillStyle = '#FF4D00';
     ctx.font = 'bold 36px font-sans, system-ui';
     ctx.textAlign = 'center';
-    ctx.fillText('PRINTBAZAAR PREMIUM CATALOGUING', 600, 150);
+    ctx.fillText('PRINTBAZAAR OFFICIAL CATALOG', 600, 150);
 
     ctx.fillStyle = '#94A3B8';
     ctx.font = 'bold tracking-[6px] 20px monospace';
-    ctx.fillText('ULTRA-HD SMART CONVERSION PROTOCOL', 600, 190);
+    ctx.fillText('HIGH-FIDELITY PRINTING', 600, 190);
 
     // Horizontal Rule
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
@@ -235,9 +235,9 @@ export const SmartShareSystem: React.FC<SmartShareSystemProps> = ({
     ctx.fillStyle = '#FFFFFF';
     ctx.font = 'bold 32px font-sans';
     ctx.textAlign = 'center';
-    ctx.fillText('MINIMUM BATCH QUOTE', 360, 845);
+    ctx.fillText('ESTIMATED PRICE', 360, 845);
     ctx.font = 'bold 50px font-mono';
-    ctx.fillText(`INR ${totalPrice.toLocaleString('en-IN')}*`, 360, 915);
+    ctx.fillText(`₹ ${totalPrice.toLocaleString('en-IN')}*`, 360, 915);
 
     // QR Code Section details
     ctx.strokeStyle = 'rgba(255, 77, 0, 0.2)';
@@ -259,8 +259,8 @@ export const SmartShareSystem: React.FC<SmartShareSystemProps> = ({
         ctx.fillStyle = '#475569';
         ctx.font = '22px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText('Scan QR Code with Camera to Open Customization Editor', 600, 1060);
-        ctx.fillText('© PrintBazaar High-Performance Smart Cloud Commerce', 600, 1100);
+        ctx.fillText('Scan QR Code with Camera to customize', 600, 1060);
+        ctx.fillText('© PrintBazaar Premium Print Services', 600, 1100);
 
         // Download call
         triggerDownload(canvas, `${product.name.replace(/\s+/g, '_')}_share_card.png`);
@@ -288,7 +288,7 @@ export const SmartShareSystem: React.FC<SmartShareSystemProps> = ({
     link.download = filename;
     link.href = canvas.toDataURL('image/png');
     link.click();
-    triggerAlert("✨ Premium High-Contrast share card downloaded successfully!");
+    triggerAlert("✨ Share card downloaded successfully!");
   };
 
   // DOWNLOAD TECHNICAL PRINT CATALOG PRODUCT SPEC PDF (using jsPDF)
@@ -301,12 +301,12 @@ export const SmartShareSystem: React.FC<SmartShareSystemProps> = ({
       doc.setTextColor(255, 77, 0); // orange branding
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(22);
-      doc.text("PRINTBAZAAR PROPOSAL SHEET", 20, 20);
+      doc.text("PRINTBAZAAR PRODUCT SUMMARY", 20, 20);
 
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(9);
       doc.setFont('courier', 'bold');
-      doc.text("SECURE AUTOMATED SMART COMMERCIAL QUOTE PROTOCOL", 20, 30);
+      doc.text("PRICE ESTIMATE", 20, 30);
 
       // Body parameters
       doc.setTextColor(33, 43, 54);
@@ -343,10 +343,10 @@ export const SmartShareSystem: React.FC<SmartShareSystemProps> = ({
       doc.setTextColor(255, 77, 0);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(11);
-      doc.text("MINIMUM ESTIMATE VALUE (ALL INCLUSIVE)", 25, currentY + 4);
+      doc.text("PRICE ESTIMATE (ALL INCLUSIVE)", 25, currentY + 4);
       doc.setTextColor(15, 23, 42);
       doc.setFontSize(18);
-      doc.text(`INR ${totalPrice.toLocaleString('en-IN')}*`, 25, currentY + 16);
+      doc.text(`₹ ${totalPrice.toLocaleString('en-IN')}*`, 25, currentY + 16);
       
       currentY += 35;
       doc.setFont('helvetica', 'italic');
@@ -357,8 +357,8 @@ export const SmartShareSystem: React.FC<SmartShareSystemProps> = ({
       doc.setFontSize(12);
       doc.text("Verification QR Code is attached below.", 20, currentY);
 
-      doc.save(`${product.name.replace(/\s+/g, '_')}_PB_Quote.pdf`);
-      triggerAlert("✨ Official commercial proposal PDF generated and downloaded!");
+      doc.save(`${product.name.replace(/\s+/g, '_')}_Summary.pdf`);
+      triggerAlert("✨ Product summary PDF generated and downloaded!");
     } catch (e: any) {
       triggerAlert(`PDF compilation error: ${e.message}`);
     }
@@ -381,7 +381,7 @@ export const SmartShareSystem: React.FC<SmartShareSystemProps> = ({
         <div className="flex items-center justify-between border-b border-zinc-800 pb-4 mb-5">
           <div className="flex items-center gap-2">
             <span className="w-1.5 h-1.5 bg-[#FF4D00] rounded-full animate-ping" />
-            <h3 className="text-sm font-black uppercase tracking-tight text-white leading-none">Smart Share & Catalogs</h3>
+            <h3 className="text-sm font-black uppercase tracking-tight text-white leading-none">Share & Export</h3>
           </div>
           <button 
             type="button" 
@@ -419,7 +419,7 @@ export const SmartShareSystem: React.FC<SmartShareSystemProps> = ({
 
         {/* Share Matrix Row 1 (Social instant shares) */}
         <div className="space-y-4 mb-6">
-          <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest font-mono">Instant Dispatch channels</p>
+          <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest font-mono">Instant Share</p>
           <div className="grid grid-cols-4 gap-3 text-center">
             
             {/* WhatsApp */}
@@ -496,10 +496,9 @@ export const SmartShareSystem: React.FC<SmartShareSystemProps> = ({
               <div className="w-10 h-10 bg-teal-600 text-white rounded-full flex items-center justify-center shadow-lg group-hover:scale-108 transition">
                 <Smartphone className="w-5 h-5" />
               </div>
-              <span className="text-[10px] font-black uppercase text-zinc-300">Nearby Share</span>
+              <span className="text-[10px] font-black uppercase text-zinc-300">Nearby</span>
             </button>
 
-            {/* Native API */}
             <button 
               onClick={handleNativeShare}
               className="flex flex-col items-center gap-2 p-3 bg-[#FF4D00]/10 hover:bg-[#FF4D00]/20 border border-[#FF4D00]/20 rounded-2xl transition group cursor-pointer"
@@ -507,7 +506,7 @@ export const SmartShareSystem: React.FC<SmartShareSystemProps> = ({
               <div className="w-10 h-10 bg-[#FF4D00] text-white rounded-full flex items-center justify-center shadow-lg group-hover:scale-108 transition">
                 <Share2 className="w-4 h-4" />
               </div>
-              <span className="text-[10px] font-black uppercase text-zinc-350">Universal UI</span>
+              <span className="text-[10px] font-black uppercase text-zinc-350">Share</span>
             </button>
 
           </div>
@@ -530,7 +529,7 @@ export const SmartShareSystem: React.FC<SmartShareSystemProps> = ({
             className="inline-flex items-center justify-center gap-2 bg-[#FF4D00] hover:bg-[#d93d00] text-white rounded-2xl py-3 px-4 text-xs font-black uppercase tracking-wider transition cursor-pointer shadow-md shadow-[#FF4D00]/15"
           >
             <FileText className="w-4 h-4" />
-            <span>Download Quote PDF</span>
+            <span>Product Summary</span>
           </button>
         </div>
 

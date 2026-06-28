@@ -56,7 +56,7 @@ export default function PrintProductionDashboard() {
       const log: ProductionLog = {
         stage: nextStatus,
         timestamp: new Date().toISOString(),
-        operator: 'Admin Agent',
+        operator: 'Production Lead',
         notes
       };
 
@@ -156,8 +156,8 @@ export default function PrintProductionDashboard() {
                  <Printer className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="text-sm font-black uppercase tracking-widest text-zinc-900">Production Engine</h1>
-                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Real-time Print Queue</p>
+                <h1 className="text-sm font-black uppercase tracking-widest text-zinc-900">Order Management</h1>
+                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Job Queue</p>
               </div>
             </div>
             <button 
@@ -197,14 +197,14 @@ export default function PrintProductionDashboard() {
           {loading ? (
             <div className="p-10 text-center space-y-3">
               <Printer className="w-8 h-8 text-zinc-200 animate-pulse mx-auto" />
-              <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Loading Pipeline...</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Loading...</p>
             </div>
           ) : filteredOrders.length === 0 ? (
             <div className="p-10 text-center space-y-3">
               <div className="w-16 h-16 bg-zinc-50 rounded-full flex items-center justify-center mx-auto">
                 <Layout className="w-6 h-6 text-zinc-200" />
               </div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400">No active production runs</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400">No active jobs</p>
             </div>
           ) : (
             <div className="divide-y divide-zinc-50">
@@ -268,7 +268,7 @@ export default function PrintProductionDashboard() {
                   </button>
                   <button className="px-5 py-2.5 bg-black text-white rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-zinc-800 transition shadow-lg shadow-black/10 flex items-center gap-2">
                     <FileText className="w-3.5 h-3.5" />
-                    Gen. Invoice
+                    Invoice
                   </button>
                 </div>
               </div>
@@ -280,7 +280,7 @@ export default function PrintProductionDashboard() {
                     <div className="p-6 border-b border-zinc-100 flex items-center justify-between">
                        <h3 className="text-xs font-black uppercase tracking-widest text-zinc-900 flex items-center gap-2">
                          <Layout className="w-4 h-4 text-[#FF4D00]" />
-                         Artwork Review & Assets
+                         Design Review
                        </h3>
                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{selectedOrder.items.length} Job Items</span>
                     </div>
@@ -329,7 +329,7 @@ export default function PrintProductionDashboard() {
                                     {item.artworkAudit.qualityScore}
                                   </div>
                                   <div className="space-y-0.5">
-                                    <p className="text-[9px] font-black uppercase text-zinc-900 tracking-wider">AI Audit Passed</p>
+                                    <p className="text-[9px] font-black uppercase text-zinc-900 tracking-wider">Quality Check Passed</p>
                                     <p className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest">
                                       {/* @ts-ignore */}
                                       {item.artworkAudit.dpi} DPI • {item.artworkAudit.colorSpace} Detected
@@ -347,7 +347,7 @@ export default function PrintProductionDashboard() {
 
                   {/* Customer Information */}
                   <div className="bg-white border border-zinc-200 rounded-[32px] p-6 space-y-6">
-                    <h3 className="text-xs font-black uppercase tracking-widest text-zinc-900">Customer Intelligence</h3>
+                    <h3 className="text-xs font-black uppercase tracking-widest text-zinc-900">Customer Information</h3>
                     <div className="grid grid-cols-2 gap-8">
                        <div className="space-y-1.5">
                          <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest block">Delivery Destination</span>
@@ -358,7 +358,7 @@ export default function PrintProductionDashboard() {
                          </p>
                        </div>
                        <div className="space-y-1.5">
-                         <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest block">Contact Protocol</span>
+                         <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest block">Contact Information</span>
                          <p className="text-[11px] font-bold text-zinc-800 uppercase tracking-widest">{selectedOrder.customerEmail}</p>
                          <p className="text-[11px] font-bold text-zinc-800">{selectedOrder.shippingAddress?.phone}</p>
                        </div>
@@ -371,7 +371,7 @@ export default function PrintProductionDashboard() {
                    <div className="bg-zinc-900 rounded-[32px] p-6 text-white space-y-6 shadow-xl shadow-zinc-200">
                       <div className="flex items-center gap-2 pb-4 border-b border-white/10">
                          <Zap className="w-4 h-4 text-[#FF4D00]" />
-                         <h3 className="text-xs font-black uppercase tracking-widest">Workflow Engine</h3>
+                         <h3 className="text-xs font-black uppercase tracking-widest">Job Workflow</h3>
                       </div>
                       
                       <div className="space-y-4">
@@ -379,7 +379,7 @@ export default function PrintProductionDashboard() {
                            <label className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Update Phase</label>
                            <div className="grid grid-cols-1 gap-2">
                               {[
-                                { status: 'Artwork Review' as OrderStatus, label: 'Approve Artwork' },
+                                { status: 'Artwork Review' as OrderStatus, label: 'Confirm Design' },
                                 { status: 'Printing' as OrderStatus, label: 'Push to Printer' },
                                 { status: 'Lamination' as OrderStatus, label: 'Start Lamination' },
                                 { status: 'Cutting' as OrderStatus, label: 'Precision Cutting' },
@@ -408,7 +408,7 @@ export default function PrintProductionDashboard() {
                              onClick={() => updateOrderStatus(selectedOrder.id, 'Waiting for Customer', 'Action required on artwork')}
                              className="w-full py-3 bg-rose-500 text-white rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-rose-600 transition shadow-lg shadow-rose-500/20"
                            >
-                             Reject Design Assets
+                             Return for Action
                            </button>
                         </div>
                       </div>
@@ -418,7 +418,7 @@ export default function PrintProductionDashboard() {
                    <div className="bg-white border border-zinc-200 rounded-[32px] p-6 space-y-6 shadow-sm">
                       <div className="flex items-center gap-2">
                          <Calendar className="w-4 h-4 text-zinc-400" />
-                         <h3 className="text-xs font-black uppercase tracking-widest text-zinc-900">Production Log</h3>
+                         <h3 className="text-xs font-black uppercase tracking-widest text-zinc-900">Order History</h3>
                       </div>
                       
                       <div className="space-y-6 relative before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-zinc-100">

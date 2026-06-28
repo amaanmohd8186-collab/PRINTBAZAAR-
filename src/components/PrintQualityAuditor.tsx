@@ -74,7 +74,7 @@ export default function PrintQualityAuditor({ imageUrl, onAuditComplete }: Print
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-5 h-5 text-emerald-500" />
-            <h4 className="text-[11px] font-black uppercase tracking-widest text-zinc-900">Artwork Verification</h4>
+            <h4 className="text-[11px] font-black uppercase tracking-widest text-zinc-900">Quality Check</h4>
           </div>
           {auditing && <Zap className="w-4 h-4 text-[#FF4D00] animate-pulse" />}
         </div>
@@ -91,7 +91,7 @@ export default function PrintQualityAuditor({ imageUrl, onAuditComplete }: Print
                 <div className="w-16 h-16 border-4 border-zinc-100 rounded-full" />
                 <div className="absolute inset-0 border-4 border-[#FF4D00] border-t-transparent rounded-full animate-spin" />
               </div>
-              <p className="text-[9px] font-black uppercase tracking-[0.3em] text-zinc-400 animate-pulse">Analyzing Artwork...</p>
+              <p className="text-[9px] font-black uppercase tracking-[0.3em] text-zinc-400 animate-pulse">Verifying design...</p>
             </motion.div>
           ) : audit ? (
             <motion.div
@@ -135,7 +135,7 @@ export default function PrintQualityAuditor({ imageUrl, onAuditComplete }: Print
                     <Printer className="w-3 h-3" />
                     <span className="text-[8px] font-black uppercase tracking-wider">Color Profile</span>
                   </div>
-                  <p className="text-[10px] font-bold text-zinc-900">{audit.colorSpace} Detected</p>
+                  <p className="text-[10px] font-bold text-zinc-900">Print Ready</p>
                   <p className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest">Ready for Production</p>
                 </div>
               </div>
@@ -145,7 +145,7 @@ export default function PrintQualityAuditor({ imageUrl, onAuditComplete }: Print
                 <div className="flex items-center justify-between p-3 bg-zinc-50 rounded-xl border border-zinc-100">
                   <div className="flex items-center gap-2">
                     <Layout className="w-3.5 h-3.5 text-zinc-400" />
-                    <span className="text-[9px] font-black uppercase tracking-wider text-zinc-600">Bleed Detection</span>
+                    <span className="text-[9px] font-black uppercase tracking-wider text-zinc-600">Edge Check</span>
                   </div>
                   <span className={`text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest ${audit.bleedCheck === 'Passed' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
                     {audit.bleedCheck}
@@ -154,7 +154,7 @@ export default function PrintQualityAuditor({ imageUrl, onAuditComplete }: Print
                 <div className="flex items-center justify-between p-3 bg-zinc-50 rounded-xl border border-zinc-100">
                   <div className="flex items-center gap-2">
                     <Maximize2 className="w-3.5 h-3.5 text-zinc-400" />
-                    <span className="text-[9px] font-black uppercase tracking-wider text-zinc-600">Safe Margin</span>
+                    <span className="text-[9px] font-black uppercase tracking-wider text-zinc-600">Safe Area</span>
                   </div>
                   <span className={`text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest ${audit.safeMarginCheck === 'Passed' ? 'bg-emerald-100 text-emerald-700' : audit.safeMarginCheck === 'Warning' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'}`}>
                     {audit.safeMarginCheck}
@@ -167,7 +167,7 @@ export default function PrintQualityAuditor({ imageUrl, onAuditComplete }: Print
                 <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl space-y-2">
                   <div className="flex items-center gap-2 text-amber-700">
                     <AlertTriangle className="w-3.5 h-3.5" />
-                    <span className="text-[9px] font-black uppercase tracking-wider">Production Warnings</span>
+                    <span className="text-[9px] font-black uppercase tracking-wider">Important Notes</span>
                   </div>
                   {audit.warnings.map((w, i) => (
                     <p key={i} className="text-[9px] font-bold text-amber-600 leading-tight">• {w}</p>

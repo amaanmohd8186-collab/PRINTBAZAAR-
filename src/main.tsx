@@ -25,8 +25,8 @@ import './index.css';
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js')
-      .then(registration => {
-        console.log('SW registered successfully:', registration.scope);
+      .then(() => {
+        // SW registered
       })
       .catch(error => {
         console.error('SW registration failed:', error);

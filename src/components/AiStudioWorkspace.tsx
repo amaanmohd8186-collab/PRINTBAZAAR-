@@ -81,6 +81,7 @@ export default function AiStudioWorkspace() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [autosaveStatus, setAutosaveStatus] = useState<string>("All changes saved");
+  const [aiProvider, setAiProvider] = useState<'gemini' | 'adobe'>('gemini');
 
   // Seller Verification Guard States
   const [isVerified, setIsVerified] = useState<boolean | null>(null);
@@ -90,7 +91,7 @@ export default function AiStudioWorkspace() {
   // Real-time seller status synchronization hook
   useEffect(() => {
     if (!auth || !db) {
-       console.warn("Auth or DB not initialized in AiStudioWorkspace. Simulating unverified state.");
+       console.warn("Auth or DB not initialized in AiStudioWorkspace. Simulating verification wait.");
        setCheckingAuth(false);
        setCurrentSellerStatus("Unregistered");
        setIsVerified(false);
@@ -170,7 +171,6 @@ export default function AiStudioWorkspace() {
   const [bgReplaceType, setBgReplaceType] = useState<string>("transparent");
   const [upscaleFactor, setUpscaleFactor] = useState<number>(2);
   const [customPrompt, setCustomPrompt] = useState<string>("");
-  const [aiProvider, setAiProvider] = useState<"gemini" | "adobe">("gemini");
 
   const [brushSize, setBrushSize] = useState<number>(20);
   const [validationScore, setValidationScore] = useState<number | null>(null);
@@ -952,7 +952,7 @@ export default function AiStudioWorkspace() {
       <div className="flex flex-col items-center justify-center h-[calc(100vh-140px)] bg-[#0F172A] text-white">
         <div className="flex flex-col items-center gap-4">
           <RefreshCw className="w-10 h-10 animate-spin text-[#FF4D00]" />
-          <p className="font-mono text-xs text-slate-400 uppercase tracking-widest">Checking Partner Integrity Credentials...</p>
+          <p className="font-mono text-xs text-slate-400 uppercase tracking-widest">Verifying Partnership Credentials...</p>
         </div>
       </div>
     );
@@ -970,21 +970,21 @@ export default function AiStudioWorkspace() {
           </div>
           
           <div className="space-y-2">
-            <h2 className="text-2xl font-sans font-bold tracking-tight">🔒 AI Edit Studio Locked</h2>
+            <h2 className="text-2xl font-sans font-bold tracking-tight">🔒 Design Studio Locked</h2>
             <p className="text-slate-400 text-sm leading-relaxed">
-              Unlock supreme vector scaling, high-definition background removal, and auto-generative print designs today. Secure onboarding is required to run multi-modal AI tasks.
+              Unlock vector scaling, high-definition background removal, and intelligent print designs today. Secure onboarding is required to run advanced design tasks.
             </p>
           </div>
 
           <div className="p-4 bg-slate-950/60 border border-slate-800/80 rounded-2xl flex items-center gap-3 text-left">
             <span className="text-xl">⏳</span>
             <div>
-              <div className="text-[10px] font-mono font-bold text-[#FF4D00] uppercase tracking-wider">Current Status</div>
+              <div className="text-[10px] font-mono font-bold text-[#FF4D00] uppercase tracking-wider">Verification Status</div>
               <div className="text-sm font-semibold text-white">
-                {currentSellerStatus === "UnderReview" && "Under Forensic Compliance Review"}
-                {currentSellerStatus === "Draft" && "Draft Profile (Verification Incomplete)"}
-                {currentSellerStatus === "Unregistered" && "Awaiting KYC Onboarding Portal"}
-                {currentSellerStatus === "Rejected" && "KYC Rejections Flagged - Action Required"}
+                {currentSellerStatus === "UnderReview" && "Under Compliance Review"}
+                {currentSellerStatus === "Draft" && "Profile Draft (Awaiting Info)"}
+                {currentSellerStatus === "Unregistered" && "Awaiting KYC Verification"}
+                {currentSellerStatus === "Rejected" && "Re-verification Required"}
                 {currentSellerStatus !== "UnderReview" && currentSellerStatus !== "Draft" && currentSellerStatus !== "Unregistered" && currentSellerStatus !== "Rejected" && `Awaiting Activation (${currentSellerStatus || "Pending"})`}
               </div>
             </div>
@@ -1096,7 +1096,7 @@ export default function AiStudioWorkspace() {
             </div>
             <div className="hidden md:block text-left">
               <span className="font-heavy text-xs uppercase tracking-widest text-[#0F172A] block leading-none">
-                AI ART STUDIO
+                DESIGN STUDIO
               </span>
               <span className="text-[9px] font-mono font-bold text-zinc-400 uppercase tracking-widest">
                 PRE-PRESS VERIFIED
@@ -1105,24 +1105,24 @@ export default function AiStudioWorkspace() {
           </div>
 
           <div className="flex-1 overflow-y-auto py-4 px-2 hide-scrollbar space-y-4">
-            <ToolGroup title="AI Remover & Canvas" icon={<Brush className="w-4 h-4 text-indigo-500" />}>
+            <ToolGroup title="Intelligent Canvas" icon={<Brush className="w-4 h-4 text-indigo-500" />}>
               <ToolButton
                 active={activeTool === "background"}
                 onClick={() => setActiveTool("background")}
                 icon={<Trash2 />}
-                label="AI Background Remove"
+                label="Background Remove"
               />
               <ToolButton
                 active={activeTool === "bg-change"}
                 onClick={() => setActiveTool("bg-change")}
                 icon={<ImageIcon />}
-                label="AI Background Replace"
+                label="Background Replace"
               />
               <ToolButton
                 active={activeTool === "object-remove"}
                 onClick={() => setActiveTool("object-remove")}
                 icon={<BoxSelect />}
-                label="AI Object Remover"
+                label="Object Remover"
               />
               <ToolButton
                 active={activeTool === "magic-eraser"}
@@ -1134,40 +1134,40 @@ export default function AiStudioWorkspace() {
                 active={activeTool === "inpaint"}
                 onClick={() => setActiveTool("inpaint")}
                 icon={<Paintbrush />}
-                label="AI Inpainting"
+                label="Smart Inpainting"
               />
               <ToolButton
                 active={activeTool === "outpaint"}
                 onClick={() => setActiveTool("outpaint")}
                 icon={<Maximize />}
-                label="AI Outpainting"
+                label="Smart Outpainting"
               />
               <ToolButton
                 active={activeTool === "watermark"}
                 onClick={() => setActiveTool("watermark")}
                 icon={<Droplet />}
-                label="AI Watermark Removal"
+                label="Watermark Removal"
               />
             </ToolGroup>
 
-            <ToolGroup title="AI Enhancement" icon={<Settings2 className="w-4 h-4 text-[#FF4D00]" />}>
+            <ToolGroup title="Enhancement" icon={<Settings2 className="w-4 h-4 text-[#FF4D00]" />}>
               <ToolButton
                 active={activeTool === "enhancement"}
                 onClick={() => setActiveTool("enhancement")}
                 icon={<Wand2 />}
-                label="AI Auto Enhance"
+                label="Auto Enhance"
               />
               <ToolButton
                 active={activeTool === "upscale"}
                 onClick={() => setActiveTool("upscale")}
                 icon={<ZoomIn />}
-                label="AI Resolution Upscale"
+                label="Resolution Upscale"
               />
               <ToolButton
                 active={activeTool === "face-restore"}
                 onClick={() => setActiveTool("face-restore")}
                 icon={<Smile />}
-                label="AI Face Restore"
+                label="Face Restore"
               />
               <ToolButton
                 active={activeTool === "portrait"}

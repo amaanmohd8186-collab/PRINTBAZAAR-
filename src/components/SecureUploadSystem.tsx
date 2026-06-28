@@ -27,7 +27,7 @@ export default function SecureUploadSystem(props: SecureUploadSystemProps) {
     props.setIsUploading(true);
     props.setUploadError('');
     try {
-      // Simulate physical analysis delay
+      // Pre-flight analysis delay
       await new Promise(r => setTimeout(r, 1000));
 
       const reader = new FileReader();
@@ -89,21 +89,21 @@ export default function SecureUploadSystem(props: SecureUploadSystemProps) {
           const isPngOrWebp = file.type === 'image/png' || file.type === 'image/webp' || file.type === 'image/avif';
           
           let cmykCompatible = true;
-          let colorFeedback = "Embedded CMYK (FOGRA39/Coated) color profile detected.";
+          let colorFeedback = "Embedded production color profile detected.";
           if (isPngOrWebp) {
             cmykCompatible = false;
-            colorFeedback = "File is in RGB mode. No embedded CMYK profile detected. Industrial offset machinery may experience color shifts.";
+            colorFeedback = "File is in standard web format. No embedded production profile detected. High-end printing equipment may experience minor color variations.";
           } else {
-            // Simulated profile scan for true pre-flight rigor
+            // Pre-flight profile scan
             const nameCmykMatch = file.name.toLowerCase().includes('cmyk') || file.name.toLowerCase().includes('print') || file.name.toLowerCase().includes('press');
             if (!nameCmykMatch && Math.random() < 0.3) {
               cmykCompatible = false;
-              colorFeedback = "Incompatible sRGB format. Missing Coated GRACoL or FOGRA ICC presets.";
+              colorFeedback = "Standard digital format. Optimized printing presets not found.";
             }
           }
 
           if (isLowRes) {
-            const errorMsg = `Pre-flight failed: Resolution (${img.width}x${img.height}px) is below the required ${MIN_WIDTH}x${MIN_HEIGHT}px minimum for crisp 300 DPI industrial prints.`;
+            const errorMsg = `Resolution Alert: Image size (${img.width}x${img.height}px) is below the recommended ${MIN_WIDTH}x${MIN_HEIGHT}px for high-quality printing.`;
             props.setUploadError(errorMsg);
             
             // Dispatch custom event to trigger global toast
@@ -115,7 +115,7 @@ export default function SecureUploadSystem(props: SecureUploadSystemProps) {
           }
 
           if (!cmykCompatible) {
-            const warnMsg = `Pre-flight warning: file is in non-CMYK format (${colorFeedback}). Minor saturation distortion might propagate during offset printing.`;
+            const warnMsg = `Color Alert: File is in non-standard format (${colorFeedback}). Minor color variations may occur during production.`;
             props.setUploadError(warnMsg);
             
             window.dispatchEvent(new CustomEvent('show-toast', {
@@ -128,7 +128,7 @@ export default function SecureUploadSystem(props: SecureUploadSystemProps) {
             props.setValidationScore(98);
             
             window.dispatchEvent(new CustomEvent('show-toast', {
-              detail: { text: `✅ Pre-flight passed! File is optimized (${img.width}x${img.height}px, CMYK Gamut Approved).`, type: 'success' }
+              detail: { text: `✅ File Verified! (${img.width}x${img.height}px, Optimized for Production).`, type: 'success' }
             }));
           }
 
@@ -209,9 +209,9 @@ export default function SecureUploadSystem(props: SecureUploadSystemProps) {
         
         const isPngOrWebp = props.imageUrlInput.toLowerCase().includes('.png') || props.imageUrlInput.toLowerCase().includes('.webp');
         
-        if (isLowRes) {
-          const errorMsg = `Pre-flight URL failed: Dimension (${img.width}x${img.height}px) is below instructions criteria (${MIN_WIDTH}x${MIN_HEIGHT}px) for high volume prints.`;
-          props.setUploadError(errorMsg);
+            if (isLowRes) {
+              const errorMsg = `Resolution Alert: Image size (${img.width}x${img.height}px) is below the recommended ${MIN_WIDTH}x${MIN_HEIGHT}px.`;
+              props.setUploadError(errorMsg);
           window.dispatchEvent(new CustomEvent('show-toast', {
             detail: { text: errorMsg, type: 'warn' }
           }));
@@ -220,7 +220,7 @@ export default function SecureUploadSystem(props: SecureUploadSystemProps) {
         }
 
         if (isPngOrWebp) {
-          const warnMsg = `Pre-flight URL warning: RGB color gamut detected. Offset machinery requires Coated CMYK conversion.`;
+          const warnMsg = `Color Alert: Non-standard format detected. Production systems require format optimization.`;
           props.setUploadError(warnMsg);
           window.dispatchEvent(new CustomEvent('show-toast', {
             detail: { text: warnMsg, type: 'warn' }
@@ -229,7 +229,7 @@ export default function SecureUploadSystem(props: SecureUploadSystemProps) {
         } else {
           props.setValidationScore(90);
           window.dispatchEvent(new CustomEvent('show-toast', {
-            detail: { text: `✅ Pre-flight passed for URL! (${img.width}x${img.height}px, CMYK checked).`, type: 'success' }
+            detail: { text: `✅ File Verified! (${img.width}x${img.height}px, Production Ready).`, type: 'success' }
           }));
         }
 
@@ -245,7 +245,7 @@ export default function SecureUploadSystem(props: SecureUploadSystemProps) {
         props.setImageUrlInput('');
         props.setIsUploading(false);
         window.dispatchEvent(new CustomEvent('show-toast', {
-          detail: { text: "✅ Image URL added with default pre-flight approval.", type: 'success' }
+          detail: { text: "✅ Image added and verified.", type: 'success' }
         }));
       };
     } catch {
@@ -272,9 +272,9 @@ export default function SecureUploadSystem(props: SecureUploadSystemProps) {
         <div>
           <h5 className="text-xs font-bold text-slate-900 uppercase tracking-wide flex items-center gap-1.5">
             <ShieldCheck className="w-4 h-4 text-emerald-600" />
-            <span>Secure Assets Upload System</span>
+            <span>Verified Image Upload</span>
           </h5>
-          <p className="text-[10px] text-slate-400 mt-1">Upload from device or paste internal CDN URLs. (Max 20 Images). Images are validated via AI rules.</p>
+          <p className="text-[10px] text-slate-400 mt-1">Upload from device or import from web. (Max 20 Images). Images are validated for quality.</p>
         </div>
         
         <div className="flex bg-zinc-100/80 p-1 rounded-lg">
@@ -318,7 +318,7 @@ export default function SecureUploadSystem(props: SecureUploadSystemProps) {
               {props.isUploading ? (
                 <div className="flex flex-col items-center gap-2">
                   <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-                  <span className="text-[10px] text-zinc-400 font-mono">Running AI checks...</span>
+                  <span className="text-[10px] text-zinc-400 font-mono">Verifying quality...</span>
                 </div>
               ) : (
                 <>

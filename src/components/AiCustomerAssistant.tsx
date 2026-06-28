@@ -3,7 +3,7 @@ import { Sparkles, Send, MessageCircle, X, HelpCircle, RefreshCw } from 'lucide-
 
 interface Msg {
   id: string;
-  sender: 'user' | 'gemini';
+  sender: 'user' | 'assistant';
   text: string;
   timestamp: string;
 }
@@ -17,7 +17,7 @@ const PRESET_FAQS = [
 export default function AiCustomerAssistant() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([
-    { id: '1', sender: 'gemini', text: "Namaste! I am the PrintBazaar Gemini-powered Customer Assistant. Ask me anything about offset specifications, paper stocks, or your delivery stages!", timestamp: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) }
+    { id: '1', sender: 'assistant', text: "Hello! I'm your PrintBazaar Assistant. Ask me anything about specifications, paper stocks, or your delivery stages!", timestamp: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) }
   ]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -58,13 +58,13 @@ export default function AiCustomerAssistant() {
         replyText = "Track order cycles inside the 'Track Orders' panel. Cycles progress from: Pending plate layout → Alignment verified → In Offset Press → Shearing & Packing → Delivered. Standard courier dispatch takes 48h.";
       }
 
-      const geminiMsg: Msg = {
-        id: 'gem-' + Date.now(),
-        sender: 'gemini',
+      const assistantMsg: Msg = {
+        id: 'ast-' + Date.now(),
+        sender: 'assistant',
         text: replyText,
         timestamp: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
       };
-      setMessages(prev => [...prev, geminiMsg]);
+      setMessages(prev => [...prev, assistantMsg]);
       setIsTyping(false);
     }, 1200);
   };
@@ -79,7 +79,7 @@ export default function AiCustomerAssistant() {
           id="ai-assistant-btn"
         >
           <Sparkles className="w-5 h-5 animate-pulse" />
-          <span className="text-[10px] font-black uppercase tracking-wider font-mono">Consult Gemini</span>
+          <span className="text-[10px] font-black uppercase tracking-wider font-mono">Help</span>
         </button>
       )}
 
@@ -93,8 +93,8 @@ export default function AiCustomerAssistant() {
                 <Sparkles className="w-4 h-4" />
               </div>
               <div>
-                <h4 className="text-xs font-black uppercase tracking-tight">PrintBazaar Gemini Agent</h4>
-                <p className="text-[8px] text-zinc-400 font-mono">B2B OFFSET SYSTEMS COPILOT • ONLINE</p>
+                <h4 className="text-xs font-black uppercase tracking-tight">PrintBazaar Assistant</h4>
+                <p className="text-[8px] text-zinc-400 font-mono">CUSTOMER ASSISTANT • ONLINE</p>
               </div>
             </div>
             <button 
@@ -123,7 +123,7 @@ export default function AiCustomerAssistant() {
             {isTyping && (
               <div className="flex items-center gap-1 text-zinc-400 text-[10px] font-mono animate-pulse">
                 <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#FF4D00]" />
-                <span>Gemini drafting press guidance...</span>
+                <span>Typing...</span>
               </div>
             )}
             <div ref={scrollRef} />

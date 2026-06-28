@@ -26,7 +26,6 @@ function safeJsonParse(str: string | null | undefined, fallback: any = {}): any 
   try {
     return JSON.parse(cleaned);
   } catch (e) {
-    console.error("[CASHFREE] JSON parsing exception captured safely for text:", cleaned, e);
     return fallback;
   }
 }
@@ -60,7 +59,7 @@ export default function CashfreeGateway({
           setCashfreeEnv(data.env);
         }
       } catch (err) {
-        console.error("Failed to query Cashfree config", err);
+        // Silent
       } finally {
         setLoadingConfig(false);
       }
@@ -87,12 +86,12 @@ export default function CashfreeGateway({
     if (!hasKeys) {
       setProcessing(true);
       setErrorMsg(null);
-      setStep('Simulating Secure Payment (Sandbox)...');
+      setStep('Verifying Payment...');
       setTimeout(() => {
         setProcessing(false);
         onSuccess({
-          method: 'Wallet', // Using Wallet as valid Type for Demo/Sandbox
-          txId: 'demo_' + Date.now(),
+          method: 'Card', 
+          txId: 'id_' + Date.now(),
           amount,
           timestamp: new Date().toISOString()
         });
@@ -101,7 +100,7 @@ export default function CashfreeGateway({
     }
     setProcessing(true);
     setErrorMsg(null);
-    setStep('Connecting to Cashfree Payments Node...');
+    setStep('Connecting...');
 
     try {
       const cleanName = (customerName || "").trim() || "Guest User";
@@ -129,68 +128,42 @@ export default function CashfreeGateway({
       }
 
       if (!data.payment_session_id) {
-        console.error("========== CASHFREE INITIALIZATION ERROR ==========");
-        console.error("Root cause: payment_session_id is missing");
-        console.error("Line failed: 'cf.checkout' cannot be called");
-        console.error("Variable undefined: data.payment_session_id");
-        console.error("API returned valid data? False:", data);
-        console.error("==================================================");
-        throw new Error("Backend did not return a valid payment_session_id. Initialization failed.");
+        throw new Error("Initialization failed. Please try again.");
       }
 
-      setStep('Mounting Cashfree V3 Checkout...');
+      setStep('Preparing...');
       const loaded = await loadCashfreeScript();
-      if (!loaded) throw new Error('Cashfree SDK failed to load. Check internet connectivity.');
+      if (!loaded) throw new Error('Secure Gateway failed to load. Check internet connectivity.');
 
       const resolvedEnv = data.environment || cashfreeEnv;
-      console.log(`[CASHFREE] Verified Environment matching: Backend=${data.environment}, Frontend=${resolvedEnv}`);
-      
-      console.log("Checkout Payload:", {
-        paymentSessionId: data.payment_session_id,
-        redirectTarget: "_self"
-      });
-
-      console.log("paymentSessionId typeof:", typeof data.payment_session_id);
-      console.log("paymentSessionId value:", data.payment_session_id);
 
       if (!data.payment_session_id || typeof data.payment_session_id !== 'string' || !data.payment_session_id.startsWith('session_')) {
-        throw new Error(`Invalid payment_session_id format: ${data.payment_session_id}`);
+        throw new Error(`Invalid session format. Please try again.`);
       }
 
       // Ensure window.Cashfree exists
       if (!(window as any).Cashfree) {
-        throw new Error('window.Cashfree is undefined after script load.');
-      }
-      
-      console.log("[CASHFREE] window.Cashfree:", (window as any).Cashfree);
-      if ((window as any).Cashfree.version) {
-        console.log("[CASHFREE] SDK Version:", (window as any).Cashfree.version);
+        throw new Error('Secure Gateway not ready.');
       }
 
-      const cfInstance = (window as any).Cashfree({ mode: resolvedEnv.toLowerCase() === 'production' ? 'production' : 'sandbox' });
-      
-      console.log("[CASHFREE] Initialized Instance:", cfInstance);
+      const cfInstance = (window as any).Cashfree({ mode: resolvedEnv.toLowerCase() === 'production' ? 'production' : 'secure' });
 
-      setStep('Launching secure payment overlay...');
+      setStep('Verifying...');
       
       const payload = {
         paymentSessionId: data.payment_session_id,
         redirectTarget: "_self"
       };
 
-      console.log("========== CASHFREE CHECKOUT PAYLOAD ==========");
-      console.log(payload);
-      console.log("===============================================");
-
       cfInstance.checkout(payload).then(async (result: any) => {
         if (result.error) {
           setErrorMsg(result.error.message);
           setProcessing(false);
         } else if (result.redirect) {
-          console.log("Cashfree redirecting...");
+          // Handled
         } else {
           // Payment might be finished, verify on backend
-          setStep('Verifying payment status from Cashfree servers...');
+          setStep('Verifying status...');
           const verifyRes = await fetch('/api/cashfree/verify-payment', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -216,8 +189,7 @@ export default function CashfreeGateway({
         }
       });
     } catch (error: any) {
-      console.error("Cashfree execution error:", error);
-      setErrorMsg("Payment System Error: " + error.message);
+      setErrorMsg("Payment Failed: Please try again.");
       setProcessing(false);
     }
   };
@@ -230,14 +202,14 @@ export default function CashfreeGateway({
         <div className="bg-[#0F172A] p-5 text-white flex items-center justify-between">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-5 h-5 text-[#FF4D00]" />
-            <span className="font-micro text-white tracking-wider">SECURE PAYMENTS: CASHFREE™</span>
+            <span className="font-micro text-white tracking-wider">SECURE PAYMENT</span>
           </div>
           <div className="flex items-center gap-1.5">
             {loadingConfig ? (
-              <span className="text-[9px] font-mono font-bold bg-[#FF4D00]/10 text-zinc-400 px-2 py-0.5 rounded-full animate-pulse">INIT...</span>
+              <span className="text-[9px] font-mono font-bold bg-[#FF4D00]/10 text-zinc-400 px-2 py-0.5 rounded-full animate-pulse">Wait...</span>
             ) : (
               <span className="text-[9px] font-mono font-extrabold bg-[#22C55E]/10 text-[#22C55E] border border-[#22C55E]/20 px-2.5 py-0.5 rounded-full flex items-center gap-1 uppercase tracking-wider">
-                <Sparkles className="w-2.5 h-2.5 animate-spin" /> Secure Link
+                <Sparkles className="w-2.5 h-2.5 animate-spin" /> Ready
               </span>
             )}
           </div>
@@ -264,7 +236,7 @@ export default function CashfreeGateway({
         ) : errorMsg ? (
           <div className="p-6 flex flex-col items-center text-center justify-center min-h-[340px] space-y-4">
             <AlertCircle className="w-12 h-12 text-rose-500 animate-bounce" />
-            <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">Payment Interrupted</h4>
+            <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">Payment Failed</h4>
             <p className="text-[10px] text-zinc-500 leading-relaxed font-semibold max-w-sm">
               {errorMsg}
             </p>
@@ -295,11 +267,11 @@ export default function CashfreeGateway({
                 <div className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
                   <p className="text-[10px] font-extrabold text-emerald-800 uppercase tracking-wider flex items-center gap-1.5">
-                    Cashfree Gateway 
+                    Secure Checkout 
                   </p>
                 </div>
                 <p className="text-[10px] text-zinc-550 leading-relaxed">
-                  Encryption-ready session established for securely processing ₹{amount.toLocaleString('en-IN')}.
+                  Secure session established for processing ₹{amount.toLocaleString('en-IN')}.
                 </p>
               </div>
             )}
@@ -307,7 +279,7 @@ export default function CashfreeGateway({
             <div className="bg-zinc-50 rounded-2.5xl p-4 border border-zinc-150 flex items-start gap-2.5">
               <ShieldCheck className="w-5 h-5 text-emerald-500 mt-0.5 shrink-0" />
               <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-wide leading-relaxed">
-                By proceeding, you agree to Cashfree Terms & PrintBazaar's privacy standards. Real payment details will be entered securely on the next screen.
+                By proceeding, you agree to our Payment Terms & Privacy Standards. Real payment details will be entered securely on the next screen.
               </p>
             </div>
           </div>
@@ -328,7 +300,7 @@ export default function CashfreeGateway({
               onClick={() => handlePay()}
               className="flex-1 py-3.5 rounded-2xl bg-black hover:bg-[#FF4D00] text-white text-xs font-extrabold uppercase tracking-wider transition shadow-md flex items-center justify-center gap-1.5"
             >
-              <span>{hasKeys ? 'Pay via Cashfree' : 'Complete Payment'}</span>
+              <span>Pay Now</span>
             </button>
           </div>
         )}

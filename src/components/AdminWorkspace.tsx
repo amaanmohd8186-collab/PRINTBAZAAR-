@@ -4,15 +4,49 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, ShoppingBag, FolderEdit, Check, Eye, Trash, Plus, FileText, ArrowRight, Truck, TrendingUp, Receipt, AlertCircle, Sparkles, RefreshCw, X, Wallet, ShieldCheck, Settings, CreditCard, AlertTriangle, Activity, ShieldAlert, MapPin, Clock, Zap, Printer } from 'lucide-react';
+import { 
+  LayoutDashboard, 
+  ShoppingBag, 
+  FolderEdit, 
+  Check, 
+  Eye, 
+  Trash, 
+  Plus, 
+  FileText, 
+  ArrowRight, 
+  Truck, 
+  TrendingUp, 
+  Receipt, 
+  AlertCircle, 
+  Sparkles, 
+  RefreshCw, 
+  X, 
+  Wallet, 
+  ShieldCheck, 
+  Settings, 
+  CreditCard, 
+  AlertTriangle, 
+  Activity, 
+  ShieldAlert, 
+  MapPin, 
+  Clock, 
+  Zap, 
+  Printer, 
+  User,
+  Users,
+  BarChart3,
+  UserPlus,
+  Shield,
+  Key
+} from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
 import { parseISO, format } from 'date-fns';
-import { Order, Product, ProductCategory, OrderStatus, SizeOption, MaterialOption, QuantitySlab } from '../types';
+import { Order, Product, ProductCategory, OrderStatus, SizeOption, MaterialOption, QuantitySlab, StaffMember, StaffRole } from '../types';
 import { CATEGORIES, CATEGORY_DEFAULT_IMAGES } from '../data';
-import { getAuthHeaders, db, collection, onSnapshot, query, setDoc, doc, updateDoc, increment, getDoc, runTransaction } from '../firebase';
+import { getAuthHeaders, db, collection, onSnapshot, query, setDoc, doc, updateDoc, increment, getDoc, runTransaction, deleteDoc } from '../firebase';
 import SecureUploadSystem from './SecureUploadSystem';
-import DiagnosticsPanel from './DiagnosticsPanel';
 import PrintProductionDashboard from './PrintProductionDashboard';
+import ReportGenerator from './ReportGenerator';
 
 interface AdminWorkspaceProps {
   orders: Order[];
@@ -31,9 +65,10 @@ export default function AdminWorkspace({
   onDeleteProduct,
   onShowAudit
 }: AdminWorkspaceProps) {
-  const [activeTab, setActiveTab ] = useState<'insights' | 'incoming' | 'products' | 'diagnostics' | 'users' | 'platform' | 'low-inventory' | 'production'>('insights');
+  const [activeTab, setActiveTab ] = useState<'insights' | 'incoming' | 'products' | 'users' | 'platform' | 'low-inventory' | 'production' | 'staff' | 'reports'>('insights');
   const [dbSellers, setDbSellers] = useState<any[]>([]);
   const [dbWithdrawals, setDbWithdrawals] = useState<any[]>([]);
+  const [dbStaff, setDbStaff] = useState<StaffMember[]>([]);
   const [isProcessingAction, setIsProcessingAction] = useState(false);
 
   React.useEffect(() => {
@@ -44,11 +79,40 @@ export default function AdminWorkspace({
     const unsubWithdrawals = onSnapshot(collection(db, 'withdrawals'), (snap) => {
       setDbWithdrawals(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a: any, b: any) => b.createdAt?.toMillis() - a.createdAt?.toMillis()));
     });
+    const unsubStaff = onSnapshot(collection(db, 'staff'), (snap) => {
+      setDbStaff(snap.docs.map(d => ({ id: d.id, ...d.data() } as StaffMember)));
+    });
     return () => {
       unsubSellers();
       unsubWithdrawals();
+      unsubStaff();
     };
   }, []);
+
+  const handleAddStaff = async (staff: Partial<StaffMember>) => {
+    if (!db) return;
+    try {
+      const id = staff.id || `staff-${Date.now()}`;
+      await setDoc(doc(db, 'staff', id), {
+        ...staff,
+        id,
+        status: 'Active',
+        joinedAt: new Date().toISOString()
+      });
+      alert('Staff member added successfully.');
+    } catch (err: any) {
+      alert('Error adding staff: ' + err.message);
+    }
+  };
+
+  const handleDeleteStaff = async (staffId: string) => {
+    if (!db || !window.confirm('Remove this staff member?')) return;
+    try {
+      await deleteDoc(doc(db, 'staff', staffId));
+    } catch (err: any) {
+      alert('Error removing staff: ' + err.message);
+    }
+  };
 
   const handleApproveSeller = async (sellerId: string) => {
     if (!db) return;
@@ -183,10 +247,10 @@ export default function AdminWorkspace({
   const [showAddProductModal, setShowAddProductModal] = useState(false);
   const [showDesignModal, setShowDesignModal] = useState<{ name: string; type: string; data?: string } | null>(null);
   // Multi-state platform settings
-  const [activeSettingsGroup, setActiveSettingsGroup] = useState<'cashfree' | 'ai' | 'logistics' | 'policies'>('cashfree');
+  const [activeSettingsGroup, setActiveSettingsGroup] = useState<'cashfree' | 'verification' | 'logistics' | 'policies'>('cashfree');
   const [platformSettings, setPlatformSettings] = useState({
     cashfreeEnv: 'TEST',
-    aiModerationEnabled: true,
+    contentVerificationEnabled: true,
     autoApproveSellers: false,
     maintenanceMode: false,
     pickupPincode: '110001',
@@ -208,12 +272,12 @@ export default function AdminWorkspace({
     try {
       const settingsRef = doc(db, 'platform_settings', 'main');
       await setDoc(settingsRef, platformSettings);
-      alert('✅ Platform settings updated and synchronized across nodes.');
+      alert('✅ Settings updated successfully.');
     } catch (err) {
       console.error('Save failed:', err);
-      // Fallback for local sandbox
+      // Fallback
       localStorage.setItem('pb_platform_settings', JSON.stringify(platformSettings));
-      alert('✅ Settings saved to local buffer (Sandbox Mode).');
+      alert('✅ Settings saved to local cache.');
     }
   };
 
@@ -284,12 +348,12 @@ export default function AdminWorkspace({
   const [previewDevice, setPreviewDevice] = useState<'Desktop'|'Tablet'|'Mobile'>('Desktop');
 
   // Legacy placeholder (keeping name for backwards compat)
-  const [aiImageError, setAiImageError] = useState('');
+  const [imageError, setImageError] = useState('');
 
 
   const [adminRevenue, setAdminRevenue] = useState<{
     totalRevenue: number;
-    aiRevenue: number;
+    premiumRevenue: number;
     subscriptionRevenue: number;
     marketplaceRevenue: number;
     payoutsPending: number;
@@ -599,7 +663,7 @@ export default function AdminWorkspace({
       {/* Header and top tab buttons */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 mb-8 border-b border-gray-200 pb-6">
         <div>
-          <h2 className="text-2xl font-heavy uppercase tracking-tight text-zinc-900">Merchants Printing Terminal</h2>
+          <h2 className="text-2xl font-heavy uppercase tracking-tight text-zinc-900">Production Terminal</h2>
           <p className="text-xs text-zinc-500 font-bold uppercase tracking-wider mt-1.5 font-mono">Manage production pipelines, configure pricing tables, log billing invoices and dispatch waybills.</p>
         </div>
 
@@ -655,6 +719,28 @@ export default function AdminWorkspace({
 
           <button
             type="button"
+            onClick={() => setActiveTab('reports')}
+            className={`py-2 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition flex items-center gap-2 ${
+              activeTab === 'reports' ? 'bg-[#FF4D00] text-white shadow-xs' : 'text-zinc-400 hover:text-white'
+            }`}
+          >
+            <BarChart3 className="w-4 h-4" />
+            <span>Reports</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('staff')}
+            className={`py-2 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition flex items-center gap-2 ${
+              activeTab === 'staff' ? 'bg-[#FF4D00] text-white shadow-xs' : 'text-zinc-400 hover:text-white'
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            <span>Staff</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab('low-inventory')}
             className={`py-2 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition flex items-center gap-2 relative ${
               activeTab === 'low-inventory' ? 'bg-rose-600 text-white shadow-xs' : 'text-zinc-400 hover:text-white'
@@ -671,23 +757,12 @@ export default function AdminWorkspace({
 
           <button
             type="button"
-            onClick={() => setActiveTab('diagnostics')}
-            className={`py-2 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition flex items-center gap-2 ${
-              activeTab === 'diagnostics' ? 'bg-[#FF4D00] text-white shadow-xs' : 'text-zinc-400 hover:text-white'
-            }`}
-          >
-            <ShieldCheck className="w-4 h-4" />
-            <span>Diagnostics</span>
-          </button>
-
-          <button
-            type="button"
             onClick={() => setActiveTab('users')}
             className={`py-2 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition flex items-center gap-2 ${
               activeTab === 'users' ? 'bg-[#FF4D00] text-white shadow-xs' : 'text-zinc-400 hover:text-white'
             }`}
           >
-            <Trash className="w-4 h-4 text-rose-500" />
+            <User className="w-4 h-4" />
             <span>Users</span>
           </button>
 
@@ -711,6 +786,84 @@ export default function AdminWorkspace({
         </div>
       )}
 
+      {activeTab === 'reports' && (
+        <ReportGenerator />
+      )}
+
+      {activeTab === 'staff' && (
+        <div className="space-y-6">
+           <div className="flex justify-between items-center bg-white p-6 rounded-[24px] border border-zinc-200/50 shadow-sm">
+             <div>
+               <h3 className="text-xl font-heavy text-slate-950 uppercase tracking-tight">Staff Management</h3>
+               <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest mt-0.5">Control Access & Roles</p>
+             </div>
+             <button 
+              onClick={() => {
+                const name = prompt('Staff Name:');
+                const role = prompt('Role (Production Manager, Designer, Operator, Packing Staff, Delivery Staff, Customer Support):') as StaffRole;
+                const email = prompt('Email:');
+                if (name && role && email) handleAddStaff({ name, role, email });
+              }}
+              className="bg-slate-950 text-white px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center gap-2"
+             >
+               <UserPlus className="w-4 h-4" /> Add Personnel
+             </button>
+           </div>
+
+           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {dbStaff.map(member => (
+                <div key={member.id} className="bg-white p-6 rounded-[32px] border border-zinc-200 shadow-sm group">
+                   <div className="flex items-center gap-4 mb-6">
+                      <div className="w-14 h-14 bg-zinc-900 rounded-2xl flex items-center justify-center text-white text-xl font-black shrink-0 shadow-lg">
+                        {member.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                         <h4 className="text-sm font-black text-slate-950 uppercase truncate">{member.name}</h4>
+                         <p className="text-[9px] text-zinc-400 font-bold uppercase truncate">{member.email}</p>
+                      </div>
+                      <span className="bg-emerald-100 text-emerald-700 text-[8px] font-black px-2 py-1 rounded-full uppercase">
+                        {member.status}
+                      </span>
+                   </div>
+
+                   <div className="space-y-4">
+                      <div className="flex items-center justify-between p-3 bg-zinc-50 rounded-xl border border-zinc-100">
+                         <div className="flex items-center gap-2">
+                            <Shield className="w-3.5 h-3.5 text-[#FF4D00]" />
+                            <span className="text-[9px] font-black text-slate-900 uppercase">Privilege Level</span>
+                         </div>
+                         <span className="text-[10px] font-black text-[#FF4D00] uppercase italic">{member.role}</span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                         <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-100">
+                            <p className="text-[8px] text-zinc-400 font-black uppercase mb-1">Assigned</p>
+                            <p className="text-xs font-black text-slate-900">{member.assignedTasks || 0} Tasks</p>
+                         </div>
+                         <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-100">
+                            <p className="text-[8px] text-zinc-400 font-black uppercase mb-1">Joined</p>
+                            <p className="text-xs font-black text-slate-900">{format(new Date(member.joinedAt), 'MMM dd')}</p>
+                         </div>
+                      </div>
+                   </div>
+
+                   <div className="mt-6 pt-6 border-t border-zinc-100 flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button className="flex-1 py-2 bg-zinc-950 text-white rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-2">
+                         <Key className="w-3.5 h-3.5" /> Permissions
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteStaff(member.id)}
+                        className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition"
+                      >
+                         <Trash className="w-4 h-4" />
+                      </button>
+                   </div>
+                </div>
+              ))}
+           </div>
+        </div>
+      )}
+
       {activeTab === 'insights' && (
         <div className="space-y-6">
           {/* Key Stat Cards */}
@@ -729,10 +882,10 @@ export default function AdminWorkspace({
 
             <div className="bg-zinc-50 p-6 rounded-[32px] border border-zinc-100 shadow-xs relative overflow-hidden">
               <div className="flex items-center justify-between text-zinc-500 mb-2">
-                <span className="font-micro text-zinc-600 block text-[10px]">AI Tools & Credit Profit</span>
+                <span className="font-micro text-zinc-600 block text-[10px]">Design Credits Profit</span>
                 <Sparkles className="w-5 h-5 text-zinc-400" />
               </div>
-              <p className="text-3xl font-heavy text-zinc-900 leading-none">₹{adminRevenue?.aiRevenue.toLocaleString('en-IN') || '---'}</p>
+              <p className="text-3xl font-heavy text-zinc-900 leading-none">₹{adminRevenue?.premiumRevenue.toLocaleString('en-IN') || '---'}</p>
               <div className="flex items-center gap-1 text-[9px] text-zinc-500 font-mono mt-3 uppercase font-bold">
                 <span>Credit Economy Yield</span>
               </div>
@@ -766,7 +919,7 @@ export default function AdminWorkspace({
               className="bg-amber-100 p-6 rounded-[32px] border border-amber-200 shadow-xs relative overflow-hidden cursor-pointer hover:scale-[1.02] transition-transform"
             >
               <div className="flex items-center justify-between text-amber-600 mb-2">
-                <span className="font-micro text-amber-700 block text-[10px]">Security & OTP Audits</span>
+                <span className="font-micro text-amber-700 block text-[10px]">Verification Logs</span>
                 <ShieldCheck className="w-5 h-5 text-amber-600" />
               </div>
               <p className="text-3xl font-heavy text-amber-900 leading-none">ACTIVE</p>
@@ -777,7 +930,7 @@ export default function AdminWorkspace({
 
             <div className="bg-indigo-100 p-6 rounded-[32px] border border-indigo-200 shadow-xs relative overflow-hidden">
               <div className="flex items-center justify-between text-indigo-600 mb-2">
-                <span className="font-micro text-indigo-700 block text-[10px]">AI Tools & Premium Plans</span>
+                <span className="font-micro text-indigo-700 block text-[10px]">Premium Services</span>
                 <Sparkles className="w-5 h-5 text-indigo-600" />
               </div>
               <p className="text-3xl font-heavy text-indigo-900 leading-none">₹28,600</p>
@@ -1401,13 +1554,6 @@ export default function AdminWorkspace({
         </div>
       )}
 
-      {/* TAB 4: SYSTEM DIAGNOSTICS */}
-      {activeTab === 'diagnostics' && (
-        <div className="bg-white rounded-[32px] p-8 border border-zinc-200/80 shadow-md">
-           <DiagnosticsPanel />
-        </div>
-      )}
-
       {/* TAB 5: USERS & DATA PROTECTION CONTROLS */}
       {activeTab === 'platform' && (
         <div className="space-y-6">
@@ -1416,13 +1562,13 @@ export default function AdminWorkspace({
               onClick={() => setActiveSettingsGroup('cashfree')}
               className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all ${activeSettingsGroup === 'cashfree' ? 'bg-[#FF4D00] text-white shadow-lg' : 'bg-white text-zinc-500 hover:bg-zinc-50'}`}
             >
-              Cashfree Finance
+              Payment Gateway
             </button>
             <button 
-              onClick={() => setActiveSettingsGroup('ai')}
-              className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all ${activeSettingsGroup === 'ai' ? 'bg-[#FF4D00] text-white shadow-lg' : 'bg-white text-zinc-500 hover:bg-zinc-50'}`}
+              onClick={() => setActiveSettingsGroup('verification')}
+              className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all ${activeSettingsGroup === 'verification' ? 'bg-[#FF4D00] text-white shadow-lg' : 'bg-white text-zinc-500 hover:bg-zinc-50'}`}
             >
-              AI Moderation
+              Verification
             </button>
             <button 
               onClick={() => setActiveSettingsGroup('logistics')}
@@ -1452,7 +1598,7 @@ export default function AdminWorkspace({
                   <div className="flex items-center justify-between p-4 bg-zinc-50 rounded-2xl border border-zinc-100">
                     <div>
                       <p className="text-[10px] font-black uppercase text-zinc-400">Environment Node</p>
-                      <p className="text-xs font-bold text-zinc-900">{platformSettings.cashfreeEnv === 'TEST' ? 'Sandbox (Testing)' : 'Production (Live)'}</p>
+                      <p className="text-xs font-bold text-zinc-900">{platformSettings.cashfreeEnv === 'TEST' ? 'Security Verifying Mode' : 'Live Environment'}</p>
                     </div>
                     <button 
                       onClick={() => setPlatformSettings(p => ({ ...p, cashfreeEnv: p.cashfreeEnv === 'TEST' ? 'PROD' : 'TEST' }))}
@@ -1491,22 +1637,22 @@ export default function AdminWorkspace({
             </div>
           )}
 
-          {activeSettingsGroup === 'ai' && (
+          {activeSettingsGroup === 'verification' && (
             <div className="bg-white p-8 rounded-[40px] border border-zinc-200 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="flex items-center justify-between mb-8">
                 <div>
-                  <h3 className="text-sm font-heavy uppercase tracking-tight text-zinc-900">AI Design Moderation Engine</h3>
-                  <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mt-1">Automatic Content Guardrails & Copyright Sweep</p>
+                  <h3 className="text-sm font-heavy uppercase tracking-tight text-zinc-900">Content Verification Hub</h3>
+                  <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mt-1">Quality Standards & Moderation</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className={`text-[9px] font-black uppercase ${platformSettings.aiModerationEnabled ? 'text-emerald-600' : 'text-rose-500'}`}>
-                    {platformSettings.aiModerationEnabled ? 'Active' : 'Disabled'}
+                  <span className={`text-[9px] font-black uppercase ${platformSettings.contentVerificationEnabled ? 'text-emerald-600' : 'text-rose-500'}`}>
+                    {platformSettings.contentVerificationEnabled ? 'Active' : 'Disabled'}
                   </span>
                   <button 
-                    onClick={() => setPlatformSettings(p => ({ ...p, aiModerationEnabled: !p.aiModerationEnabled }))}
-                    className={`w-12 h-6 rounded-full transition-all relative ${platformSettings.aiModerationEnabled ? 'bg-emerald-500' : 'bg-zinc-200'}`}
+                    onClick={() => setPlatformSettings(p => ({ ...p, contentVerificationEnabled: !p.contentVerificationEnabled }))}
+                    className={`w-12 h-6 rounded-full transition-all relative ${platformSettings.contentVerificationEnabled ? 'bg-emerald-500' : 'bg-zinc-200'}`}
                   >
-                    <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${platformSettings.aiModerationEnabled ? 'right-1' : 'left-1'}`} />
+                    <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${platformSettings.contentVerificationEnabled ? 'right-1' : 'left-1'}`} />
                   </button>
                 </div>
               </div>
@@ -1529,9 +1675,9 @@ export default function AdminWorkspace({
                 <div className="p-5 bg-zinc-50 rounded-3xl border border-zinc-100">
                   <div className="flex items-center gap-2 mb-3">
                     <Activity className="w-4 h-4 text-emerald-500" />
-                    <p className="text-[10px] font-black uppercase text-zinc-800">Prompt Filter</p>
+                    <p className="text-[10px] font-black uppercase text-zinc-800">Content Filter</p>
                   </div>
-                  <p className="text-[10px] text-zinc-500 leading-relaxed font-medium">Restricts generation of sensitive names or addresses in AI text layers.</p>
+                  <p className="text-[10px] text-zinc-500 leading-relaxed font-medium">Prevents sensitive data from appearing in generated text.</p>
                 </div>
               </div>
             </div>
@@ -1545,8 +1691,8 @@ export default function AdminWorkspace({
                     <Truck className="w-7 h-7" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-heavy uppercase tracking-tight text-zinc-900">Shiprocket Logistics Core</h3>
-                    <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mt-1">Configure automated shipment fulfillment & pre-press dispatch logic</p>
+                    <h3 className="text-xl font-heavy uppercase tracking-tight text-zinc-900">Logistics Settings</h3>
+                    <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mt-1">Configure automated shipping and delivery settings</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -1950,13 +2096,13 @@ export default function AdminWorkspace({
                   return;
                 }
                 
-                // Flush local cache registers
+                // Clear local data
                 localStorage.removeItem(`pb_pending_deletion_${targetEmailInput}`);
                 localStorage.removeItem(`pb_deactivated_state_${targetEmailInput}`);
                 localStorage.removeItem(`pb_wallet_balance_${targetEmailInput}`);
-                localStorage.removeItem(`pb_ai_credits_${targetEmailInput}`);
+                localStorage.removeItem(`pb_design_credits_${targetEmailInput}`);
                 
-                alert(`💥 Complete wipe execute success: Target account ${targetEmailInput} shredded from catalog databases.`);
+                alert(`💥 Complete wipe success: Target account ${targetEmailInput} removed from systems.`);
                 e.currentTarget.reset();
                 window.location.reload();
               }}
@@ -2176,7 +2322,7 @@ export default function AdminWorkspace({
                     onClick={() => setNewProdDesc(`Premium high-quality ${newProdName || 'product'} with exceptional printing finish. Available in various size specifications with quick delivery.`)}
                     className="text-[10px] text-sky-600 font-bold uppercase hover:bg-sky-50 px-2 py-0.5 rounded cursor-pointer"
                   >
-                    ✨ AI Autocopy
+                    ✨ Generate Description
                   </button>
                 </div>
                 <textarea

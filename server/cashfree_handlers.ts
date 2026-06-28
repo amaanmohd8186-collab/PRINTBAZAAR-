@@ -1,7 +1,6 @@
 import { Request, Response } from "express";
 import { Cashfree, CFEnvironment } from "cashfree-pg";
 import { adminDb, FieldValue, logDbWarning } from "./firebase";
-import { logOrderRequest, logOrderResponse } from "../api/diagnostics";
 
 // Helper to get clean environment variables
 function getCleanEnv(name: string): string | undefined {
@@ -115,11 +114,11 @@ export const createOrderHandler = async (req: Request, res: Response) => {
         }
       };
 
-      logOrderRequest(request);
+      // Log request removed
 
       // 3. gateway call
       const response = await cf.PGCreateOrder(request);
-      logOrderResponse(response);
+      // Log response removed
 
       if (!response.data || !response.data.payment_session_id) {
         throw new Error("Cashfree Gateway succeeded but returned no payment_session_id. Full response: " + JSON.stringify(response.data));

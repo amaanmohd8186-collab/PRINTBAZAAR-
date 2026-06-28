@@ -11,7 +11,7 @@ export default function BulkQuoteGenerator() {
   const [isAssembling, setIsAssembling] = useState(false);
   const [quoteResults, setQuoteResults] = useState<any | null>(null);
 
-  const triggerAiQuotation = async () => {
+  const calculateEstimate = async () => {
     setIsAssembling(true);
     setQuoteResults(null);
 
@@ -35,10 +35,10 @@ export default function BulkQuoteGenerator() {
           gst: data.tax,
           total: data.total,
           timeline: quantity > 5000 ? '5-7 Working Days' : '3-4 Working Days',
-          aiRecommendations: [
-            `Automated price lock active for ${category} @ ${quantity} units.`,
+          productionNotes: [
+            `Price lock active for ${category} @ ${quantity} units.`,
             `Integrated shipping calculation to ${pincode} included in total.`,
-            `AI Model verified specifications: ${customReq || 'Standard configurations applied'}.`
+            `Verified specifications: ${customReq || 'Standard configurations applied'}.`
           ]
         });
       }
@@ -54,14 +54,14 @@ export default function BulkQuoteGenerator() {
       <div className="border-b border-zinc-100 pb-5">
         <h3 className="text-xl font-heavy text-slate-900 uppercase tracking-tight flex items-center gap-2">
           <Layers className="w-5 h-5 text-[#FF4D00]" />
-          <span>Super Offset Bulk Quote Constructor</span>
+          <span>Bulk Order Pricing</span>
         </h3>
-        <p className="text-xs text-zinc-500 font-mono mt-1 font-bold">Configure wholesale volume runs and fetch instant AI-optimized production quotes with automatic slab discounts.</p>
+        <p className="text-xs text-zinc-500 font-mono mt-1 font-bold">Configure large volume orders and get instant pricing with automatic quantity discounts.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         <div className="space-y-4 bg-zinc-50 border border-zinc-200/80 p-5 rounded-[24px]">
-          <h4 className="text-xs font-black uppercase tracking-widest text-[#FF4D00] font-mono">Quotation Requirements Matrix</h4>
+          <h4 className="text-xs font-black uppercase tracking-widest text-[#FF4D00] font-mono">Project Details</h4>
           
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
@@ -130,12 +130,12 @@ export default function BulkQuoteGenerator() {
 
           <button
             type="button"
-            onClick={triggerAiQuotation}
+            onClick={calculateEstimate}
             disabled={isAssembling}
             className="w-full py-3 bg-black hover:bg-neutral-800 text-white rounded-[18px] text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer"
           >
             {isAssembling ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 text-[#FF4D00]" />}
-            <span>{isAssembling ? 'Analyzing slab rates...' : 'Request Instant AI Quote'}</span>
+            <span>{isAssembling ? 'Calculating...' : 'Get Pricing'}</span>
           </button>
         </div>
 
@@ -146,7 +146,7 @@ export default function BulkQuoteGenerator() {
               <div className="flex items-center justify-between border-b pb-3">
                 <span className="text-[10px] font-mono text-emerald-600 font-black uppercase tracking-wider flex items-center gap-1">
                   <ShieldCheck className="w-4 h-4" />
-                  <span>Verified Instant Quotation Active</span>
+                  <span>Pricing Updated</span>
                 </span>
                 <span className="text-[10px] font-mono text-zinc-400 font-semibold uppercase">{quoteResults.timeline}</span>
               </div>
@@ -161,7 +161,7 @@ export default function BulkQuoteGenerator() {
                   <span className="font-mono font-black text-slate-800">₹{quoteResults.subtotal.toLocaleString('en-IN')}</span>
                 </div>
                 <div className="flex justify-between text-xs pb-2 border-b border-dashed">
-                  <span className="text-zinc-500 font-bold">GST Tax Rate (18%)</span>
+                  <span className="text-zinc-500 font-bold">Taxes</span>
                   <span className="font-mono font-black text-slate-800">₹{quoteResults.gst.toLocaleString('en-IN')}</span>
                 </div>
                 <div className="flex justify-between text-sm pt-1">
@@ -170,11 +170,11 @@ export default function BulkQuoteGenerator() {
                 </div>
               </div>
 
-              {quoteResults.aiRecommendations && (
+              {quoteResults.productionNotes && (
                 <div className="bg-gradient-to-br from-zinc-900 to-[#0F172A] text-white rounded-[20px] p-4 space-y-2.5">
-                  <span className="text-[9px] font-mono text-[#FF4D00] font-black uppercase tracking-widest block">Offset AI Recommendations & Logic</span>
+                  <span className="text-[9px] font-mono text-[#FF4D00] font-black uppercase tracking-widest block">Specifications & Summary</span>
                   <ul className="space-y-2">
-                    {quoteResults.aiRecommendations.map((rec: string, idx: number) => (
+                    {quoteResults.productionNotes.map((rec: string, idx: number) => (
                       <li key={idx} className="text-[10.5px] leading-relaxed text-zinc-300 font-medium">✨ {rec}</li>
                     ))}
                   </ul>
@@ -186,7 +186,7 @@ export default function BulkQuoteGenerator() {
               <FileText className="w-10 h-10 text-zinc-300 animate-bounce" />
               <div>
                 <p className="text-xs font-bold text-zinc-500 uppercase">Awaiting Specifications Input</p>
-                <p className="text-[10px] text-zinc-400 mt-1 max-w-[280px]">Change the sliders or quantities and tap Request to invoke high speed offset quotation audits immediately.</p>
+                <p className="text-[10px] text-zinc-400 mt-1 max-w-[280px]">Adjust quantities and tap Request to generate a quotation immediately.</p>
               </div>
             </div>
           )}

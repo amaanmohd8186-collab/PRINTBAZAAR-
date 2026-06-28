@@ -20,7 +20,7 @@ export const AuthModal = ({ onClose, triggerToast }: { onClose: () => void, trig
 
     // Enforce strictly Gmail restriction per instructions
     if (!cleanEmail.endsWith('@gmail.com')) {
-      setErrorMsg('Direct Gmail signup restriction: Only official "@gmail.com" accounts are permitted.');
+      setErrorMsg('Please use a valid @gmail.com account for secure access.');
       setLoading(false);
       return;
     }
@@ -42,27 +42,21 @@ export const AuthModal = ({ onClose, triggerToast }: { onClose: () => void, trig
         // Register standard Email user with Gmail restriction
         const userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
         await updateProfile(userCredential.user, { displayName: name.trim() });
-        triggerToast('Account created and verified successfully!', 'success');
+        triggerToast('Welcome! Your account is ready.', 'success');
       } else {
         // Login standard Email user with Gmail restriction
         await signInWithEmailAndPassword(auth, cleanEmail, password);
-        triggerToast('Welcome back! Authentication successful.', 'success');
+        triggerToast('Welcome back!', 'success');
       }
       onClose();
     } catch (err: any) {
-      console.log("🚀 [FIREBASE EMAIL AUTH FAILURE]", err.message || "Unknown error");
-      let localizedError = err.message || 'Authentication encountered an unexpected issue.';
+      console.log("🚀 [AUTH FAILURE]", err.message || "Unknown error");
+      let localizedError = 'Something went wrong. Please try again.';
       
-      if (err.code === 'auth/user-not-found') {
-        localizedError = 'No account found matching this address. Toggle "Create Account" below to register.';
-      } else if (err.code === 'auth/wrong-password') {
-        localizedError = 'Invalid password credentials. Please verify your typing and try again.';
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        localizedError = 'Invalid login details. Please check and try again.';
       } else if (err.code === 'auth/email-already-in-use') {
-        localizedError = 'This address is already registered. Please sign in instead.';
-      } else if (err.code === 'auth/invalid-credential') {
-        localizedError = 'Authentication failed. Please check your credentials or register a new account.';
-      } else if (err.code === 'auth/weak-password') {
-        localizedError = 'The password must be at least 6 characters.';
+        localizedError = 'This account already exists. Please sign in instead.';
       }
       setErrorMsg(localizedError);
     } finally {
@@ -85,12 +79,12 @@ export const AuthModal = ({ onClose, triggerToast }: { onClose: () => void, trig
             <ShieldAlert className="w-7 h-7 text-[#FF4D00]" />
           </div>
           
-          <h2 className="text-xl font-black uppercase tracking-tight text-zinc-900 leading-none" id="auth-modal-title">
-            {isSignUp ? 'Create Gmail Account' : 'Gmail Sign In'}
-          </h2>
-          <p className="text-xs text-zinc-500 mt-2 mb-6 text-center max-w-sm leading-relaxed">
-            Welcome to PrintBazaar Design Studio. Access is strictly limited to official <strong>@gmail.com</strong> accounts.
-          </p>
+            <h2 className="text-xl font-black uppercase tracking-tight text-zinc-900 leading-none" id="auth-modal-title">
+              {isSignUp ? 'Create Account' : 'Welcome Back'}
+            </h2>
+            <p className="text-xs text-zinc-500 mt-2 mb-6 text-center max-w-sm leading-relaxed">
+              Experience the future of personalized printing with PrintBazaar.
+            </p>
 
           {errorMsg && (
             <div className="mb-5 p-4 w-full bg-rose-50 border border-rose-100 rounded-2xl text-[11px] text-rose-600 font-bold uppercase tracking-wider text-left leading-normal animate-shake">
@@ -190,7 +184,7 @@ export const AuthModal = ({ onClose, triggerToast }: { onClose: () => void, trig
               disabled={loading}
               className="w-full py-3.5 bg-black hover:bg-[#FF4D00] disabled:bg-zinc-400 text-white text-xs font-black uppercase tracking-widest rounded-2xl transition-all shadow-md cursor-pointer flex items-center justify-center gap-2 hover:-translate-y-0.5 active:translate-y-0"
             >
-              <span>{loading ? 'PROCESSING...' : (isSignUp ? 'CREATE ACCOUNT' : 'SECURE SIGN IN')}</span>
+              <span>{loading ? 'Signing You In...' : (isSignUp ? 'Create Account' : 'Sign In')}</span>
             </button>
           </form>
 
@@ -207,7 +201,7 @@ export const AuthModal = ({ onClose, triggerToast }: { onClose: () => void, trig
             </button>
             
             <p className="text-[9px] text-zinc-400 mt-4 max-w-xs text-center uppercase tracking-wider font-mono">
-              Secure authentication.
+              Privacy protected.
             </p>
           </div>
         </div>

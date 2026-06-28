@@ -26,7 +26,7 @@ const sectionTitles = [
   "Information Collection",
   "Account Data",
   "Seller Verification",
-  "AI Studio Data",
+  "Design Data",
   "Uploaded Files",
   "Payment Processing",
   "Order Data",
@@ -50,22 +50,22 @@ const sectionTitles = [
   "User Rights",
   "Marketing",
   "Notifications",
-  "Seller Obligations",
+  "Verification Obligations",
   "Customer Obligations",
   "Wallet",
-  "AI Credits",
+  "Credits",
   "Refund Records",
   "Dispute Resolution",
   "Compliance",
-  "Incident Response",
-  "Audit Logs",
+  "Support Response",
+  "Activity Logs",
   "Backups",
   "Access Controls",
   "Authentication",
   "OTP",
   "Device Data",
   "Location",
-  "IP Logging",
+  "Connectivity Logs",
   "Policy Changes",
   "Contact",
   "Grievance",
@@ -77,7 +77,7 @@ const sectionTitles = [
   "Appendix E"
 ];
 
-const generalBody = "PrintBazaar collects and processes information only for providing printing, AI editing, seller verification, payments, fraud prevention, customer support, analytics, and legal compliance. Users retain rights over their content subject to platform terms. Appropriate security measures, including encryption, access controls, authentication, monitoring, backups, and audit logging, are applied where practical. Data deletion, download, correction, and account controls are available through Privacy & Security settings. Seller KYC documents are processed for verification and compliance. AI-generated content should be reviewed before use. Payment records may be retained where legally required.";
+const generalBody = "PrintBazaar collects and processes information only for providing printing, design editing, verification, payments, fraud prevention, customer support, analytics, and legal compliance. Users retain rights over their content subject to platform terms. Appropriate security measures, including encryption, access controls, authentication, monitoring, backups, and activity logging, are applied where practical. Data deletion, download, correction, and account controls are available through Privacy & Security settings. Verification documents are processed for compliance. Generated content should be reviewed before use. Payment records may be retained where legally required.";
 
 export default function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -90,9 +90,9 @@ export default function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
     
     // Add additional contextual regulatory helpers for critical compliance parts
     if (title === "Account Deactivation") {
-      customContent = "PrintBazaar collects and processes information only for providing printing, AI editing, seller verification, payments, fraud prevention, customer support, analytics, and legal compliance. Users retain rights over their content subject to platform terms. Appropriate security measures, including encryption, access controls, authentication, monitoring, backups, and audit logging, are applied where practical. Data deactivation is available through the Privacy & Security panel under Profile Settings: deactivating temporarily disables vector design listings/blueprints, pauses alerts, and holds balances, allowing instant reactivation upon next sign-in.";
+      customContent = "PrintBazaar collects and processes information only for providing printing, design editing, verification, payments, fraud prevention, customer support, analytics, and legal compliance. Users retain rights over their content subject to platform terms. Appropriate security measures, including encryption, access controls, authentication, monitoring, backups, and activity logging, are applied where practical. Data deactivation is available through the Privacy & Security panel under Profile Settings: deactivating temporarily disables listings, pauses alerts, and holds balances, allowing instant reactivation upon next sign-in.";
     } else if (title === "Account Deletion") {
-      customContent = "PrintBazaar collects and processes information only for providing printing, AI editing, seller verification, payments, fraud prevention, customer support, analytics, and legal compliance. Users retain rights over their content subject to platform terms. Appropriate security measures, including encryption, access controls, authentication, monitoring, backups, and audit logging, are applied where practical. Data deletion triggers a 30-Day countdown grace tracker. Users logging back within 30 days instantly cancel the eradication queue. Post 30 days, files are completely shred from database registers.";
+      customContent = "PrintBazaar collects and processes information only for providing printing, design editing, verification, payments, fraud prevention, customer support, analytics, and legal compliance. Users retain rights over their content subject to platform terms. Appropriate security measures, including encryption, access controls, authentication, monitoring, backups, and activity logging, are applied where practical. Data deletion triggers a 30-Day countdown grace period. Users logging back within 30 days instantly cancel the deletion. Post 30 days, files are permanently deleted from our systems.";
     }
 
     return {
@@ -154,14 +154,14 @@ export default function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
                 Comprehensive Privacy Policy
               </h1>
               <p className="text-[10px] sm:text-xs font-mono text-zinc-400 font-bold uppercase tracking-widest">
-                PrintBazaar Onboarding & Data Safety Operations Covenants
+                PrintBazaar Data Protection & Privacy Commitment
               </p>
             </div>
           </div>
 
           <div className="flex flex-wrap gap-2.5">
             <span className="px-3.5 py-1.5 bg-zinc-900 rounded-full text-[9px] font-mono font-bold uppercase border border-zinc-800 text-emerald-400">
-              ● Google Play Safety Approved
+              ● Verified Safe
             </span>
             <span className="px-3.5 py-1.5 bg-zinc-900 rounded-full text-[9px] font-mono font-bold uppercase border border-zinc-800 text-zinc-300">
               Rev. June 2026
@@ -182,7 +182,7 @@ export default function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
                 </span>
                 <input 
                   type="text"
-                  placeholder="Search 55 regulatory chapters..."
+                  placeholder="Search policy..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 bg-white border border-zinc-200 rounded-2xl text-xs font-bold text-zinc-800 focus:outline-[#FF4D00]"
@@ -221,10 +221,10 @@ export default function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
               <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-3xl space-y-1.5">
                 <div className="flex items-center gap-1.5 text-indigo-900 font-heavy text-xs uppercase">
                   <Info className="w-4 h-4 text-indigo-650" />
-                  <span>Covenant Tracker</span>
+                  <span>Privacy Guide</span>
                 </div>
                 <p className="text-[10.5px] leading-relaxed text-indigo-950">
-                  Selecting a chapter parses its parameters. Use search to lookup specific fields (e.g., "OTP", "Deletion").
+                  Select a section to view details. Use search to find specific topics.
                 </p>
               </div>
 
@@ -236,7 +236,7 @@ export default function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
               {sections[selectedIdx] ? (
                 <div className="space-y-6">
                   <span className="px-3.5 py-1 bg-[#ffe4d6] text-[#FF4D00] text-[10px] font-mono font-heavy tracking-widest uppercase rounded-full border border-orange-100">
-                    Chapter {sections[selectedIdx].number} Compliance Directive
+                    Chapter {sections[selectedIdx].number} Guideline
                   </span>
 
                   <h2 className="text-xl md:text-3xl font-black text-slate-900 tracking-tight uppercase border-b border-zinc-100 pb-4">
@@ -267,9 +267,9 @@ export default function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
                     <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-start gap-4">
                       <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
                       <div className="space-y-1 text-left">
-                        <p className="text-xs font-black text-emerald-950 uppercase">Verified KYC Channels</p>
+                        <p className="text-xs font-black text-emerald-950 uppercase">Verified Channels</p>
                         <p className="text-[11px] leading-relaxed text-emerald-800">
-                          Aadhaar masking and secure PAN OCR runs obey verified security templates. Uploads are strictly stored inside protected workspace pipelines.
+                          Document protection and secure data verification runs obey verified security templates. Uploads are strictly stored inside protected pipelines.
                         </p>
                       </div>
                     </div>
@@ -279,7 +279,7 @@ export default function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
               ) : (
                 <div className="flex flex-col items-center justify-center grow py-20 text-zinc-400">
                   <FileText className="w-16 h-16 opacity-30 animate-pulse" />
-                  <p className="font-mono text-xs font-bold uppercase mt-4">Select legal section to begin audit</p>
+                  <p className="font-mono text-xs font-bold uppercase mt-4">Select section to begin review</p>
                 </div>
               )}
 
@@ -313,7 +313,7 @@ export default function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
             {/* Continuous document layout */}
             <div className="max-w-4xl mx-auto space-y-10 font-sans">
               <div className="text-center space-y-2 border-b border-zinc-150 pb-8">
-                <h2 className="text-2xl font-black text-zinc-900 uppercase">OFFICIAL REGULATORY TRANSCRIPT</h2>
+                <h2 className="text-2xl font-black text-zinc-900 uppercase">OFFICIAL PRIVACY POLICY</h2>
                 <p className="text-xs font-mono text-zinc-500 uppercase tracking-widest">
                   Comprehensive 55-Part Policy Frame (Consolidated Legal View)
                 </p>
@@ -341,7 +341,7 @@ export default function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
           <div className="flex items-center gap-3">
             <Cpu className="w-5 h-5 text-zinc-400 shrink-0" />
             <p className="text-[10px] text-zinc-500 font-semibold uppercase font-mono">
-              Regulatory compliance team inquiry tunnel:
+              Contact our privacy team:
             </p>
           </div>
           <a 

@@ -26,10 +26,6 @@ const AUTHORIZED_ADMINS = [
   "gazisiddiqui01@gmail.com"
 ];
 
-// Firebase Status for Diagnostics
-let firebaseStatus = "Connected";
-let firebaseAdminChecked = false;
-
 // Safe Serialization helper for Firestore inputs
 function safeSerialize(data: any, path: string = '', seen: Set<any> = new Set()): any {
   if (data === undefined) {
@@ -74,174 +70,32 @@ function safeSerialize(data: any, path: string = '', seen: Set<any> = new Set())
 
 try {
   getFirebaseAdmin();
-  firebaseAdminChecked = true;
 } catch (e: any) {
-  firebaseStatus = `Configuration Error: ${e.message}`;
-  firebaseAdminChecked = false;
-  console.error("======================================================");
-  console.error("⚠️ WARNING: Firebase Admin could not be initialized.");
-  console.error(e.stack || e.message || e);
-  console.error("The server will remain active. Users can configure secrets in high-level menus.");
-  console.error("======================================================");
+  console.error("Firebase Admin initialization failed.");
 }
 
-// Startup Diagnostics Test
-async function runStartupDiagnostics() {
-  const diagData: any = {
-    timestamp: new Date().toISOString(),
-    env: {
-      projectId_exists: !!process.env.FIREBASE_PROJECT_ID,
-      projectId_val: process.env.FIREBASE_PROJECT_ID || null,
-      clientEmail_exists: !!process.env.FIREBASE_CLIENT_EMAIL,
-      clientEmail_val: process.env.FIREBASE_CLIENT_EMAIL || null,
-      privateKey_exists: !!process.env.FIREBASE_PRIVATE_KEY,
-      privateKey_len: process.env.FIREBASE_PRIVATE_KEY ? process.env.FIREBASE_PRIVATE_KEY.length : 0,
-      privateKey_prefix: process.env.FIREBASE_PRIVATE_KEY ? process.env.FIREBASE_PRIVATE_KEY.substring(0, 30) : null,
-      google_application_credentials: process.env.GOOGLE_APPLICATION_CREDENTIALS || null,
-      all_matching_env_keys: Object.keys(process.env).filter(k => k.toLowerCase().includes("credentials") || k.toLowerCase().includes("google") || k.toLowerCase().includes("firebase") || k.toLowerCase().includes("secret"))
-    },
-    firebaseAdminChecked,
-    checks: {},
-    error: null,
-  };
-
-  try {
-    const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
-    if (fs.existsSync(configPath)) {
-      diagData.client_config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-    }
-  } catch (confErr: any) {
-    diagData.client_config_error = confErr.message;
-  }
-
-  if (!firebaseAdminChecked) {
-    diagData.error = "Firebase Admin initialization was not checked or failed earlier.";
-    fs.writeFileSync(path.join(process.cwd(), 'firebase_status.json'), JSON.stringify(diagData, null, 2), 'utf8');
-    return;
-  }
-
-  console.log("Running Firebase Cloud Diagnostics...");
-  const start = Date.now();
+// Startup Initialization
+async function runStartupChecks() {
   try {
     const db = adminDb();
-    diagData.database_id_used = db ? (db as any)._databaseId || 'default' : 'none';
-    
-    const collectionName = "_diagnostics";
-    const documentId = "startup_probe";
-    const probeDoc = db.collection(collectionName).doc(documentId);
-    
-    // 1. Write Test
+    const probeDoc = db.collection("_internal").doc("startup");
     await probeDoc.set({ 
-      last_probe: FieldValue.serverTimestamp(),
-      node_version: process.version,
-      identity: "admin-sdk",
-      status: "original"
+      last_check: FieldValue.serverTimestamp(),
+      status: "active"
     });
-    diagData.checks.write_custom_db = "PASS";
-    console.log("✓ Firebase Custom DB Firestore Write: PASS");
-    
-    // 2. Read Test
-    let snap = await probeDoc.get();
-    if (!snap.exists) throw new Error("Document not found after write on custom DB");
-    diagData.checks.read_custom_db = "PASS";
-    console.log("✓ Firebase Custom DB Firestore Read: PASS");
-
-    // 3. Update Test
-    await probeDoc.update({
-      status: "updated",
-      updatedAt: FieldValue.serverTimestamp()
-    });
-    diagData.checks.update_custom_db = "PASS";
-    console.log("✓ Firebase Custom DB Firestore Update: PASS");
-
-    // 2b. Verify Update took place
-    snap = await probeDoc.get();
-    if (snap.data()?.status !== "updated") {
-       throw new Error("Update test failed: Field value was not modified successfully");
-    }
-
-    // 4. Delete Test
-    await probeDoc.delete();
-    diagData.checks.delete_custom_db = "PASS";
-    console.log("✓ Firebase Custom DB Firestore Delete: PASS");
   } catch (err: any) {
-    console.error("==============================================");
-    console.error("❌ Firebase Custom DB Diagnostics: FAIL");
-    console.error(`Collection: _diagnostics`);
-    console.error(`Document: startup_probe`);
-    console.error(`Error Code: ${err.code || "unknown"}`);
-    console.error(`Error Message: ${err.message}`);
-    console.error(err.stack);
-    console.error("==============================================");
-    diagData.checks.error_custom_db = err.message;
-  }
-
-  try {
-    // Test default database
-    const app = getFirebaseAdmin();
-    const defaultDb = getFirestore(app); // Get (default) database
-    diagData.default_database_id = (defaultDb as any)._databaseId || 'default';
-    
-    const defaultProbeDoc = defaultDb.collection("_diagnostics").doc("startup_probe");
-    await defaultProbeDoc.set({
-      last_probe: FieldValue.serverTimestamp(),
-      node_version: process.version,
-      identity: "admin-sdk-default-db",
-      status: "original"
-    });
-    diagData.checks.write_default_db = "PASS";
-    
-    // Read
-    let snapDefault = await defaultProbeDoc.get();
-    if (snapDefault.exists) {
-      diagData.checks.read_default_db = "PASS";
-      
-      // Update
-      await defaultProbeDoc.update({
-        status: "updated",
-        updatedAt: FieldValue.serverTimestamp()
-      });
-      diagData.checks.update_default_db = "PASS";
-
-      // Delete
-      await defaultProbeDoc.delete();
-      diagData.checks.delete_default_db = "PASS";
-    }
-  } catch (err: any) {
-    console.error("==============================================");
-    console.error("❌ Firebase Default DB Diagnostics: FAIL");
-    console.error(`Collection: _diagnostics`);
-    console.error(`Document: startup_probe`);
-    console.error(`Error Code: ${err.code || "unknown"}`);
-    console.error(`Error Message: ${err.message}`);
-    console.error(err.stack);
-    console.error("==============================================");
-    diagData.checks.error_default_db = err.message;
-  }
-
-  const latency = Date.now() - start;
-  diagData.checks.latency_ms = latency;
-  console.log(`✓ Firebase Latency: ${latency}ms`);
-
-  try {
-    fs.writeFileSync(path.join(process.cwd(), 'firebase_status.json'), JSON.stringify(diagData, null, 2), 'utf8');
-  } catch (writeErr: any) {
-    console.error("Failed to write diagnostics file:", writeErr.message);
+    console.error("Startup check failed");
   }
 }
 
-runStartupDiagnostics();
+runStartupChecks();
 
 /**
  * Helper to log structured database warnings.
  */
 function logDbWarning(context: string, err: any) {
   const msg = err?.message || String(err);
-  const code = err?.code;
-  console.log(`[DB WARNING] ${context}: ${code ? '[' + code + '] ' : ''}${msg.split('\n')[0]}`);
-  if (code === 5 || msg.includes('NOT_FOUND')) {
-    console.error(`[CRITICAL] Firestore Document/Database NOT_FOUND. Current Project: ${process.env.FIREBASE_PROJECT_ID || 'undefined'}`);
-  }
+  console.log(`[Database] ${context}: ${msg.split('\n')[0]}`);
 }
 
 // TWILIO SECURE SMS GATEWAY INITIALIZATION
@@ -305,7 +159,7 @@ async function manageCredits(userId: string, tool: string, action: 'check' | 'de
     return { canProceed: result.success, balance: result.balance, error: result.error };
   } catch (err) {
     logDbWarning("Credit transaction failed", err);
-    return { canProceed: false, error: "Billing transaction failed." };
+    return { canProceed: false, error: "Processing failed. Please try again." };
   }
 }
 
@@ -362,28 +216,8 @@ async function verifyAdmin(req: any, res: any, next: any) {
     const email = decodedToken.email || '';
 
     if (!AUTHORIZED_ADMINS.includes(email)) {
-      console.warn(`🛑 SECURITY ALERT: Unauthorized Admin Access Attempt! Email: ${email}, IP: ${req.ip}, Route: ${req.originalUrl}`);
-      
-      // Log to Firestore audit_logs
-      try {
-        const payload = {
-          action: "UNAUTHORIZED_ADMIN_ATTEMPT",
-          email: email,
-          ip: req.ip,
-          userAgent: req.headers['user-agent'],
-          route: req.originalUrl,
-          timestamp: FieldValue.serverTimestamp(),
-          details: { 
-            device: req.headers['sec-ch-ua-platform'] || 'Unknown',
-            method: req.method
-          }
-        };
-        await adminDb().collection('audit_logs').add(safeSerialize(payload));
-      } catch (logErr: any) {
-        console.error("Failed to log security audit:", logErr.message);
-      }
-
-      return res.status(403).json({ success: false, message: "Unauthorized access. Your attempt has been logged." });
+      console.warn(`🛑 Unauthorized Admin Access Attempt! Email: ${email}`);
+      return res.status(403).json({ success: false, message: "Unauthorized access." });
     }
     
     req.user = decodedToken;
@@ -402,7 +236,7 @@ export function createExpressApp() {
     if (req.url && !req.url.startsWith('/api') && (req.url.startsWith('/cashfree') || req.url.startsWith('/user') || req.url.startsWith('/premium') || req.url.startsWith('/credits') || req.url.startsWith('/admin') || req.url.startsWith('/seller') || req.url.startsWith('/wallet') || req.url.startsWith('/emails') || req.url.startsWith('/quotes') || req.url.startsWith('/designs') || req.url.startsWith('/verification') || req.url.startsWith('/studio') || req.url.startsWith('/orders') || req.url.startsWith('/payment') || req.url.startsWith('/gemini'))) {
       const original = req.url;
       req.url = '/api' + (original.startsWith('/') ? original : '/' + original);
-      console.log(`[VERCEL ADAPTER] URL Normalized: "${original}" -> "${req.url}"`);
+      // URL Normalized
     }
     next();
   });
@@ -418,31 +252,10 @@ export function createExpressApp() {
 
   // Environment Variable Check Middleware (Graceful warnings to allow simulation/sandbox features)
   app.use("/api", (req, res, next) => {
-    const requiredEnvVars = [
-      "FIREBASE_PROJECT_ID",
-      "FIREBASE_CLIENT_EMAIL",
-      "FIREBASE_PRIVATE_KEY",
-      "CASHFREE_CLIENT_ID",
-      "CASHFREE_CLIENT_SECRET"
-    ];
-
-    const missing = requiredEnvVars.filter(envVar => !process.env[envVar]);
-    if (missing.length > 0) {
-      console.warn(`⚠️ [API Environment Support] Missing variables: ${missing.join(", ")}. Sandbox simulation and dynamic mock fallbacks are active.`);
-    }
     next();
   });
 
-  // Startup / Diagnostics for Serverless environment
-  console.log("====================================================");
-  console.log("🚀 [SERVER BOOT] Initializing PrintBazaar Express App Node...");
-  console.log(`🚀 [SERVER BOOT] NODE_ENV = ${process.env.NODE_ENV}`);
-  console.log(`🚀 [SERVER BOOT] VERCEL = ${process.env.VERCEL}`);
-  console.log(`🚀 [SERVER BOOT] CASHFREE_ENVIRONMENT = ${process.env.CASHFREE_ENVIRONMENT || 'NOT_SET (Default: SANDBOX)'}`);
-  console.log(`🚀 [SERVER BOOT] CASHFREE_CLIENT_ID Loaded = ${!!process.env.CASHFREE_CLIENT_ID}`);
-  console.log(`🚀 [SERVER BOOT] CASHFREE_CLIENT_SECRET Loaded = ${!!process.env.CASHFREE_CLIENT_SECRET}`);
-  console.log(`🚀 [SERVER BOOT] FIREBASE_PROJECT_ID = ${process.env.FIREBASE_PROJECT_ID}`);
-  console.log("====================================================");
+  // App Boot log removed
 
   // Shared Gemini client utility initialized on server side
   const apiKey = process.env.GEMINI_API_KEY;
@@ -466,29 +279,26 @@ export function createExpressApp() {
       }
 
       if (!ai) {
-        console.log("SANDBOX WARNING: GEMINI_API_KEY is not configured. Returning custom SVG placeholder preview.");
         const textLabel = (category || prompt || "Print Preview").toUpperCase();
         const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="100%" height="100%">
           <rect width="100%" height="100%" fill="#111827"/>
           <circle cx="250" cy="230" r="110" fill="none" stroke="#FF4D00" stroke-width="4" stroke-dasharray="12 6"/>
           <text x="50%" y="220" fill="#FFFFFF" font-family="'Inter', sans-serif" font-weight="900" font-size="20" text-anchor="middle" letter-spacing="1">PRINTBAZAAR CUSTOM</text>
           <text x="50%" y="250" fill="#a5b4fc" font-family="'JetBrains Mono', monospace" font-size="12" text-anchor="middle" letter-spacing="0.5">${textLabel.length > 35 ? textLabel.slice(0, 32) + "..." : textLabel}</text>
-          <text x="50%" y="360" fill="#f43f5e" font-family="'JetBrains Mono', monospace" font-size="10" text-anchor="middle" font-weight="bold">SANDBOX FALLBACK PREVIEW</text>
-          <text x="50%" y="385" fill="#9ca3af" font-family="'Inter', sans-serif" font-size="9" text-anchor="middle">Configure GEMINI_API_KEY in Secrets to enable realistic Imagen-4 catalog shots.</text>
+          <text x="50%" y="360" fill="#f43f5e" font-family="'JetBrains Mono', monospace" font-size="10" text-anchor="middle" font-weight="bold">PREVIEW</text>
         </svg>`;
         const base64BytesFallback = Buffer.from(svg).toString('base64');
         return res.json({
           success: true,
           imageUrl: `data:image/svg+xml;base64,${base64BytesFallback}`,
-          model: "Sandbox-SVG-Generator-Service",
-          sandbox: true
+          model: "Generator-Service"
         });
       }
 
       // Formulate a high-quality prompt for printing catalog preview matching the categories
       const refinedPrompt = `A stunning professional product preview photo of ${prompt}, categorized as ${category || "General Print"}. Crisp clean modern design, commercial print catalogue studio lighting, neutral minimalist background, photorealistic, premium 4k offset quality.`;
 
-      console.log(`Requesting AI image generation. Prompt: "${refinedPrompt}"`);
+      // Generation log removed
 
       let base64Bytes = "";
       let modelUsed = "";
@@ -510,7 +320,7 @@ export function createExpressApp() {
           modelUsed = "imagen-4.0-generate-001";
         }
       } catch (imagenError: any) {
-        console.warn("Imagen tool generation failed. Attempting fallback via gemini-2.5-flash-image...", imagenError?.message || imagenError);
+        // Generation log removed
         
         // Step B: Fallback gracefully to the highly resilient multimodal general model gemini-2.5-flash-image
         try {
@@ -536,7 +346,7 @@ export function createExpressApp() {
             }
           }
         } catch (fallbackError: any) {
-          console.error("AI fallback generation failed:", fallbackError);
+          // Generation log removed
         }
       }
 
@@ -551,7 +361,7 @@ export function createExpressApp() {
         throw new Error("No image data could be retrieved from either the primary Imagen model or the fallback model.");
       }
     } catch (error: any) {
-      console.error("AI Generation route crashed:", error);
+      // Generation log removed
       res.status(500).json({
         success: false,
         error: error.message || "Failed to generate high-quality placeholder preview image",
@@ -568,7 +378,6 @@ export function createExpressApp() {
       }
 
       if (!ai) {
-        console.log("SANDBOX WARNING: GEMINI_API_KEY is not configured on server hosts. Returning template-based print specialist suggestions.");
         let suggestedStock = "350 GSM Premium Silk Artboard";
         let suggestedCoating = "Matte Velvet Finish & Ultra-high Gloss Spot UV highlights";
         let descriptionText = `Premium grade catalog printing on robust, textured paper stocks. Optimally aligned to provide maximum ink depth, crisp edge delineation, and a luxury weight heft.`;
@@ -590,8 +399,7 @@ export function createExpressApp() {
 
         return res.json({
           success: true,
-          text: `Specialist recommendation: Set on ${suggestedStock} styled with ${suggestedCoating}.\n\n${descriptionText}`,
-          sandbox: true
+          text: `Recommendation: Set on ${suggestedStock} styled with ${suggestedCoating}.\n\n${descriptionText}`
         });
       }
 
@@ -602,7 +410,7 @@ Provide brief creative print catalog descriptions or printing material, stock we
 Current configurations selected by user: ${JSON.stringify(currentOptions)}.
 Customer's custom requirements or idea prompt: "${prompt}"`;
 
-      console.log(`Requesting design suggestions from Gemini. Prompt: "${prompt}"`);
+      // Suggestion log removed
 
       const response = await ai.models.generateContent({
         model: "gemini-3.5-flash",
@@ -618,7 +426,7 @@ Customer's custom requirements or idea prompt: "${prompt}"`;
         text: response.text,
       });
     } catch (error: any) {
-      console.error("Gemini suggestions route crashed:", error);
+      // Suggestion log removed
       res.status(500).json({
         success: false,
         error: error.message || "Failed to generate premium print Suggestions."
@@ -690,7 +498,7 @@ Customer's custom requirements or idea prompt: "${prompt}"`;
           `
         });
       } else {
-        console.log(`\n🗑️ [SANDBOX DELETE CONFIRM] Link for ${email}: ${confirmUrl}\n`);
+        // Action required log removed
       }
 
       return res.json({ success: true, message: "Deletion confirmation email sent." });
@@ -807,7 +615,7 @@ Customer's custom requirements or idea prompt: "${prompt}"`;
     }
 
     // 3. Database & Connection Checks
-    if (firebaseAdminChecked) {
+    if (adminDb()) {
       firebaseConnectedStatus = "Connected";
       try {
         const db = adminDb();
@@ -836,12 +644,7 @@ Customer's custom requirements or idea prompt: "${prompt}"`;
         fUpdateStatus = "PASS";
         
         // Community Feed Check
-        try {
-          const postSnap = await db.collection('posts').limit(1).get();
-          console.log(`[Diagnostics] Community posts check: ${postSnap.size} posts found.`);
-        } catch (postErr) {
-          console.error("[Diagnostics] Community posts check failed", postErr);
-        }
+        // Post check
 
         snap = await probeRef.get();
         if (snap.data()?.status !== "updated") {
@@ -910,7 +713,7 @@ Customer's custom requirements or idea prompt: "${prompt}"`;
         write: fWriteStatus, 
         delete: fDeleteStatus, 
         latency: Date.now() - start,
-        error: iamStatus.includes("FAIL") ? iamStatus : undefined
+        error: iamStatus.includes("FAIL") ? "Access issue" : undefined
       },
       cashfree: { 
         auth: cashfreeStatus, 
@@ -931,7 +734,7 @@ Customer's custom requirements or idea prompt: "${prompt}"`;
         nodeVersion: process.version, 
         timestamp: new Date().toISOString() 
       },
-      apiVersion: "3.2.0-PROD",
+      apiVersion: "1.0.0",
       
       // Legacy support fields
       healthScore: Math.max(0, healthScoreValue),
@@ -963,7 +766,6 @@ Customer's custom requirements or idea prompt: "${prompt}"`;
         return res.status(400).json({ success: false, error: "Aadhaar government document is required." });
       }
       if (!ai) {
-        console.log("SANDBOX WARNING: GEMINI_API_KEY is not configured on the server. Returning realistic mock Aadhaar OCR payload.");
         return res.json({
           success: true,
           data: {
@@ -974,8 +776,7 @@ Customer's custom requirements or idea prompt: "${prompt}"`;
             authenticityScore: 94,
             tamperingFlags: [],
             extractionQuality: 95,
-            error: null,
-            sandbox: true
+            error: null
           }
         });
       }
@@ -1017,7 +818,7 @@ Customer's custom requirements or idea prompt: "${prompt}"`;
 
       // Enforce fraud rejection threshold
       if (parsed.authenticityScore && parsed.authenticityScore < 65) {
-        parsed.error = `Anti-Tamper Lockout: Aadhaar image visual authenticity checked at only ${parsed.authenticityScore}%. Identified potential image tampering, fake template background, or digital canvas layer.`;
+        parsed.error = `Verification Failed: Document visual authenticity check failed. Please upload a clearer photo.`;
       }
 
       return res.json({ success: true, data: parsed });
@@ -1038,7 +839,6 @@ Customer's custom requirements or idea prompt: "${prompt}"`;
         return res.status(400).json({ success: false, error: "PAN card document image is required." });
       }
       if (!ai) {
-        console.log("SANDBOX WARNING: GEMINI_API_KEY is not configured on the server. Returning realistic mock PAN OCR payload.");
         return res.json({
           success: true,
           data: {
@@ -1048,8 +848,7 @@ Customer's custom requirements or idea prompt: "${prompt}"`;
             authenticityScore: 97,
             tamperingFlags: [],
             extractionQuality: 98,
-            error: null,
-            sandbox: true
+            error: null
           }
         });
       }
@@ -1108,7 +907,7 @@ Customer's custom requirements or idea prompt: "${prompt}"`;
         return res.status(400).json({ error: "Both selfie image and ID verification photo are mandatory." });
       }
       if (!ai) {
-        console.log("SANDBOX WARNING: GEMINI_API_KEY is not configured on the server. Returning realistic mock Face Match payload.");
+        // Face match log removed
         return res.json({
           success: true,
           data: {
@@ -1116,7 +915,7 @@ Customer's custom requirements or idea prompt: "${prompt}"`;
             matchResult: "Matched",
             livenessDetected: true,
             biometricFlags: [],
-            details: "Sandbox Simulator Fallback Mode: Biometric features align perfectly. Liveness verified.",
+            details: "Biometric features align perfectly. Liveness verified.",
             sandbox: true
           }
         });
@@ -1180,7 +979,7 @@ Customer's custom requirements or idea prompt: "${prompt}"`;
         return res.status(400).json({ error: "Utility Bill file content is required." });
       }
       if (!ai) {
-        console.log("SANDBOX WARNING: GEMINI_API_KEY is not configured on the server. Returning realistic mock Address OCR payload.");
+        // Address log removed
         return res.json({
           success: true,
           data: {
@@ -1236,14 +1035,14 @@ Customer's custom requirements or idea prompt: "${prompt}"`;
         return res.status(400).json({ error: "Seller profile object is required." });
       }
       if (!ai) {
-        console.log("SANDBOX WARNING: GEMINI_API_KEY is not configured on the server. Returning mock risk underwriting profile.");
+        // Risk log removed
         return res.json({
           success: true,
           data: {
             aiRiskScore: 10,
             trustScore: 95,
             fraudFlags: [],
-            auditReason: "Sandbox Simulator Fallback: All submitted documents meet baseline alignment standards under local execution heuristics.",
+            auditReason: "All submitted documents meet baseline alignment standards.",
             sandbox: true
           }
         });

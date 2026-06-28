@@ -15,7 +15,7 @@ export const supabase = createClient(
 if (typeof window !== 'undefined') {
   (window as any).supabaseClient = supabase;
   (window as any).supabaseConfigured = isSupabaseConfigured;
-  (window as any).firebaseInitStatus = isSupabaseConfigured ? 'Success (Supabase Connected)' : 'Offline (Local Sandbox Mode)';
+  (window as any).firebaseInitStatus = isSupabaseConfigured ? 'Ready' : 'Limited Mode';
 }
 
 // Map collections to Supabase tables
@@ -192,7 +192,7 @@ export async function createUserWithEmailAndPassword(authInstance: any, email: s
         role: 'customer'
       });
     } catch (upsertErr) {
-      console.log("Supabase fallback activated msg: " + (upsertErr?.message || ""));
+      // Handled
     }
     triggerAuthChange(user);
     return { user };
@@ -268,7 +268,7 @@ export async function updateProfile(userInstance: any, profile: { displayName?: 
         avatar_url: profile.photoURL
       }).eq('id', userInstance.uid);
     } catch (upsertErr) {
-      console.log("Supabase fallback activated msg: " + (upsertErr?.message || ""));
+      // Handled
     }
   }
 
@@ -571,7 +571,7 @@ export async function setDoc(docRef: DocumentReference, data: any, options?: any
         await supabase.from(table).upsert(payload);
       }
     } catch (e) {
-      console.log("Supabase fallback activated msg: " + (e.message || ""));
+      // Handled
     }
   }
 }
@@ -592,7 +592,7 @@ export async function updateDoc(docRef: DocumentReference, data: any) {
         await supabase.from(table).update(parsedData).eq('id', docRef.docId);
       }
     } catch (e) {
-      console.log("Supabase fallback activated msg: " + (e.message || ""));
+      // Handled
     }
   }
 }
@@ -618,7 +618,7 @@ export async function deleteDoc(docRef: DocumentReference) {
         await supabase.from(table).delete().eq('id', docRef.docId);
       }
     } catch (e) {
-      console.log("Supabase fallback activated msg: " + (e.message || ""));
+      // Handled
     }
   }
 }
@@ -746,7 +746,6 @@ export async function safeFetch<T = any>(url: string, options: RequestInit = {})
     }
 
   } catch (err: any) {
-    console.error(`[SafeFetch Failed] ${url}:`, err.message);
-    return { success: false, error: err.message || "Network request failed" } as unknown as T;
+    return { success: false, error: "Network connection issue. Please try again." } as unknown as T;
   }
 }

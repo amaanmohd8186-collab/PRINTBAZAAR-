@@ -118,12 +118,12 @@ export const checkServiceability = async (
  */
 
 export const shiprocketAuth = async () => {
-  console.log('[Shiprocket] Authenticating...');
+  // Log removed
   return { token: 'mock-token' };
 };
 
 export const getShippingRates = async (request: ShippingRateRequest) => {
-  console.log('[Shiprocket] Calculating Rates...', request);
+  // Log removed
   // Prepare for real API: POST /external/courier/serviceability
   return {
     status: 200,
@@ -135,18 +135,18 @@ export const getShippingRates = async (request: ShippingRateRequest) => {
 };
 
 export const createShiprocketOrder = async (order: ShippingOrderRequest) => {
-  console.log('[Shiprocket] Creating Order...', order);
+  // Log removed
   // Prepare for real API: POST /external/orders/create/adhoc
   return { order_id: 'SR-' + Date.now(), shipment_id: 'SH-' + Date.now() };
 };
 
 export const generateAWB = async (shipmentId: string) => {
-  console.log('[Shiprocket] Generating AWB...', shipmentId);
+  // Log removed
   return { awb_code: 'AWB' + Math.floor(Math.random() * 100000000) };
 };
 
 export const getTrackingInfo = async (awb: string) => {
-  console.log('[Shiprocket] Fetching Tracking...', awb);
+  // Log removed
   return {
     status: 'In Transit',
     history: [

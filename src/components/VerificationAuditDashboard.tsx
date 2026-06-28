@@ -54,10 +54,10 @@ export const VerificationAuditDashboard: React.FC<VerificationAuditDashboardProp
 
   const getEventLabel = (type: string) => {
     switch (type) {
-      case 'request': return 'OTP REQUEST';
-      case 'verify': return 'LOGIN ATTEMPT';
-      case 'block': return 'SECURITY LOCK';
-      case 'resend': return 'RE-DISPATCH';
+      case 'request': return 'VERIFICATION REQUEST';
+      case 'verify': return 'ACCESS ATTEMPT';
+      case 'block': return 'ACCESS BLOCKED';
+      case 'resend': return 'RESENT';
       default: return type.toUpperCase();
     }
   };
@@ -75,15 +75,15 @@ export const VerificationAuditDashboard: React.FC<VerificationAuditDashboardProp
           <div>
             <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-3">
               <Shield className="text-orange-500" size={28} />
-              Verification Intelligence
+              Security Dashboard
             </h2>
-            <p className="text-slate-500 text-sm mt-1">Real-time seller KYC & fraud prevention audit logs</p>
+            <p className="text-slate-500 text-sm mt-1">Real-time security logs</p>
           </div>
         </div>
         <div className="flex gap-4">
           <div className="px-4 py-2 bg-white border border-slate-200 rounded-2xl flex items-center gap-3 shadow-sm">
              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-             <span className="text-xs font-bold text-slate-700">SYSTEM LIVE</span>
+             <span className="text-xs font-bold text-slate-700">LIVE</span>
           </div>
         </div>
       </div>
@@ -132,7 +132,7 @@ export const VerificationAuditDashboard: React.FC<VerificationAuditDashboardProp
 
               <div className="flex items-center gap-6">
                 <div className="text-right">
-                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Provider</p>
+                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Service</p>
                    <p className="text-xs font-medium text-slate-600">{audit.provider}</p>
                 </div>
                 <div className="h-8 w-px bg-slate-100" />
@@ -156,7 +156,7 @@ export const VerificationAuditDashboard: React.FC<VerificationAuditDashboardProp
              <span>8 Fraud Blocks</span>
            </div>
          </div>
-         <p className="text-[10px] text-white/30 font-mono">NODE_ENV: PRODUCTION_ENGINE v4.0.2</p>
+         <p className="text-[10px] text-white/30 font-mono">PRINTBAZAAR SECURITY v4.0.2</p>
       </div>
     </div>
   );

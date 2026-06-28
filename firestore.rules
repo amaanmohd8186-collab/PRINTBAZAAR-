@@ -113,7 +113,28 @@ service cloud.firestore {
       allow write: if isSignedIn();
     }
 
-    // 14. Diagnostics & Internal (Admin Only)
+    // 14. Brand Kits (Owner + Admin)
+    match /brandKits/{userId} {
+      allow read, write: if (isSignedIn() && (request.auth.uid == userId || isAdmin()));
+    }
+
+    // 15. Staff Management (Admin Only)
+    match /staff/{staffId} {
+      allow read, write: if isAdmin();
+    }
+
+    // 16. Business Reports (Admin Only)
+    match /business_reports/{reportId} {
+      allow read, write: if isAdmin();
+    }
+
+    // 17. Platform Settings (Admin Only)
+    match /platform_settings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 18. Diagnostics & Internal (Admin Only)
     match /_diagnostics/{id} {
       allow read, write: if isAdmin();
     }

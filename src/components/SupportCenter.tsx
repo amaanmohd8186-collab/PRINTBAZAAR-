@@ -81,7 +81,7 @@ export default function SupportCenter({ userId, userEmail, onClose }: SupportCen
     { q: "What is the standard turnaround time?", a: "Standard turnaround is 2-3 business days plus shipping." },
     { q: "Can I cancel my order after design approval?", a: "Once approved and sent to production, cancellation is not possible." },
     { q: "Do you offer GST invoices?", a: "Yes, all professional orders generate a compliant GST invoice." },
-    { q: "How do I check my design status?", a: "Visit the Design Tracker or check your email for status updates." }
+    { q: "How do I check my order status?", a: "Visit the Order Tracker or check your email for status updates." }
   ];
 
   return (
@@ -105,8 +105,8 @@ export default function SupportCenter({ userId, userEmail, onClose }: SupportCen
                 <Headphones size={32} />
               </div>
               <div>
-                <h2 className="text-xl font-black uppercase tracking-tight text-zinc-900 leading-tight">Support Intelligence</h2>
-                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mt-1">Enterprise Assistance Hub</p>
+                <h2 className="text-xl font-black uppercase tracking-tight text-zinc-900 leading-tight">Help Center</h2>
+                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mt-1">How can we help?</p>
               </div>
            </div>
 
@@ -136,9 +136,9 @@ export default function SupportCenter({ userId, userEmail, onClose }: SupportCen
               </div>
 
               <div className="space-y-3">
-                 <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Knowledge Base</h3>
+                 <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Guides & FAQs</h3>
                  <div className="space-y-1">
-                    {['Printing Guides', 'Tax & Invoicing', 'Shipping Info'].map((item, i) => (
+                    {['Artwork Guides', 'Billing & Invoices', 'Shipping Info'].map((item, i) => (
                       <button key={i} className="w-full text-left p-3 hover:bg-zinc-100 rounded-xl text-[10px] font-black uppercase tracking-widest text-zinc-600 transition flex items-center justify-between">
                          {item}
                          <ChevronRight size={14} className="opacity-30" />
@@ -149,7 +149,7 @@ export default function SupportCenter({ userId, userEmail, onClose }: SupportCen
            </div>
 
            <div className="mt-auto p-4 bg-zinc-900 rounded-3xl text-white text-center space-y-2">
-              <p className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Emergency Hotlink</p>
+              <p className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Emergency Contact</p>
               <p className="text-lg font-black tracking-tighter italic">+91 98765 43210</p>
            </div>
         </div>
@@ -160,7 +160,7 @@ export default function SupportCenter({ userId, userEmail, onClose }: SupportCen
              <div className="space-y-10">
                 <div className="flex items-center justify-between">
                    <div className="space-y-1">
-                      <h3 className="text-2xl font-black uppercase tracking-tight text-zinc-900">Your Conversations</h3>
+                      <h3 className="text-2xl font-black uppercase tracking-tight text-zinc-900">My Support Tickets</h3>
                       <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Ongoing and resolved support tickets</p>
                    </div>
                    <button 
@@ -217,7 +217,7 @@ export default function SupportCenter({ userId, userEmail, onClose }: SupportCen
 
                 {/* FAQ Section */}
                 <div className="pt-10 border-t border-zinc-100 space-y-6">
-                   <h3 className="text-xs font-black uppercase tracking-widest text-zinc-900">Popular Intelligence (FAQs)</h3>
+                   <h3 className="text-xs font-black uppercase tracking-widest text-zinc-900">Popular Questions (FAQs)</h3>
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {faqs.map((faq, i) => (
                         <div key={i} className="p-6 bg-white border border-zinc-100 rounded-3xl space-y-2">
@@ -245,7 +245,7 @@ export default function SupportCenter({ userId, userEmail, onClose }: SupportCen
                    <div className="space-y-2">
                       <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Query Category</label>
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                         {['Order Issue', 'Technical', 'Payment', 'Design Help', 'General'].map(cat => (
+                         {['Order Issue', 'App Help', 'Payment', 'Design Help', 'General'].map(cat => (
                            <button
                              key={cat}
                              type="button"
@@ -285,7 +285,7 @@ export default function SupportCenter({ userId, userEmail, onClose }: SupportCen
                      disabled={loading || !subject || !message}
                      className="w-full py-4 bg-black text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800 transition disabled:opacity-50"
                    >
-                     {loading ? 'Submitting to Neural Core...' : 'Send Ticket Securely'}
+                     {loading ? 'Submitting...' : 'Send Ticket'}
                    </button>
                 </form>
              </div>

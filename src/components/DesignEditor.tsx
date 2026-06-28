@@ -60,15 +60,23 @@ import {
   AlignRight,
   AlignVerticalJustifyStart,
   AlignVerticalJustifyCenter,
-  AlignVerticalJustifyEnd
+  AlignVerticalJustifyEnd,
+  Grid,
+  Ruler,
+  Magnet,
+  ShieldCheck,
+  Search,
+  ShoppingCart
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { jsPDF } from 'jspdf';
-import { db, safeFetch, doc, updateDoc } from '../firebase';
+import { db, safeFetch, doc, updateDoc, onSnapshot, getDoc } from '../firebase';
 import confetti from 'canvas-confetti';
-import { ToolType, Design, UserStats } from '../types';
+import { ToolType, Design, UserStats, BrandKit } from '../types';
 import { ALL_TEMPLATES, TEMPLATE_CATEGORIES } from '../data/templates';
 import { GOOGLE_FONTS, FONT_CATEGORIES } from '../data/fonts';
+import TemplateMarketplace from './TemplateMarketplace';
+import { calculateEnterprisePrice } from '../lib/enterprise-pricing';
 
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 600;
@@ -116,7 +124,52 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
   const [opacity, setOpacity] = useState(1);
   const [scale, setScale] = useState(1);
   const [rotation, setRotation] = useState(0);
-  const [rightPanelTab, setRightPanelTab] = useState<'inspector' | 'templates' | 'assets' | 'print'>('inspector');
+  const [rightPanelTab, setRightPanelTab] = useState<'inspector' | 'templates' | 'assets' | 'print' | 'brandkit' | 'marketplace'>('inspector');
+
+  // Enterprise Studio Pro Tools
+  const [showGrid, setShowGrid] = useState(false);
+  const [showRulers, setShowRulers] = useState(false);
+  const [snapToObjects, setSnapToObjects] = useState(true);
+  const [brandKit, setBrandKit] = useState<BrandKit | null>(null);
+  const [printHealth, setPrintHealth] = useState<{ score: number; alerts: string[] }>({ score: 100, alerts: [] });
+
+  // Load Brand Kit
+  useEffect(() => {
+    if (!userId) return;
+    const unsub = onSnapshot(doc(db, 'brandKits', userId), (snap) => {
+      if (snap.exists()) setBrandKit(snap.data() as BrandKit);
+    });
+    return unsub;
+  }, [userId]);
+
+  const checkPrintHealth = () => {
+    if (!fabricCanvas.current) return;
+    const objs = fabricCanvas.current.getObjects();
+    const alerts: string[] = [];
+    let score = 100;
+
+    // Check for low resolution images
+    objs.forEach(obj => {
+      if (obj instanceof fabric.Image) {
+        if ((obj.scaleX || 1) > 2) {
+          alerts.push('Low Resolution Image Detected');
+          score -= 15;
+        }
+      }
+    });
+
+    // Check for bleeds/margins
+    const margin = 20;
+    objs.forEach(obj => {
+      const bound = obj.getBoundingRect();
+      if (bound.left < margin || bound.top < margin || (bound.left + bound.width) > CANVAS_WIDTH - margin || (bound.top + bound.height) > CANVAS_HEIGHT - margin) {
+        alerts.push('Elements too close to trim edge');
+        score -= 5;
+      }
+    });
+
+    setPrintHealth({ score: Math.max(0, score), alerts: Array.from(new Set(alerts)) });
+  };
 
   // States & Refs for Undo, Redo, Layers, and Templates
   const historyStackRef = useRef<string[]>([]);
@@ -151,74 +204,6 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
   const filteredTemplates = selectedCategory === 'All' 
     ? ALL_TEMPLATES 
     : ALL_TEMPLATES.filter(t => t.category === selectedCategory);
-  {
-      name: "Luxury Visiting Card",
-      desc: "Standard 3.5x2 inch equivalent landscape blueprint.",
-      elements: [
-        { type: 'rect', left: 200, top: 200, width: 400, height: 230, rx: 12, ry: 12, fill: '#0F172A' },
-        { type: 'text', left: 240, top: 240, text: 'Amaan Mohd', fill: '#FF4D00', fontSize: 24, fontWeight: 'black', fontFamily: 'Space Grotesk' },
-        { type: 'text', left: 240, top: 280, text: 'CREATIVE DIRECTOR', fill: '#94A3B8', fontSize: 10, fontFamily: 'JetBrains Mono' },
-        { type: 'text', left: 240, top: 350, text: '+91 98765 43210 | hello@printbazaar.com', fill: '#FFFFFF', fontSize: 10, fontFamily: 'Inter' }
-      ]
-    },
-    {
-      name: "Event Flyer (Portrait)",
-      desc: "A4 proportions with bold headline blocks.",
-      elements: [
-        { type: 'rect', left: 150, top: 50, width: 500, height: 600, rx: 0, ry: 0, fill: '#FFFFFF', stroke: '#000000', strokeWidth: 1 },
-        { type: 'rect', left: 150, top: 50, width: 500, height: 150, rx: 0, ry: 0, fill: '#000000' },
-        { type: 'text', left: 200, top: 100, text: 'MUSIC FESTIVAL 2026', fill: '#FFFFFF', fontSize: 36, fontWeight: 'black', fontFamily: 'Space Grotesk' },
-        { type: 'text', left: 200, top: 250, text: 'LIVE CONCERT AT MAIDAN', fill: '#000000', fontSize: 22, fontWeight: 'bold', fontFamily: 'Inter' }
-      ]
-    },
-    {
-      name: "Marketing Poster",
-      desc: "Large scale high-impact social layouts.",
-      elements: [
-        { type: 'rect', left: 100, top: 50, width: 600, height: 600, rx: 16, ry: 16, fill: '#4F46E5' },
-        { type: 'text', left: 150, top: 150, text: 'REACH THE WORLD', fill: '#FFFFFF', fontSize: 48, fontWeight: 'black', fontFamily: 'Space Grotesk' },
-        { type: 'text', left: 150, top: 220, text: 'PROFESSIONAL PRINTING SOLUTIONS', fill: '#C7D2FE', fontSize: 16, fontFamily: 'Inter' }
-      ]
-    },
-    {
-      name: "Social Media Post Square",
-      desc: "Ideal size for Instagram and Facebook.",
-      elements: [
-        { type: 'rect', left: 200, top: 100, width: 400, height: 400, rx: 0, ry: 0, fill: '#EF4444' },
-        { type: 'text', left: 240, top: 150, text: 'FLASH SALE!', fill: '#FFFFFF', fontSize: 36, fontWeight: 'black', fontFamily: 'Space Grotesk' },
-        { type: 'text', left: 240, top: 210, text: '50% Off Custom Prints', fill: '#FFFF00', fontSize: 16, fontWeight: 'bold', fontFamily: 'Inter' },
-        { type: 'text', left: 240, top: 400, text: 'Use Code: PB50', fill: '#FFFFFF', fontSize: 14, fontFamily: 'JetBrains Mono' }
-      ]
-    },
-    {
-      name: "Instagram Reels Cover",
-      desc: "Vertical 9:16 aspect preview template.",
-      elements: [
-        { type: 'rect', left: 250, top: 120, width: 300, height: 400, rx: 4, ry: 4, fill: '#000000' },
-        { type: 'text', left: 280, top: 200, text: 'DESIGN HACKS', fill: '#F43F5E', fontSize: 22, fontWeight: 'black', fontFamily: 'Space Grotesk' },
-        { type: 'text', left: 280, top: 240, text: 'How to make print ready files', fill: '#FFFFFF', fontSize: 12, fontFamily: 'Inter' },
-        { type: 'text', left: 280, top: 450, text: 'SWIPE UP', fill: '#6B7280', fontSize: 10, fontFamily: 'JetBrains Mono' }
-      ]
-    },
-    {
-      name: "YouTube Thumbnail Frame",
-      desc: "HD layout with high click-rate elements.",
-      elements: [
-        { type: 'rect', left: 160, top: 120, width: 480, height: 320, rx: 12, ry: 12, fill: '#1E293B' },
-        { type: 'text', left: 190, top: 170, text: 'CANVA SECRETS', fill: '#F59E0B', fontSize: 30, fontWeight: 'extrabold', fontFamily: 'Space Grotesk' },
-        { type: 'text', left: 190, top: 220, text: '100% Free Design Engine', fill: '#FFFFFF', fontSize: 14, fontFamily: 'Inter' }
-      ]
-    },
-    {
-      name: "WhatsApp Status Post",
-      desc: "Story-ready creative card.",
-      elements: [
-        { type: 'rect', left: 250, top: 100, width: 300, height: 440, rx: 20, ry: 20, fill: '#047857' },
-        { type: 'text', left: 280, top: 160, text: 'EXCITING UPDATE', fill: '#10B981', fontSize: 18, fontWeight: 'bold', fontFamily: 'Space Grotesk' },
-        { type: 'text', left: 240, top: 240, text: 'We now deliver curated proofs overnight!', fill: '#FFFFFF', fontSize: 11, fontFamily: 'Inter' }
-      ]
-    }
-  ];
 
   const updateLayersList = () => {
     if (!fabricCanvas.current) return;
@@ -379,7 +364,7 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
       if (!fabricCanvas.current || isHistoryLoadingRef.current) return;
       const json = JSON.stringify(fabricCanvas.current.toJSON());
       localStorage.setItem(`printbazaar_autosave_${userId || 'anon'}`, json);
-      console.log("[AutoSave] Layout saved locally.");
+      // AutoSave log removed
     }, 30000);
 
     return () => clearInterval(autoSaveTimer);
@@ -553,10 +538,12 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
     fabricCanvas.current.on('object:added', () => {
       if (!active) return;
       pushToHistory();
+      checkPrintHealth();
     });
     fabricCanvas.current.on('object:removed', () => {
       if (!active) return;
       pushToHistory();
+      checkPrintHealth();
     });
 
     loadDesigns();
@@ -667,6 +654,36 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
     fabricCanvas.current?.renderAll();
   };
 
+  const applyTemplate = (tpl: any) => {
+    if (!fabricCanvas.current) return;
+    fabricCanvas.current.clear();
+    const bg = new fabric.Rect({
+      left: 0,
+      top: 0,
+      width: CANVAS_WIDTH,
+      height: CANVAS_HEIGHT,
+      fill: '#ffffff',
+      selectable: false,
+      evented: false,
+    });
+    fabricCanvas.current.add(bg);
+    if (tpl.elements) {
+      tpl.elements.forEach((el: any) => {
+        let obj;
+        if (el.type === 'rect') {
+          obj = new fabric.Rect(el);
+        } else if (el.type === 'text' || el.type === 'i-text') {
+          obj = new fabric.IText(el.text || 'Text', el);
+        } else if (el.type === 'circle') {
+          obj = new fabric.Circle(el);
+        }
+        if (obj) fabricCanvas.current?.add(obj);
+      });
+    }
+    fabricCanvas.current.renderAll();
+    showStatus('success', 'Template applied successfully!');
+  };
+
   const addIconText = (iconChar: string, initialFont: string) => {
     if (!fabricCanvas.current) return;
     const text = new fabric.IText(iconChar, {
@@ -686,7 +703,7 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
     const rect = new fabric.Rect({
       left: 200,
       top: 200,
-      fill: '#FF4D00',
+      fill: brandKit?.colors?.[0] || '#FF4D00',
       width: 120,
       height: 120,
       rx: 12,
@@ -902,7 +919,7 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
       showStatus('error', 'Select multiple objects to group!');
       return;
     }
-    (activeObj as fabric.ActiveSelection).toGroup();
+    (activeObj as any).toGroup();
     fabricCanvas.current.renderAll();
     showStatus('success', 'Grouped objects successfully!');
   };
@@ -914,7 +931,7 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
       showStatus('error', 'Select a group to ungroup!');
       return;
     }
-    (activeObj as fabric.Group).toActiveSelection();
+    (activeObj as any).toActiveSelection();
     fabricCanvas.current.renderAll();
     showStatus('success', 'Ungrouped objects successfully!');
   };
@@ -939,7 +956,7 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
   const duplicateObject = () => {
     const activeObj = fabricCanvas.current?.getActiveObject();
     if (!activeObj) return;
-    activeObj.clone((cloned: fabric.Object) => {
+    (activeObj as any).clone((cloned: any) => {
       fabricCanvas.current?.discardActiveObject();
       cloned.set({
         left: (cloned.left || 0) + 20,
@@ -1201,7 +1218,7 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
         promptToSend = "Generative Fill luxury detail components";
       }
 
-      console.log(`[Adobe AI Studio Dispatch] Tool: ${adobeSelectedTool}, Cost: ${toolCost}`);
+      // AI Dispatch log removed
 
       const response = await safeFetch<any>('/api/studio/process', {
         method: 'POST',
@@ -1330,7 +1347,7 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
         imageData = fabricCanvas.current.toDataURL({ format: 'png', quality: 0.8, multiplier: 1 });
       }
 
-      console.log(`[AI Studio Dispatch] Tool: ${tool}, Cost: ${toolCost}`);
+      // AI Dispatch log removed
 
       const data = await safeFetch<any>('/api/studio/process', {
         method: 'POST',
@@ -2540,13 +2557,27 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
             </div>
 
             {/* Premium Tab Toggles */}
-            <div className="grid grid-cols-4 gap-1 bg-zinc-900 p-1 border border-zinc-800 rounded-xl text-center shrink-0">
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-1 bg-zinc-900 p-1 border border-zinc-800 rounded-xl text-center shrink-0">
               <button 
                 type="button"
                 onClick={() => setRightPanelTab('inspector')}
                 className={`py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition cursor-pointer ${rightPanelTab === 'inspector' ? 'bg-[#FF4D00] text-white shadow-sm' : 'text-zinc-400 hover:text-white'}`}
               >
                 Inspect
+              </button>
+              <button 
+                type="button"
+                onClick={() => setRightPanelTab('marketplace')}
+                className={`py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition cursor-pointer ${rightPanelTab === 'marketplace' ? 'bg-[#FF4D00] text-white shadow-sm' : 'text-zinc-400 hover:text-white'}`}
+              >
+                Market
+              </button>
+              <button 
+                type="button"
+                onClick={() => setRightPanelTab('brandkit')}
+                className={`py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition cursor-pointer ${rightPanelTab === 'brandkit' ? 'bg-[#FF4D00] text-white shadow-sm' : 'text-zinc-400 hover:text-white'}`}
+              >
+                Brand
               </button>
               <button 
                 type="button"
@@ -2791,7 +2822,111 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
               </div>
             )}
 
-            {rightPanelTab === 'templates' && (
+            {rightPanelTab === 'brandkit' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between border-b border-zinc-850 pb-4">
+                <span className="text-xs font-black uppercase tracking-wider text-white flex items-center gap-2">
+                   <Briefcase className="w-4 h-4 text-[#FF4D00]" /> Brand Assets
+                </span>
+              </div>
+
+              {!brandKit ? (
+                <div className="p-8 bg-zinc-900 rounded-3xl border border-zinc-800 text-center">
+                  <p className="text-xs text-zinc-500 font-bold uppercase tracking-wider mb-4">No Brand Kit Detected</p>
+                  <p className="text-[10px] text-zinc-600 leading-relaxed mb-6">Setup your Brand Kit in the dashboard to access logos and colors here.</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                   {/* Brand Logo */}
+                   {brandKit.logoUrl && (
+                     <div className="space-y-3">
+                        <p className="text-[10px] text-zinc-400 font-black uppercase tracking-widest">Brand Logo</p>
+                        <div 
+                          className="bg-white p-4 rounded-2xl border border-zinc-800 flex items-center justify-center group cursor-pointer relative"
+                          onClick={async () => {
+                            const img = await fabric.Image.fromURL(brandKit.logoUrl!, { crossOrigin: 'anonymous' });
+                            img.scaleToWidth(150);
+                            fabricCanvas.current?.add(img);
+                            fabricCanvas.current?.centerObject(img);
+                            fabricCanvas.current?.renderAll();
+                          }}
+                        >
+                           <img src={brandKit.logoUrl} className="max-h-16 object-contain" alt="Logo" />
+                           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-2xl">
+                              <Plus className="w-6 h-6 text-white" />
+                           </div>
+                        </div>
+                     </div>
+                   )}
+
+                   {/* Brand Colors */}
+                   <div className="space-y-3">
+                      <p className="text-[10px] text-zinc-400 font-black uppercase tracking-widest">Brand Colors</p>
+                      <div className="grid grid-cols-4 gap-3">
+                         {brandKit.colors.map((color, i) => (
+                           <button 
+                            key={i} 
+                            onClick={() => updateActiveObjectProperty('fill', color)}
+                            className="aspect-square rounded-xl border border-white/10 shadow-sm"
+                            style={{ backgroundColor: color }}
+                           />
+                         ))}
+                      </div>
+                   </div>
+
+                   {/* Brand Info Quick Insert */}
+                   <div className="space-y-3">
+                      <p className="text-[10px] text-zinc-400 font-black uppercase tracking-widest">Quick Insert Details</p>
+                      <div className="space-y-2">
+                         {[
+                           { label: 'Company Name', value: brandKit.companyName },
+                           { label: 'Phone', value: brandKit.phone },
+                           { label: 'Website', value: brandKit.website },
+                           { label: 'GST', value: brandKit.gstNumber }
+                         ].filter(i => i.value).map((item, idx) => (
+                           <button 
+                             key={idx}
+                             onClick={() => {
+                                const text = new fabric.IText(item.value!, {
+                                  left: 100,
+                                  top: 100,
+                                  fontSize: 20,
+                                  fontFamily: brandKit.favoriteFonts?.[0] || 'Inter',
+                                  fill: brandKit.colors?.[0] || '#000000'
+                                });
+                                fabricCanvas.current?.add(text);
+                                fabricCanvas.current?.renderAll();
+                             }}
+                             className="w-full p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-left hover:border-zinc-700 transition"
+                           >
+                              <p className="text-[8px] text-zinc-500 font-black uppercase mb-1">{item.label}</p>
+                              <p className="text-[10px] text-zinc-300 font-black truncate">{item.value}</p>
+                           </button>
+                         ))}
+                      </div>
+                   </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {rightPanelTab === 'marketplace' && (
+            <div className="-m-5 h-[calc(100vh-250px)]">
+               <div className="p-5 border-b border-zinc-850">
+                  <h3 className="text-xs font-black uppercase text-white flex items-center gap-2">
+                    <ShoppingCart className="w-4 h-4 text-[#FF4D00]" /> Template Marketplace
+                  </h3>
+               </div>
+               <div className="p-2 h-full overflow-hidden">
+                 <TemplateMarketplace onSelectTemplate={(tpl) => {
+                   applyTemplate(tpl);
+                   showStatus('success', `Imported ${tpl.name} from marketplace!`);
+                 }} />
+               </div>
+            </div>
+          )}
+
+          {rightPanelTab === 'templates' && (
               <div className="space-y-4 flex-1 overflow-y-auto pr-1">
                 <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest font-mono">1000+ Premium Blueprints</span>
                 
@@ -2835,7 +2970,52 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
             )}
 
             {rightPanelTab === 'inspector' && (
-              <div className="space-y-6 flex-1 flex flex-col min-h-0">
+              <div className="space-y-6 flex-1 flex flex-col min-h-0 overflow-y-auto pr-1">
+                {/* Precision & Health Tools */}
+                <div className="space-y-3 bg-zinc-900/60 p-4 rounded-2xl border border-zinc-805 shrink-0 mx-1 mb-2">
+                  <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-widest font-mono flex items-center gap-1.5 border-b border-zinc-800 pb-2">
+                    <ShieldCheck className="w-3.5 h-3.5 text-[#FF4D00]" />
+                    <span>Precision & Health</span>
+                  </span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button 
+                      onClick={() => setShowGrid(!showGrid)}
+                      className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border transition ${showGrid ? 'bg-[#FF4D00]/10 border-[#FF4D00] text-white' : 'bg-zinc-900 border-zinc-800 text-zinc-400'}`}
+                    >
+                      <Grid size={14} />
+                      <span className="text-[9px] font-black uppercase">Grid</span>
+                    </button>
+                    <button 
+                      onClick={() => setShowRulers(!showRulers)}
+                      className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border transition ${showRulers ? 'bg-[#FF4D00]/10 border-[#FF4D00] text-white' : 'bg-zinc-900 border-zinc-800 text-zinc-400'}`}
+                    >
+                      <Ruler size={14} />
+                      <span className="text-[9px] font-black uppercase">Rulers</span>
+                    </button>
+                    <button 
+                      onClick={() => setSnapToObjects(!snapToObjects)}
+                      className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border transition ${snapToObjects ? 'bg-[#FF4D00]/10 border-[#FF4D00] text-white' : 'bg-zinc-900 border-zinc-800 text-zinc-400'}`}
+                    >
+                      <Magnet size={14} />
+                      <span className="text-[9px] font-black uppercase">Snap</span>
+                    </button>
+                    <div className="flex items-center justify-center gap-2 p-2.5 rounded-xl border bg-zinc-900 border-zinc-800 text-zinc-400">
+                      <Activity size={14} className={printHealth.score > 80 ? 'text-emerald-500' : 'text-rose-500'} />
+                      <span className="text-[9px] font-black uppercase italic">{printHealth.score}% Healthy</span>
+                    </div>
+                  </div>
+
+                  {printHealth.alerts.length > 0 && (
+                    <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl space-y-1">
+                      {printHealth.alerts.map((alert, i) => (
+                        <p key={i} className="text-[8px] text-rose-400 font-black uppercase flex items-center gap-1.5">
+                          <AlertCircle size={10} /> {alert}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 {/* Object Operations Group */}
                 <div className="space-y-3 bg-zinc-900/60 p-4 rounded-2xl border border-zinc-805 shrink-0 mx-1 mb-2">
                   <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-widest font-mono flex items-center gap-1.5 border-b border-zinc-800 pb-2">
