@@ -1910,36 +1910,86 @@ export default function AdminWorkspace({
           )}
 
           {activeSettingsGroup === 'policies' && (
-            <div className="bg-[#0F172A] p-8 rounded-[40px] shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <h3 className="text-lg font-heavy uppercase tracking-tight text-white mb-6">Platform Governance Settings</h3>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-6 bg-zinc-900 rounded-3xl border border-zinc-800">
-                  <div>
-                    <h4 className="text-xs font-bold text-white uppercase tracking-wider">Seller Auto-Approval</h4>
-                    <p className="text-[10px] text-zinc-500 mt-1">If enabled, new valid merchant applications skip manual audit logs.</p>
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="bg-[#0F172A] p-8 rounded-[40px] shadow-2xl">
+                <h3 className="text-lg font-heavy uppercase tracking-tight text-white mb-6">Platform Governance Settings</h3>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-6 bg-zinc-900 rounded-3xl border border-zinc-800">
+                    <div>
+                      <h4 className="text-xs font-bold text-white uppercase tracking-wider">Seller Auto-Approval</h4>
+                      <p className="text-[10px] text-zinc-500 mt-1">If enabled, new valid merchant applications skip manual audit logs.</p>
+                    </div>
+                    <button 
+                      onClick={() => setPlatformSettings(p => ({ ...p, autoApproveSellers: !p.autoApproveSellers }))}
+                      className={`px-5 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all ${platformSettings.autoApproveSellers ? 'bg-emerald-500 text-white' : 'bg-transparent border border-zinc-700 text-zinc-400'}`}
+                    >
+                      {platformSettings.autoApproveSellers ? 'Auto-Active' : 'Manual Audit Only'}
+                    </button>
                   </div>
-                   <button 
-                    onClick={() => setPlatformSettings(p => ({ ...p, autoApproveSellers: !p.autoApproveSellers }))}
-                    className={`px-5 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all ${platformSettings.autoApproveSellers ? 'bg-emerald-500 text-white' : 'bg-transparent border border-zinc-700 text-zinc-400'}`}
-                  >
-                    {platformSettings.autoApproveSellers ? 'Auto-Active' : 'Manual Audit Only'}
-                  </button>
-                </div>
 
-                <div className="flex items-center justify-between p-6 bg-rose-950/20 rounded-3xl border border-rose-900/30">
-                  <div>
-                    <h4 className="text-xs font-bold text-rose-100 uppercase tracking-wider flex items-center gap-2">
-                       <ShieldAlert className="w-4 h-4 text-rose-500" />
-                       Emergency Maintenance
-                    </h4>
-                    <p className="text-[10px] text-rose-300/60 mt-1">Locks all checkout gateways and seller portal access globally.</p>
+                  <div className="flex items-center justify-between p-6 bg-rose-950/20 rounded-3xl border border-rose-900/30">
+                    <div>
+                      <h4 className="text-xs font-bold text-rose-100 uppercase tracking-wider flex items-center gap-2">
+                        <ShieldAlert className="w-4 h-4 text-rose-500" />
+                        Emergency Maintenance
+                      </h4>
+                      <p className="text-[10px] text-rose-300/60 mt-1">Locks all checkout gateways and seller portal access globally.</p>
+                    </div>
+                    <button 
+                      onClick={() => setPlatformSettings(p => ({ ...p, maintenanceMode: !p.maintenanceMode }))}
+                      className={`px-6 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all ${platformSettings.maintenanceMode ? 'bg-rose-600 text-white' : 'bg-rose-900/30 text-rose-400'}`}
+                    >
+                      {platformSettings.maintenanceMode ? 'UNLOCK SYSTEM' : 'LOCK PLATFORM'}
+                    </button>
                   </div>
-                  <button 
-                    onClick={() => setPlatformSettings(p => ({ ...p, maintenanceMode: !p.maintenanceMode }))}
-                    className={`px-6 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all ${platformSettings.maintenanceMode ? 'bg-rose-600 text-white' : 'bg-rose-900/30 text-rose-400'}`}
-                  >
-                    {platformSettings.maintenanceMode ? 'UNLOCK SYSTEM' : 'LOCK PLATFORM'}
-                  </button>
+                </div>
+              </div>
+
+              {/* PLATFORM INITIALIZATION MODULE */}
+              <div className="bg-white p-8 rounded-[40px] border-[3px] border-black shadow-[12px_12px_0px_#000] relative overflow-hidden group">
+                <div className="relative z-10 space-y-6">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 bg-[#FF4D00] rounded-2xl flex items-center justify-center text-black shadow-xl shadow-[#FF4D00]/20 border-2 border-black">
+                      <Zap className="w-8 h-8" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-heavy uppercase tracking-tight text-slate-950">System Initialization</h3>
+                      <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider mt-1 font-mono">Deep Data Seeding Terminal</p>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-zinc-650 leading-relaxed max-w-2xl font-semibold">
+                    This terminal initializes the production database with verified product catalogues, system metadata, and platform settings. Use this to prepare the environment for live commercial operations.
+                  </p>
+
+                  <div className="flex flex-wrap gap-4 pt-2">
+                    <button 
+                      disabled={isProcessingAction}
+                      onClick={async () => {
+                        if (!window.confirm("Initialize Real Database? This will seed production products into Firestore.")) return;
+                        try {
+                          setIsProcessingAction(true);
+                          const { SEED_PRODUCTS } = await import('../seed_data');
+                          for (const p of SEED_PRODUCTS) {
+                            await setDoc(doc(db, 'products', p.id), {
+                              ...p,
+                              createdAt: new Date().toISOString(),
+                              updatedAt: new Date().toISOString()
+                            });
+                          }
+                          alert("✅ Platform initialized with production products.");
+                        } catch (err: any) {
+                          alert("❌ Initialization failed: " + err.message);
+                        } finally {
+                          setIsProcessingAction(false);
+                        }
+                      }}
+                      className="px-8 py-4 bg-[#FF4D00] hover:bg-black text-white font-black uppercase tracking-widest text-[11px] rounded-2xl transition-all shadow-xl shadow-[#FF4D00]/10 flex items-center gap-2 group/btn cursor-pointer disabled:bg-zinc-400"
+                    >
+                      <RefreshCw className={`w-4 h-4 group-hover/btn:rotate-180 transition-transform duration-500 ${isProcessingAction ? 'animate-spin' : ''}`} />
+                      {isProcessingAction ? 'Initializing...' : 'Seed Production Products'}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

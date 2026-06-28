@@ -313,8 +313,40 @@ export default function App() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   // 1. Core State shifted to Firestore only
-  const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
+  const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
+
+  // Fetch real products from Firestore
+  useEffect(() => {
+    const q = query(collection(db, 'products'), where('published', '==', true));
+    const unsubscribe = onSnapshot(q, (snap) => {
+      const prods = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+      setProducts(prods);
+      setLoadingProducts(false);
+    }, (err) => {
+      console.error("Failed to fetch products:", err);
+      setLoadingProducts(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Fetch real orders from Firestore for current user
+  useEffect(() => {
+    if (!user) {
+      setOrders([]);
+      return;
+    }
+    const q = query(collection(db, 'orders'), where('userId', '==', user.uid), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snap) => {
+      const ords = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
+      setOrders(ords);
+    }, (err) => {
+      console.warn("Orders fetch restricted (Rules):", err);
+    });
+    return () => unsubscribe();
+  }, [user]);
+
   const [successOrder, setSuccessOrder] = useState<Order | null>(null);
   const [cartItems, setCartItems] = useState<CartItem[]>(() => 
     getLocalStorageData<CartItem[]>('pb_cart', [])
@@ -344,9 +376,9 @@ export default function App() {
 
   // 3. User session info custom assigned
   const [session, setSession] = useState<UserSession>({
-    id: 'amaanmohd8186_gmail_com', // derived or set on login
-    name: 'Amaan Mohd',
-    email: 'amaanmohd8186@gmail.com',
+    id: '', 
+    name: 'Anonymous User',
+    email: '',
     role: 'customer'
   });
 
@@ -1166,29 +1198,6 @@ export default function App() {
 
     return () => unsubscribe();
   }, [user, session.role]);
-
-  // Seed INITIAL_ORDERS if list is empty and user is logged in as Admin
-  useEffect(() => {
-    if (user && session.role === 'admin' && orders.length === 0) {
-      const seedOrders = async () => {
-        if (!db) return;
-        try {
-          const snapshot = await getDocs(query(collection(db, 'orders'), limit(1)));
-          if (snapshot.empty) {
-            for (const ord of INITIAL_ORDERS) {
-              await setDoc(doc(db, 'orders', ord.id), {
-                ...removeUndefinedFields(ord),
-                createdAt: serverTimestamp()
-              });
-            }
-          }
-        } catch (e) {
-          console.error("Failed to seed initial orders", e);
-        }
-      };
-      seedOrders();
-    }
-  }, [user, session.role, orders.length]);
 
   const handleSignInWithGoogle = async () => {
     try {

@@ -158,18 +158,25 @@ export interface BusinessReport {
 
 export type OrderStatus = 
   | 'Order Received'
+  | 'Order Confirmed'
   | 'Artwork Review'
+  | 'Design Review' // Alias/Support for legacy code
+  | 'Preparing Design'
   | 'Customer Approval'
+  | 'Waiting for Customer'
   | 'Printing'
   | 'Lamination'
   | 'Cutting'
+  | 'Quality Check'
   | 'Packing'
+  | 'Packed'
   | 'Courier Pickup'
   | 'Shipped'
   | 'Out For Delivery'
   | 'Delivered'
   | 'Cancelled'
-  | 'Refunded';
+  | 'Refunded'
+  | 'Pending Payment';
 
 export interface ArtworkAudit {
   qualityScore: number;

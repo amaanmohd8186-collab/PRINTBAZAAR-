@@ -389,6 +389,7 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
         width: CANVAS_WIDTH,
         height: CANVAS_HEIGHT,
         backgroundColor: '#f8fafc',
+        allowTouchScrolling: true,
       });
       canvasInstance = c;
       fabricCanvas.current = c;

@@ -84,18 +84,8 @@ export default function CashfreeGateway({
 
   const handlePay = async () => {
     if (!hasKeys) {
-      setProcessing(true);
-      setErrorMsg(null);
-      setStep('Verifying Payment...');
-      setTimeout(() => {
-        setProcessing(false);
-        onSuccess({
-          method: 'Card', 
-          txId: 'id_' + Date.now(),
-          amount,
-          timestamp: new Date().toISOString()
-        });
-      }, 3000);
+      setProcessing(false);
+      setErrorMsg("Payment service temporarily unavailable (Credentials Missing).");
       return;
     }
     setProcessing(true);
