@@ -73,7 +73,7 @@ import {
   updateDoc, 
   deleteDoc, 
   addDoc,
-  signInWithGoogle,
+  signInWithCustomToken,
   onSnapshot, 
   query, 
   where, 
@@ -816,13 +816,15 @@ export default function App() {
 
   const toggleWishlist = (productId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setWishlistProducts(prev => {
-      if (prev.includes(productId)) {
-        return prev.filter(id => id !== productId);
-      }
-      return [...prev, productId];
+    requireUserAuthAction(() => {
+      setWishlistProducts(prev => {
+        if (prev.includes(productId)) {
+          return prev.filter(id => id !== productId);
+        }
+        return [...prev, productId];
+      });
+      triggerToast(wishlistProducts.includes(productId) ? 'Removed from Wishlist' : 'Added to Wishlist');
     });
-    triggerToast(wishlistProducts.includes(productId) ? 'Removed from Wishlist' : 'Added to Wishlist');
   };
 
   // Toast notifier helper
@@ -1183,17 +1185,7 @@ export default function App() {
     return () => unsubscribe();
   }, [user, session.role]);
 
-  const handleSignInWithGoogle = async () => {
-    try {
-      await signInWithGoogle();
-      triggerToast('Signed in successfully with Google');
-    } catch (error: any) {
-      triggerToast(`Sign in failed: ${error.message}`);
-    }
-  };
-
-  // handleGoogleSignIn shifted to AuthModal module
-
+  // Auth handling via AuthModal
   const handleSignOut = async () => {
     try {
       await signOut(auth);
@@ -1245,9 +1237,13 @@ export default function App() {
 
   const handleCheckoutSuccess = async (placedOrder: Order) => {
     try {
-      if (user && db) {
-        placedOrder.customerId = user.uid;
-        placedOrder.customerEmail = user.email || placedOrder.customerEmail;
+      if (db) {
+        if (user) {
+          placedOrder.customerId = user.uid;
+          placedOrder.customerEmail = user.email || placedOrder.customerEmail;
+        } else {
+          placedOrder.customerId = 'guest_' + Math.random().toString(36).substring(2, 10);
+        }
         
         await setDoc(doc(db, 'orders', placedOrder.id), {
           ...removeUndefinedFields(placedOrder),
@@ -1766,7 +1762,7 @@ export default function App() {
 
               <button
                 type="button"
-                onClick={() => setCustomerActiveTab('status')}
+                onClick={() => requireUserAuthAction(() => setCustomerActiveTab('status'))}
                 className={`py-2 px-4.5 rounded-2xl text-xs font-heavy uppercase tracking-wider transition flex items-center gap-1.5 border border-transparent cursor-pointer relative ${
                   customerActiveTab === 'status'
                     ? 'bg-black text-white shadow-md'
@@ -1807,7 +1803,7 @@ export default function App() {
 
               <button
                 type="button"
-                onClick={() => setCustomerActiveTab('wishlist')}
+                onClick={() => requireUserAuthAction(() => setCustomerActiveTab('wishlist'))}
                 className={`py-2 px-4.5 rounded-2xl text-xs font-heavy uppercase tracking-wider transition flex items-center gap-1.5 relative border border-transparent cursor-pointer ${
                   customerActiveTab === 'wishlist'
                     ? 'bg-rose-500 text-white shadow-md'
@@ -2618,16 +2614,15 @@ export default function App() {
                   <div className="space-y-2">
                     <h2 className="text-2xl font-black uppercase tracking-tight text-zinc-900">Secure Access</h2>
                     <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest leading-relaxed">
-                      Sign in with your Google account to access your dashboard, orders, and premium design tools.
+                      Sign in to access your dashboard, orders, and premium design tools.
                     </p>
                   </div>
                   
                   <button 
-                    onClick={handleSignInWithGoogle}
-                    className="w-full flex items-center justify-center gap-3 py-4 bg-white border-2 border-zinc-900 rounded-2xl text-black font-black uppercase tracking-widest hover:bg-zinc-50 transition shadow-lg shadow-zinc-100"
+                    onClick={() => setShowAuthModal(true)}
+                    className="w-full flex items-center justify-center gap-3 py-4 bg-zinc-900 border-2 border-zinc-900 rounded-2xl text-white font-black uppercase tracking-widest hover:bg-black transition shadow-lg"
                   >
-                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="" />
-                    Continue with Google
+                    Login / Register Account
                   </button>
                </div>
             )}
@@ -3245,7 +3240,7 @@ export default function App() {
 
             <button
               type="button"
-              onClick={() => setCustomerActiveTab('status')}
+              onClick={() => requireUserAuthAction(() => setCustomerActiveTab('status'))}
               className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition relative cursor-pointer ${
                 customerActiveTab === 'status' ? 'text-[#FF4D00]' : 'text-zinc-400 hover:text-white'
               }`}

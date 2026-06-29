@@ -6,13 +6,14 @@
 import { initializeApp } from 'firebase/app';
 import { 
   getAuth, 
-  GoogleAuthProvider, 
-  signInWithPopup, 
   onAuthStateChanged as fbOnAuthStateChanged,
   signOut as fbSignOut,
   updateProfile as fbUpdateProfile,
   signInWithEmailAndPassword as fbSignInWithEmailAndPassword,
-  createUserWithEmailAndPassword as fbCreateUserWithEmailAndPassword
+  createUserWithEmailAndPassword as fbCreateUserWithEmailAndPassword,
+  sendPasswordResetEmail as fbSendPasswordResetEmail,
+  sendEmailVerification as fbSendEmailVerification,
+  signInWithCustomToken as fbSignInWithCustomToken
 } from 'firebase/auth';
 import { 
   getFirestore, 
@@ -58,21 +59,9 @@ initMessaging();
 export const getMessagingService = () => messagingInstance;
 export const getToken = fbGetToken;
 export const isSupported = fbIsSupported;
-const googleProvider = new GoogleAuthProvider();
-
 // Auth Helpers
 export const onAuthStateChanged = (authInstance: any, cb: (user: any) => void) => {
   return fbOnAuthStateChanged(auth, cb);
-};
-
-export const signInWithGoogle = async () => {
-  try {
-    const result = await signInWithPopup(auth, googleProvider);
-    return result;
-  } catch (error) {
-    console.error("Google Sign-In Error:", error);
-    throw error;
-  }
 };
 
 export const signInWithEmailAndPassword = (authInstance: any, email: string, pass: string) => {
@@ -89,6 +78,18 @@ export const signOut = (authInstance: any) => {
 
 export const updateProfile = (user: any, profile: { displayName?: string, photoURL?: string }) => {
   return fbUpdateProfile(user, profile);
+};
+
+export const sendPasswordResetEmail = (email: string) => {
+  return fbSendPasswordResetEmail(auth, email);
+};
+
+export const sendEmailVerification = (user: any) => {
+  return fbSendEmailVerification(user);
+};
+
+export const signInWithCustomToken = (token: string) => {
+  return fbSignInWithCustomToken(auth, token);
 };
 
 // Firestore Helpers (Exporting standard aliases for easier integration)

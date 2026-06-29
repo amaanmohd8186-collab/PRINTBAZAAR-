@@ -165,6 +165,23 @@ export const getTrackingInfo = async (awb: string) => {
 export const lookupPincode = async (pincode: string): Promise<PincodeInfo | null> => {
   if (!isValidIndianPincode(pincode)) return null;
   
+  try {
+    const res = await fetch(`/api/shipping/estimate?destination=${pincode}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.success) {
+        return {
+          pincode,
+          city: data.city,
+          state: data.state,
+          district: data.region
+        };
+      }
+    }
+  } catch (err) {
+    console.warn("Failed to query shipping estimate API, falling back:", err);
+  }
+
   // Mock logic for city/state detection
   let city = 'New Delhi';
   let state = 'Delhi';

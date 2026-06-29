@@ -620,13 +620,12 @@ function CreatePostModal({ session, onClose, triggerToast }: { session: UserSess
         </div>
 
         <div className="space-y-4">
-           {/* Mock File Uploader */}
-           <div className="border-2 border-dashed border-zinc-200 rounded-2xl p-8 flex flex-col items-center justify-center cursor-pointer hover:border-[#FF4D00] hover:bg-orange-50/50 transition-colors">
-              <div className="w-12 h-12 bg-orange-100 text-[#FF4D00] rounded-full flex items-center justify-center mb-3">
+           <div className="border-2 border-dashed border-zinc-200 rounded-2xl p-8 flex flex-col items-center justify-center cursor-not-allowed bg-zinc-50 opacity-60">
+              <div className="w-12 h-12 bg-zinc-200 text-zinc-500 rounded-full flex items-center justify-center mb-3">
                  <Sparkles className="w-5 h-5" />
               </div>
-              <p className="text-xs font-bold text-zinc-600">Click to upload Media</p>
-              <p className="text-[10px] text-zinc-400 mt-1 uppercase font-bold text-center">Supports 5 Images or 2 Videos<br/>Max size 50MB</p>
+              <p className="text-xs font-bold text-zinc-600">Media Upload Not Yet Available</p>
+              <p className="text-[10px] text-zinc-400 mt-1 uppercase font-bold text-center">We are upgrading our storage infrastructure.</p>
            </div>
 
            <textarea 

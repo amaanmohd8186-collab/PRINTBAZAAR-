@@ -67,7 +67,8 @@ import {
   ShieldCheck,
   Search,
   ShoppingCart,
-  Activity
+  Activity,
+  Box
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { jsPDF } from 'jspdf';
@@ -77,6 +78,7 @@ import { ToolType, Design, UserStats, BrandKit } from '../types';
 import { ALL_TEMPLATES, TEMPLATE_CATEGORIES } from '../data/templates';
 import { GOOGLE_FONTS, FONT_CATEGORIES } from '../data/fonts';
 import TemplateMarketplace from './TemplateMarketplace';
+import { Preview3D } from './Preview3D';
 import { calculateEnterprisePrice } from '../lib/enterprise-pricing';
 
 const CANVAS_WIDTH = 800;
@@ -182,6 +184,14 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
   const [scaleFactor, setScaleFactor] = useState(1);
   const [isMobileScreen, setIsMobileScreen] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
   const [showMobileInspector, setShowMobileInspector] = useState(false);
+  const [show3DPreview, setShow3DPreview] = useState(false);
+  const [preview3DTextureUrl, setPreview3DTextureUrl] = useState('');
+  const [exportSettings, setExportSettings] = useState({
+    cmykProfile: true,
+    cropMarks: true,
+    bleedArea: false,
+    curves: true
+  });
 
   useEffect(() => {
     const handleResize = () => {
@@ -1278,21 +1288,28 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
     showStatus('success', 'Ungrouped objects successfully!');
   };
 
-  const lockObject = () => {
+  const toggleLock = () => {
     const activeObj = fabricCanvas.current?.getActiveObject();
     if (!activeObj) return;
+    const isLocked = activeObj.lockMovementX;
     activeObj.set({
-      lockMovementX: true,
-      lockMovementY: true,
-      lockScalingX: true,
-      lockScalingY: true,
-      lockRotation: true,
-      selectable: false,
-      hasControls: false
+      lockMovementX: !isLocked,
+      lockMovementY: !isLocked,
+      lockScalingX: !isLocked,
+      lockScalingY: !isLocked,
+      lockRotation: !isLocked,
+      selectable: isLocked, // If it was locked, it becomes selectable=true
+      hasControls: isLocked
     });
-    fabricCanvas.current?.discardActiveObject();
+    
+    // Maintain selection but update controls
+    if (!isLocked) {
+      fabricCanvas.current?.discardActiveObject();
+    } else {
+      activeObj.setCoords();
+    }
     fabricCanvas.current?.renderAll();
-    showStatus('success', 'Object locked securely!');
+    showStatus('success', isLocked ? 'Object unlocked!' : 'Object locked securely!');
   };
 
   const duplicateObject = () => {
@@ -2089,6 +2106,20 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
             </div>
 
             <button 
+              onClick={() => {
+                if (!show3DPreview && fabricCanvas.current) {
+                  const dataUrl = fabricCanvas.current.toDataURL({ format: 'png', quality: 1, multiplier: 2 });
+                  setPreview3DTextureUrl(dataUrl);
+                }
+                setShow3DPreview(!show3DPreview);
+              }}
+              className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl transition text-[11px] font-bold uppercase tracking-wider cursor-pointer shadow-sm border ${show3DPreview ? 'bg-[#FF4D00] text-white border-[#FF4D00]' : 'bg-zinc-800 hover:bg-zinc-700 text-white border-zinc-700/50'}`}
+            >
+              <Box className="w-3.5 h-3.5" />
+              <span>{show3DPreview ? 'Close 3D' : '3D Preview'}</span>
+            </button>
+
+            <button 
               onClick={saveDesign}
               disabled={isSaving}
               className="inline-flex items-center gap-2 px-3.5 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl transition text-[11px] font-bold uppercase tracking-wider disabled:opacity-50 cursor-pointer shadow-sm border border-zinc-700/50"
@@ -2311,6 +2342,30 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
             </div>
           )}
           
+          {/* 3D Preview UI */}
+          {show3DPreview && preview3DTextureUrl && (
+            <div className="absolute inset-2 md:inset-4 z-[90] rounded-xl md:rounded-2xl overflow-hidden border border-zinc-800 shadow-2xl bg-zinc-950 flex flex-col">
+              <div className="flex items-center justify-between px-4 py-2 bg-zinc-900 border-b border-zinc-800 shadow-sm shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-6 h-6 rounded shadow bg-gradient-to-br from-[#FF4D00] to-[#E03D00] flex items-center justify-center">
+                    <Box className="w-3.5 h-3.5 text-white" />
+                  </div>
+                  <span className="text-zinc-100 font-black text-[11px] uppercase tracking-wider font-sans">Interactive 3D Product Preview</span>
+                </div>
+                <button
+                  onClick={() => setShow3DPreview(false)}
+                  className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white text-[10px] font-black uppercase tracking-widest rounded-lg border border-zinc-700 transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <X size={12} />
+                  Close Preview
+                </button>
+              </div>
+              <div className="flex-1 w-full bg-zinc-900">
+                <Preview3D textureUrl={preview3DTextureUrl} productType={''} />
+              </div>
+            </div>
+          )}
+
           {/* Smart Designer API UI */}
           {activeTool === 'easy' && (
             <div className="absolute inset-2 md:inset-4 z-[99] rounded-xl md:rounded-2xl overflow-hidden border border-zinc-800 shadow-2xl bg-[#f4f5f7] flex flex-col">
@@ -3034,29 +3089,29 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
                   
                   <div className="flex items-center justify-between text-xs text-zinc-300 font-medium">
                     <span>CMYK Conversion Profile</span>
-                    <div className="w-10 h-5 bg-[#FF4D00] rounded-full relative shadow-inner cursor-pointer">
-                      <div className="w-4 h-4 bg-white rounded-full absolute top-0.5 right-0.5 shadow-md"></div>
+                    <div onClick={() => setExportSettings(s => ({...s, cmykProfile: !s.cmykProfile}))} className={`w-10 h-5 rounded-full relative shadow-inner cursor-pointer transition ${exportSettings.cmykProfile ? 'bg-[#FF4D00]' : 'bg-zinc-800'}`}>
+                      <div className={`w-4 h-4 rounded-full absolute top-0.5 shadow-md transition-all ${exportSettings.cmykProfile ? 'right-0.5 bg-white' : 'left-0.5 bg-zinc-500'}`}></div>
                     </div>
                   </div>
 
                   <div className="flex items-center justify-between text-xs text-zinc-300 font-medium">
                     <span>Show Crop Marks</span>
-                    <div className="w-10 h-5 bg-emerald-500 rounded-full relative shadow-inner cursor-pointer">
-                      <div className="w-4 h-4 bg-white rounded-full absolute top-0.5 right-0.5 shadow-md"></div>
+                    <div onClick={() => setExportSettings(s => ({...s, cropMarks: !s.cropMarks}))} className={`w-10 h-5 rounded-full relative shadow-inner cursor-pointer transition ${exportSettings.cropMarks ? 'bg-[#FF4D00]' : 'bg-zinc-800'}`}>
+                      <div className={`w-4 h-4 rounded-full absolute top-0.5 shadow-md transition-all ${exportSettings.cropMarks ? 'right-0.5 bg-white' : 'left-0.5 bg-zinc-500'}`}></div>
                     </div>
                   </div>
 
                   <div className="flex items-center justify-between text-xs text-zinc-300 font-medium">
                     <span>Bleed Area (3mm)</span>
-                    <div className="w-10 h-5 bg-zinc-800 rounded-full relative shadow-inner cursor-pointer">
-                      <div className="w-4 h-4 bg-zinc-500 rounded-full absolute top-0.5 left-0.5 shadow-md"></div>
+                    <div onClick={() => setExportSettings(s => ({...s, bleedArea: !s.bleedArea}))} className={`w-10 h-5 rounded-full relative shadow-inner cursor-pointer transition ${exportSettings.bleedArea ? 'bg-[#FF4D00]' : 'bg-zinc-800'}`}>
+                      <div className={`w-4 h-4 rounded-full absolute top-0.5 shadow-md transition-all ${exportSettings.bleedArea ? 'right-0.5 bg-white' : 'left-0.5 bg-zinc-500'}`}></div>
                     </div>
                   </div>
 
                   <div className="flex items-center justify-between text-xs text-zinc-300 font-medium">
                     <span>Convert Text to Curves (Vector)</span>
-                    <div className="w-10 h-5 bg-[#FF4D00] rounded-full relative shadow-inner cursor-pointer">
-                      <div className="w-4 h-4 bg-white rounded-full absolute top-0.5 right-0.5 shadow-md"></div>
+                    <div onClick={() => setExportSettings(s => ({...s, curves: !s.curves}))} className={`w-10 h-5 rounded-full relative shadow-inner cursor-pointer transition ${exportSettings.curves ? 'bg-[#FF4D00]' : 'bg-zinc-800'}`}>
+                      <div className={`w-4 h-4 rounded-full absolute top-0.5 shadow-md transition-all ${exportSettings.curves ? 'right-0.5 bg-white' : 'left-0.5 bg-zinc-500'}`}></div>
                     </div>
                   </div>
 
@@ -3452,9 +3507,9 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
                   </span>
                   
                   <div className="grid grid-cols-2 gap-2">
-                    <button onClick={lockObject} className="flex flex-col items-center justify-center p-3 bg-zinc-900 border border-zinc-800 rounded-xl hover:border-[#FF4D00] transition group">
+                    <button onClick={toggleLock} className="flex flex-col items-center justify-center p-3 bg-zinc-900 border border-zinc-800 rounded-xl hover:border-[#FF4D00] transition group">
                       <Lock className="w-4 h-4 text-zinc-500 group-hover:text-white mb-1" />
-                      <span className="text-[9px] font-black uppercase text-zinc-400 group-hover:text-white">Lock</span>
+                      <span className="text-[9px] font-black uppercase text-zinc-400 group-hover:text-white">Lock/Unlock</span>
                     </button>
                     <button onClick={duplicateObject} className="flex flex-col items-center justify-center p-3 bg-zinc-900 border border-zinc-800 rounded-xl hover:border-[#FF4D00] transition group">
                       <Copy className="w-4 h-4 text-zinc-500 group-hover:text-white mb-1" />

@@ -9,8 +9,8 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 import { createOrderHandler, configHandler, verifyPaymentHandler, getCashfree, processPayoutHandler } from "./server/cashfree_handlers";
+import { fetchPincodeDetails, createShiprocketOrder, generateAWB } from "./server/shiprocket_handlers";
 import crypto from "crypto";
-import twilio from "twilio";
 import nodemailer from "nodemailer";
 import fs from "fs";
 import bcrypt from "bcryptjs";
@@ -98,12 +98,6 @@ function logDbWarning(context: string, err: any) {
   console.log(`[Database] ${context}: ${msg.split('\n')[0]}`);
 }
 
-// TWILIO SECURE SMS GATEWAY INITIALIZATION
-const twilioSid = getCleanEnv("TWILIO_ACCOUNT_SID");
-const twilioAuth = getCleanEnv("TWILIO_AUTH_TOKEN");
-const twilioFrom = getCleanEnv("TWILIO_PHONE_NUMBER");
-const twilioClient = (twilioSid && twilioAuth) ? twilio(twilioSid, twilioAuth) : null;
-
 // AI Credit Config
 const CREDIT_COSTS: Record<string, number> = {
   'background-removal': 2,
@@ -174,8 +168,8 @@ async function logAudit(event: {
   try {
     const payload = {
       userId: null,
-      action: `OTP_${event.type.toUpperCase()}`,
-      entityType: 'OTP',
+      action: `AUTH_${event.type.toUpperCase()}`,
+      entityType: 'AUTH',
       entityId: event.identifier,
       details: { 
         ...event, 
@@ -1240,24 +1234,9 @@ Customer's custom requirements or idea prompt: "${prompt}"`;
         console.warn(`[SMS PRECHECK] FAILED to fetch order ${orderId} from DB:`, dbErr);
       }
 
-      // Trigger SMS if required and status is Dispatch Ready
+      // SMS sending functionality removed per requirements
       if (status === 'Ready for Dispatch' && notifyViaSms && customerPhone) {
-        if (twilioClient && twilioFrom) {
-          try {
-            // Clean phone number (prefix +91 for India if not present)
-            const formattedPhone = customerPhone.startsWith('+') ? customerPhone : `+91${customerPhone}`;
-            await twilioClient.messages.create({
-              body: `PrintBazaar Alert: Your Order #${orderId} is READY FOR DISPATCH! Our courier logistics partner will collect it shortly for transit.`,
-              from: twilioFrom,
-              to: formattedPhone
-            });
-            console.log(`✅ DISPATCH SMS successfully routed to +91${customerPhone} via Twilio SID.`);
-          } catch (smsErr: any) {
-            console.error("❌ Twilio dispatch failed:", smsErr.message);
-          }
-        } else {
-          console.log(`\n📱 [SANDBOX SMS LOG] Dispatch Notification for Order ${orderId} would be sent to ${customerPhone} (Status: ${status})`);
-        }
+        console.log(`\n📱 [SANDBOX SMS LOG] Dispatch Notification for Order ${orderId} would be sent to ${customerPhone} (Status: ${status})`);
       }
 
       const transporter = getMailer();
@@ -1339,13 +1318,22 @@ Customer's custom requirements or idea prompt: "${prompt}"`;
         totalWalletBalance += (doc.data().walletBalance || 0);
       });
 
+      const ordersSnap = await adminDb().collection('orders').get();
+      let totalOrderRevenue = 0;
+      ordersSnap.forEach(doc => {
+        const orderData = doc.data();
+        if (orderData.payments && Array.isArray(orderData.payments)) {
+          totalOrderRevenue += orderData.payments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+        }
+      });
+
       const stats = {
-        totalRevenue: 1250000 + totalWalletBalance,
-        aiRevenue: 45000,
-        subscriptionRevenue: 85000,
-        marketplaceRevenue: 120000,
-        payoutsPending: 15000,
-        referralPayouts: 3200
+        totalRevenue: totalOrderRevenue + totalWalletBalance,
+        aiRevenue: 0,
+        subscriptionRevenue: 0,
+        marketplaceRevenue: 0,
+        payoutsPending: 0,
+        referralPayouts: 0
       };
       return res.json({ success: true, stats });
     } catch (err) {
@@ -1721,92 +1709,21 @@ Customer's custom requirements or idea prompt: "${prompt}"`;
       let courierName = "Delhivery Surface";
       let distanceKm = 650;
 
-      switch (firstDigit) {
-        case '1':
-          region = "Northern India";
-          shippingDays = 2;
-          courierName = "Delhivery Standard";
-          distanceKm = 280;
-          if (pincode.startsWith("110")) { city = "New Delhi"; state = "Delhi"; distanceKm = 210; }
-          else if (pincode.startsWith("122")) { city = "Gurugram"; state = "Haryana"; distanceKm = 240; }
-          else if (pincode.startsWith("141")) { city = "Ludhiana"; state = "Punjab"; distanceKm = 520; }
-          else { city = "Ambala"; state = "Haryana"; }
-          break;
-        case '2':
-          region = "Home State / Local Region";
-          shippingDays = 1;
-          courierName = "Delhivery Express Local";
-          distanceKm = 150;
-          if (pincode === originPincode) {
-            city = "Marehra (Kasganj)";
-            state = "Uttar Pradesh";
-            shippingDays = 1;
-            distanceKm = 0;
-            courierName = "PrintBazaar Local Dispatch";
-          } else if (pincode.startsWith("201")) { city = "Noida"; state = "Uttar Pradesh"; distanceKm = 180; }
-          else if (pincode.startsWith("226")) { city = "Lucknow"; state = "Uttar Pradesh"; distanceKm = 330; }
-          else if (pincode.startsWith("248")) { city = "Dehradun"; state = "Uttarakhand"; distanceKm = 390; }
-          else { city = "Kasganj"; state = "Uttar Pradesh"; }
-          break;
-        case '3':
-          region = "Western India";
-          shippingDays = 3;
-          courierName = "Xpressbees Air";
-          distanceKm = 780;
-          if (pincode.startsWith("302")) { city = "Jaipur"; state = "Rajasthan"; distanceKm = 350; }
-          else if (pincode.startsWith("380")) { city = "Ahmedabad"; state = "Gujarat"; distanceKm = 820; }
-          else { city = "Jodhpur"; state = "Rajasthan"; }
-          break;
-        case '4':
-          region = "Western-Central India";
-          shippingDays = 3;
-          courierName = "Delhivery Priority";
-          distanceKm = 950;
-          if (pincode.startsWith("400")) { city = "Mumbai"; state = "Maharashtra"; distanceKm = 1250; }
-          else if (pincode.startsWith("452")) { city = "Indore"; state = "Madhya Pradesh"; distanceKm = 680; }
-          else { city = "Nagpur"; state = "Maharashtra"; }
-          break;
-        case '5':
-          region = "Southern India";
-          shippingDays = 4;
-          courierName = "BlueDart Air Cargo";
-          distanceKm = 1600;
-          if (pincode.startsWith("500")) { city = "Hyderabad"; state = "Telangana"; distanceKm = 1350; }
-          else if (pincode.startsWith("560")) { city = "Bengaluru"; state = "Karnataka"; distanceKm = 1750; }
-          else { city = "Vijayawada"; state = "Andhra Pradesh"; }
-          break;
-        case '6':
-          region = "Southern India (Deep South)";
-          shippingDays = 4;
-          courierName = "BlueDart Priority Air";
-          distanceKm = 1950;
-          if (pincode.startsWith("600")) { city = "Chennai"; state = "Tamil Nadu"; distanceKm = 1850; }
-          else if (pincode.startsWith("682")) { city = "Kochi"; state = "Kerala"; distanceKm = 2300; }
-          else { city = "Coimbatore"; state = "Tamil Nadu"; }
-          break;
-        case '7':
-          region = "Eastern & North-Eastern India";
-          shippingDays = 4;
-          courierName = "Delhivery Air Express";
-          distanceKm = 1450;
-          if (pincode.startsWith("700")) { city = "Kolkata"; state = "West Bengal"; distanceKm = 1250; }
-          else if (pincode.startsWith("751")) { city = "Bhubaneswar"; state = "Odisha"; distanceKm = 1320; }
-          else { city = "Guwahati"; state = "Assam"; distanceKm = 1780; }
-          break;
-        case '8':
-          region = "East-Central India";
-          shippingDays = 3;
-          courierName = "Xpressbees Standard";
-          distanceKm = 850;
-          if (pincode.startsWith("800")) { city = "Patna"; state = "Bihar"; distanceKm = 780; }
-          else if (pincode.startsWith("834")) { city = "Ranchi"; state = "Jharkhand"; distanceKm = 980; }
-          else { city = "Gaya"; state = "Bihar"; }
-          break;
-        default:
-          region = "All India Grid";
-          shippingDays = 4;
-          courierName = "Delhivery Surface";
-          distanceKm = 1000;
+      // Try Real Shiprocket Integration
+      try {
+        const srData = await fetchPincodeDetails(pincode);
+        if (srData && srData.status === 200 && srData.data && srData.data.available_courier_companies && srData.data.available_courier_companies.length > 0) {
+          const firstCourier = srData.data.available_courier_companies[0];
+          city = firstCourier.city || city;
+          state = firstCourier.state || state;
+          shippingDays = firstCourier.etd_hours ? Math.ceil(firstCourier.etd_hours / 24) : 3;
+          courierName = firstCourier.courier_name || courierName;
+        } else {
+          return res.status(503).json({ success: false, message: "Shipping service is currently unavailable." });
+        }
+      } catch (err: any) {
+        console.error("Shiprocket estimate failed:", err.message);
+        return res.status(503).json({ success: false, message: "Shipping service is currently unavailable." });
       }
 
       // 2. Compute timeline
@@ -2092,22 +2009,44 @@ Customer's custom requirements or idea prompt: "${prompt}"`;
         </div>
       `;
 
+      let emailPromise = null;
       if (transporter) {
-        await transporter.sendMail({
+        emailPromise = transporter.sendMail({
           from: `"PrintBazaar Orders" <${getCleanEnv("SMTP_FROM") || getCleanEnv("SMTP_USER")}>`,
           to: order.customerEmail,
           subject: `Order Received & Under Review: ${order.id}`,
           text: `Thank you for your order! Order ${order.id} for ₹${order.totalAmount} is currently under design review.`,
           html: htmlContent
-        });
-        console.log(`✅ Order confirmation email successfully sent to ${order.customerEmail}`);
-        return res.json({ success: true, message: "Order confirmation email sent successfully via SMTP" });
+        }).then(() => console.log(`✅ Order confirmation email sent to ${order.customerEmail}`));
       } else {
         console.log(`\n📬 [SANDBOX EMAIL LOG] Automated Order Confirmation email would be sent to: ${order.customerEmail}`);
-        console.log(`Order Payload:`, JSON.stringify(order, null, 2));
-        console.log(`Email Body:\n`, htmlContent, `\n`);
-        return res.json({ success: true, message: "SMTP not configured. Email logged to sandbox output successfully." });
       }
+
+      let srOrderInfo = null;
+      try {
+        if (process.env.SHIPROCKET_EMAIL && process.env.SHIPROCKET_PASSWORD) {
+          console.log(`🚀 Creating Shiprocket order for ${order.id}...`);
+          const srRes = await createShiprocketOrder(order);
+          console.log(`✅ Shiprocket order created successfully:`, srRes.order_id);
+          
+          if (srRes.shipment_id) {
+             console.log(`🚀 Generating AWB for shipment ${srRes.shipment_id}...`);
+             const awbRes = await generateAWB(srRes.shipment_id);
+             console.log(`✅ AWB Generated:`, awbRes?.response?.data?.awb_code);
+             srOrderInfo = awbRes;
+          }
+        }
+      } catch (srErr: any) {
+        console.error("❌ Shiprocket Order Creation Error:", srErr.message);
+      }
+
+      if (emailPromise) await emailPromise;
+
+      return res.json({ 
+        success: true, 
+        message: transporter ? "Order confirmation email sent successfully via SMTP" : "SMTP not configured. Email logged to sandbox output successfully.",
+        shiprocket_status: srOrderInfo ? "created" : "skipped"
+      });
     } catch (err: any) {
       console.error("❌ Send Order Confirmation Error:", err.message);
       return res.status(500).json({ success: false, error: err.message });

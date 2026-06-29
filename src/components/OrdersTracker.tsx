@@ -1253,7 +1253,7 @@ ${separator}
                           <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider font-mono mt-1 leading-relaxed max-w-[280px]">
                             {order.notifyOnDispatch 
                               ? 'SMS alerts enabled! You will be notified the instant your items are ready for courier logistics.'
-                              : 'Enable Twilio SMS alerts to get real-time status transitions when your print run is finished.'}
+                              : 'Enable SMS alerts to get real-time status transitions when your print run is finished.'}
                           </p>
                         </div>
                       </div>

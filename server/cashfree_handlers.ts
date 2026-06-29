@@ -278,19 +278,12 @@ export const processPayoutHandler = async (req: Request, res: Response) => {
            return res.status(400).json({ success: false, error: "Validation failed. Missing required payout parameters." });
         }
 
-        // Mock call simulating Cashfree API response for instant transfer request
-        // In real execution, we POST /payout/transfers with Cashfree-Signature
-        const mockTransferId = `TRANS_${Date.now()}_${Math.floor(Math.random() * 9000) + 1000}`;
-        const mockUtr = `CMS${Date.now()}`;
-
-        console.log(`[CASHFREE-SERVERLESS] Payout simulated success: ${mockTransferId}`);
-
-        return res.json({
-            success: true,
-            message: "Payout queued/successful from Cashfree Vault",
-            referenceId: mockTransferId,
-            utr: mockUtr,
-            status: "SUCCESS"
+        // Payout API is separate from PG API and requires different credentials/endpoints.
+        // We will not fake a successful transfer. Return unavailable if not configured.
+        return res.status(503).json({
+            success: false,
+            error: "PAYOUT_UNAVAILABLE",
+            message: "Real Cashfree Payout integration is not yet available."
         });
 
     } catch (err: any) {

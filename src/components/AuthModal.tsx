@@ -1,62 +1,138 @@
-import React, { useState } from 'react';
-import { X, ShieldAlert, Eye, EyeOff, Mail, Lock, User } from 'lucide-react';
-import { auth, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from '../firebase';
+import React, { useState, useEffect } from 'react';
+import { X, ShieldAlert, Eye, EyeOff, Mail, Lock, User, Phone, CheckCircle2, AlertCircle, ArrowLeft, KeyRound } from 'lucide-react';
+import { 
+  auth, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  updateProfile,
+  sendPasswordResetEmail,
+  signInWithCustomToken
+} from '../firebase';
 
 export const AuthModal = ({ onClose, triggerToast }: { onClose: () => void, triggerToast: (msg: string, type?: 'success' | 'warn' | 'error') => void }) => {
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [activeTab, setActiveTab] = useState<'login' | 'register' | 'forgot'>('login');
   const [loading, setLoading] = useState(false);
+  
+  // Form States
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [rememberMe, setRememberMe] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
+
+  const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setErrorMsg('');
+    setSuccessMsg('');
 
     const cleanEmail = email.trim().toLowerCase();
 
-    // Enforce strictly Gmail restriction per instructions
-    if (!cleanEmail.endsWith('@gmail.com')) {
-      setErrorMsg('Please use a valid @gmail.com account for secure access.');
-      setLoading(false);
-      return;
-    }
-
-    if (password.length < 6) {
-      setErrorMsg('Password should be at least 6 characters in length.');
-      setLoading(false);
-      return;
-    }
-
-    if (isSignUp && !name.trim()) {
-      setErrorMsg('Please specify your Full Name.');
+    if (!cleanEmail || !password) {
+      setErrorMsg('Please specify both your Email and Password.');
       setLoading(false);
       return;
     }
 
     try {
-      if (isSignUp) {
-        // Register standard Email user with Gmail restriction
-        const userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
-        await updateProfile(userCredential.user, { displayName: name.trim() });
-        triggerToast('Welcome! Your account is ready.', 'success');
-      } else {
-        // Login standard Email user with Gmail restriction
-        await signInWithEmailAndPassword(auth, cleanEmail, password);
-        triggerToast('Welcome back!', 'success');
-      }
+      await signInWithEmailAndPassword(auth, cleanEmail, password);
+      triggerToast('Signed in successfully!', 'success');
       onClose();
     } catch (err: any) {
-      console.log("🚀 [AUTH FAILURE]", err.message || "Unknown error");
-      let localizedError = 'Something went wrong. Please try again.';
+      console.error("[AUTH FAILURE]", err);
+      let localizedError = 'Invalid credentials. Please verify your details and try again.';
+      if (err.code === 'auth/user-not-found') {
+        localizedError = 'No account exists with this email address.';
+      } else if (err.code === 'auth/wrong-password') {
+        localizedError = 'Incorrect password. Please try again.';
+      }
+      setErrorMsg(localizedError);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEmailRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (!cleanEmail || !password || !name.trim()) {
+      setErrorMsg('All registration fields are mandatory.');
+      setLoading(false);
+      return;
+    }
+
+    if (password.length < 6) {
+      setErrorMsg('Password should be at least 6 characters.');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
+      await updateProfile(userCredential.user, { displayName: name.trim() });
       
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-        localizedError = 'Invalid login details. Please check and try again.';
-      } else if (err.code === 'auth/email-already-in-use') {
-        localizedError = 'This account already exists. Please sign in instead.';
+      // If user specified phone, sync phone to Firestore user profile
+      try {
+        const { db, doc, setDoc, serverTimestamp } = await import('../firebase');
+        if (db && phone.trim()) {
+          const userRef = doc(db, 'users', userCredential.user.uid);
+          await setDoc(userRef, {
+            phoneNumber: phone.trim(),
+            updatedAt: serverTimestamp()
+          }, { merge: true });
+        }
+      } catch (err) {
+        console.warn("Could not sync phone detail:", err);
+      }
+
+      triggerToast('Account registered successfully!', 'success');
+      onClose();
+    } catch (err: any) {
+      console.error("[AUTH FAILURE]", err);
+      let localizedError = 'Registration failed. Please try again.';
+      if (err.code === 'auth/email-already-in-use') {
+        localizedError = 'An account already exists with this email address.';
+      } else if (err.code === 'auth/invalid-email') {
+        localizedError = 'Please specify a valid email address.';
+      }
+      setErrorMsg(localizedError);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail) {
+      setErrorMsg('Please specify your registered email address.');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      await sendPasswordResetEmail(cleanEmail);
+      setSuccessMsg('A password reset link has been dispatched to your email address.');
+      triggerToast('Password reset link sent!', 'success');
+    } catch (err: any) {
+      console.error("[FORGOT PASSWORD FAIL]", err);
+      let localizedError = 'Failed to request password reset. Please verify your email.';
+      if (err.code === 'auth/user-not-found') {
+        localizedError = 'No account is registered under this email address.';
       }
       setErrorMsg(localizedError);
     } finally {
@@ -65,70 +141,146 @@ export const AuthModal = ({ onClose, triggerToast }: { onClose: () => void, trig
   };
 
   return (
-    <div className="fixed inset-0 z-[11000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md" id="auth-modal-overlay">
-      <div className="bg-white rounded-[32px] w-full max-w-md shadow-2xl relative overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-zinc-100" id="auth-modal-card">
+    <div className="fixed inset-0 z-[11000] flex items-center justify-center p-4 bg-zinc-950/80 backdrop-blur-md" id="auth-modal-overlay">
+      <div className="bg-white rounded-[28px] w-full max-w-md shadow-2xl relative overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-zinc-100 flex flex-col" id="auth-modal-card">
+        
+        {/* Decorative Top Accent */}
+        <div className="h-2 bg-gradient-to-r from-orange-500 via-rose-500 to-amber-500 w-full" />
+
         <button 
           onClick={onClose}
-          className="absolute top-5 right-5 text-zinc-400 hover:text-black hover:bg-zinc-100 p-2 rounded-full transition cursor-pointer"
+          className="absolute top-6 right-6 text-zinc-400 hover:text-black hover:bg-zinc-100 p-2 rounded-full transition cursor-pointer"
         >
           <X className="w-5 h-5" />
         </button>
 
-        <div className="px-8 pt-10 pb-8 flex flex-col items-center">
-          <div className="w-14 h-14 bg-[#FF4D00]/10 rounded-2xl flex items-center justify-center mb-5">
-            <ShieldAlert className="w-7 h-7 text-[#FF4D00]" />
-          </div>
+        <div className="px-8 pt-8 pb-8 flex flex-col">
           
-            <h2 className="text-xl font-black uppercase tracking-tight text-zinc-900 leading-none" id="auth-modal-title">
-              {isSignUp ? 'Create Account' : 'Welcome Back'}
+          {/* Header section */}
+          <div className="flex flex-col items-center mb-6">
+            <div className="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center mb-3">
+              <KeyRound className="w-6 h-6 text-orange-500" />
+            </div>
+            <h2 className="text-xl font-black uppercase tracking-tight text-zinc-900 leading-none">
+              {activeTab === 'login' && 'Sign In'}
+              {activeTab === 'register' && 'Create Account'}
+              {activeTab === 'forgot' && 'Reset Password'}
             </h2>
-            <p className="text-xs text-zinc-500 mt-2 mb-6 text-center max-w-sm leading-relaxed">
-              Experience the future of personalized printing with PrintBazaar.
+            <p className="text-xs text-zinc-500 mt-2 text-center leading-relaxed">
+              {activeTab === 'login' && 'Access PrintBazaar Canva-style Creative Studio'}
+              {activeTab === 'register' && 'Join India’s premium commercial printing destination'}
+              {activeTab === 'forgot' && 'Enter your email to receive recovery instructions'}
             </p>
+          </div>
 
-          {errorMsg && (
-            <div className="mb-5 p-4 w-full bg-rose-50 border border-rose-100 rounded-2xl text-[11px] text-rose-600 font-bold uppercase tracking-wider text-left leading-normal animate-shake">
-              {errorMsg}
+          {/* Quick tab switchers for Login/Register (only visible in those states) */}
+          {(activeTab === 'login' || activeTab === 'register') && (
+            <div className="grid grid-cols-2 p-1 bg-zinc-100 rounded-xl mb-6">
+              <button
+                type="button"
+                onClick={() => { setActiveTab('login'); setErrorMsg(''); setSuccessMsg(''); }}
+                className={`py-2 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${activeTab === 'login' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-900'}`}
+              >
+                Sign In
+              </button>
+              <button
+                type="button"
+                onClick={() => { setActiveTab('register'); setErrorMsg(''); setSuccessMsg(''); }}
+                className={`py-2 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${activeTab === 'register' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-900'}`}
+              >
+                Register
+              </button>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="w-full space-y-4">
-            {/* Divider */}
-            <div className="relative flex items-center gap-4 my-6">
-              <div className="h-[1px] flex-1 bg-zinc-100" />
-              <span className="text-[9px] font-black text-zinc-300 uppercase tracking-widest">or continue with</span>
-              <div className="h-[1px] flex-1 bg-zinc-100" />
+          {/* Feedback messages */}
+          {errorMsg && (
+            <div className="mb-4 p-4 bg-rose-50 border border-rose-100 rounded-xl flex items-start gap-3 text-xs text-rose-600 font-medium">
+              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+              <span>{errorMsg}</span>
             </div>
+          )}
 
-            <button
-              type="button"
-              onClick={async () => {
-                try {
-                  setLoading(true);
-                  const { signInWithGoogle } = await import('../firebase');
-                  await signInWithGoogle();
-                  triggerToast('Signed in successfully!', 'success');
-                  onClose();
-                } catch (err: any) {
-                  setErrorMsg(err.message || 'Google sign-in failed.');
-                } finally {
-                  setLoading(false);
-                }
-              }}
-              disabled={loading}
-              className="w-full py-3 bg-white hover:bg-zinc-50 border border-zinc-200 text-zinc-900 text-[10px] font-black uppercase tracking-widest rounded-2xl transition-all shadow-xs cursor-pointer flex items-center justify-center gap-3 hover:border-zinc-300"
-            >
-              <img src="https://www.google.com/favicon.ico" className="w-4 h-4 grayscale opacity-70" alt="Google" />
-              <span>Continue with Google</span>
-            </button>
-
-            <div className="relative flex items-center gap-4 my-6">
-              <div className="h-[1px] flex-1 bg-zinc-100" />
-              <span className="text-[9px] font-black text-zinc-300 uppercase tracking-widest">Email Access</span>
-              <div className="h-[1px] flex-1 bg-zinc-100" />
+          {successMsg && (
+            <div className="mb-4 p-4 bg-emerald-50 border border-emerald-100 rounded-xl flex items-start gap-3 text-xs text-emerald-700 font-medium">
+              <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />
+              <div>
+                <span>{successMsg}</span>
+              </div>
             </div>
+          )}
 
-            {isSignUp && (
+          {/* LOGIN FLOW */}
+          {activeTab === 'login' && (
+            <form onSubmit={handleEmailLogin} className="space-y-4">
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-zinc-400">
+                  <Mail className="w-4 h-4" />
+                </span>
+                <input
+                  type="email"
+                  required
+                  placeholder="EMAIL ADDRESS"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full pl-11 pr-4 py-3 bg-zinc-50 hover:bg-zinc-100/50 border border-zinc-200 rounded-xl text-xs font-bold uppercase tracking-wider focus:outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition-all font-mono"
+                />
+              </div>
+
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-zinc-400">
+                  <Lock className="w-4 h-4" />
+                </span>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  placeholder="PASSWORD"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full pl-11 pr-12 py-3 bg-zinc-50 hover:bg-zinc-100/50 border border-zinc-200 rounded-xl text-xs font-bold uppercase tracking-wider focus:outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition-all font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-zinc-400 hover:text-zinc-600 transition cursor-pointer"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between text-xs mt-2">
+                <label className="flex items-center gap-2 text-zinc-500 font-bold uppercase tracking-wider select-none cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="rounded border-zinc-300 text-orange-500 focus:ring-orange-500 h-4 w-4"
+                  />
+                  <span>Remember Me</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => { setActiveTab('forgot'); setErrorMsg(''); setSuccessMsg(''); }}
+                  className="text-orange-500 font-bold uppercase tracking-wider hover:underline cursor-pointer"
+                >
+                  Forgot Password?
+                </button>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3.5 bg-zinc-900 hover:bg-orange-600 disabled:bg-zinc-400 text-white text-xs font-black uppercase tracking-widest rounded-xl transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
+              >
+                {loading ? 'Authenticating...' : 'Sign In'}
+              </button>
+
+            </form>
+          )}
+
+          {/* REGISTER FLOW */}
+          {activeTab === 'register' && (
+            <form onSubmit={handleEmailRegister} className="space-y-4">
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-zinc-400">
                   <User className="w-4 h-4" />
@@ -139,74 +291,113 @@ export const AuthModal = ({ onClose, triggerToast }: { onClose: () => void, trig
                   placeholder="FULL NAME"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 bg-zinc-50 hover:bg-zinc-100/50 border border-zinc-200 rounded-2xl text-xs font-bold uppercase tracking-wider focus:outline-none focus:border-[#FF4D00] focus:ring-4 focus:ring-[#FF4D00]/10 transition-all font-mono"
+                  className="w-full pl-11 pr-4 py-3 bg-zinc-50 hover:bg-zinc-100/50 border border-zinc-200 rounded-xl text-xs font-bold uppercase tracking-wider focus:outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition-all font-mono"
                 />
               </div>
-            )}
 
-            <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-zinc-400">
-                <Mail className="w-4 h-4" />
-              </span>
-              <input
-                type="email"
-                required
-                placeholder="YOURNAME@GMAIL.COM"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-11 pr-4 py-3 bg-zinc-50 hover:bg-zinc-100/50 border border-zinc-200 rounded-2xl text-xs font-bold uppercase tracking-wider focus:outline-none focus:border-[#FF4D00] focus:ring-4 focus:ring-[#FF4D00]/10 transition-all font-mono"
-              />
-            </div>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-zinc-400">
+                  <Mail className="w-4 h-4" />
+                </span>
+                <input
+                  type="email"
+                  required
+                  placeholder="EMAIL ADDRESS"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full pl-11 pr-4 py-3 bg-zinc-50 hover:bg-zinc-100/50 border border-zinc-200 rounded-xl text-xs font-bold uppercase tracking-wider focus:outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition-all font-mono"
+                />
+              </div>
 
-            <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-zinc-400">
-                <Lock className="w-4 h-4" />
-              </span>
-              <input
-                type={showPassword ? "text" : "password"}
-                required
-                placeholder="PASSWORD"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-11 pr-12 py-3 bg-zinc-50 hover:bg-zinc-100/50 border border-zinc-200 rounded-2xl text-xs font-bold uppercase tracking-wider focus:outline-none focus:border-[#FF4D00] focus:ring-4 focus:ring-[#FF4D00]/10 transition-all font-mono"
-              />
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-zinc-400">
+                  <Phone className="w-4 h-4" />
+                </span>
+                <input
+                  type="tel"
+                  placeholder="MOBILE NUMBER (OPTIONAL)"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="w-full pl-11 pr-4 py-3 bg-zinc-50 hover:bg-zinc-100/50 border border-zinc-200 rounded-xl text-xs font-bold uppercase tracking-wider focus:outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition-all font-mono"
+                />
+              </div>
+
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-zinc-400">
+                  <Lock className="w-4 h-4" />
+                </span>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  placeholder="PASSWORD (MIN 6 CHARACTERS)"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full pl-11 pr-12 py-3 bg-zinc-50 hover:bg-zinc-100/50 border border-zinc-200 rounded-xl text-xs font-bold uppercase tracking-wider focus:outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition-all font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-zinc-400 hover:text-zinc-600 transition cursor-pointer"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3.5 bg-zinc-900 hover:bg-orange-600 disabled:bg-zinc-400 text-white text-xs font-black uppercase tracking-widest rounded-xl transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
+              >
+                {loading ? 'Creating Account...' : 'Register'}
+              </button>
+            </form>
+          )}
+
+
+
+          {/* FORGOT PASSWORD FLOW */}
+          {activeTab === 'forgot' && (
+            <form onSubmit={handleForgotPassword} className="space-y-4">
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-zinc-400">
+                  <Mail className="w-4 h-4" />
+                </span>
+                <input
+                  type="email"
+                  required
+                  placeholder="ENTER REGISTERED EMAIL"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full pl-11 pr-4 py-3 bg-zinc-50 hover:bg-zinc-100/50 border border-zinc-200 rounded-xl text-xs font-bold uppercase tracking-wider focus:outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition-all font-mono"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3.5 bg-zinc-900 hover:bg-orange-600 disabled:bg-zinc-400 text-white text-xs font-black uppercase tracking-widest rounded-xl transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
+              >
+                {loading ? 'Sending Request...' : 'Send Recovery Instructions'}
+              </button>
+
               <button
                 type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 pr-4 flex items-center text-zinc-400 hover:text-zinc-600 transition cursor-pointer"
+                onClick={() => { setActiveTab('login'); setErrorMsg(''); setSuccessMsg(''); }}
+                className="w-full py-2.5 mt-2 text-[10px] font-black uppercase tracking-wider text-zinc-500 hover:text-zinc-900 flex items-center justify-center gap-1 transition cursor-pointer"
               >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Back to Sign In</span>
               </button>
-            </div>
+            </form>
+          )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3.5 bg-black hover:bg-[#FF4D00] disabled:bg-zinc-400 text-white text-xs font-black uppercase tracking-widest rounded-2xl transition-all shadow-md cursor-pointer flex items-center justify-center gap-2 hover:-translate-y-0.5 active:translate-y-0"
-            >
-              <span>{loading ? 'Signing You In...' : (isSignUp ? 'Create Account' : 'Sign In')}</span>
-            </button>
-          </form>
+          {/* Secure watermark */}
+          <p className="text-[9px] text-zinc-400 mt-6 text-center uppercase tracking-wider font-mono">
+            🛡️ PRINTBAZAAR ULTRA ENCRYPTED 2026
+          </p>
 
-          <div className="mt-6 flex flex-col items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setIsSignUp(!isSignUp);
-                setErrorMsg('');
-              }}
-              className="text-[11px] font-black uppercase tracking-wider text-zinc-500 hover:text-[#FF4D00] transition cursor-pointer"
-            >
-              {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Create one"}
-            </button>
-            
-            <p className="text-[9px] text-zinc-400 mt-4 max-w-xs text-center uppercase tracking-wider font-mono">
-              Privacy protected.
-            </p>
-          </div>
         </div>
       </div>
     </div>
   );
 };
-

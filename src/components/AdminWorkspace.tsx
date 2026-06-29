@@ -927,7 +927,7 @@ export default function AdminWorkspace({
                 <span className="font-micro text-indigo-700 block text-[10px]">Premium Services</span>
                 <Sparkles className="w-5 h-5 text-indigo-600" />
               </div>
-              <p className="text-3xl font-heavy text-indigo-900 leading-none">₹28,600</p>
+              <p className="text-3xl font-heavy text-indigo-900 leading-none">₹{((adminRevenue?.aiRevenue || 0) + (adminRevenue?.subscriptionRevenue || 0)).toLocaleString('en-IN') || '---'}</p>
               <div className="flex items-center gap-1 text-[9px] text-indigo-700 font-mono mt-3 uppercase font-bold">
                 <span>Credit packs + Subscriptions</span>
               </div>
