@@ -379,6 +379,20 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
     const originalBodyPosition = document.body.style.position;
     document.body.style.overflow = 'hidden';
 
+    // Prevent default touch gestures from scrolling the iframe page on canvas / workspace touches
+    const preventDefaultTouch = (e: TouchEvent) => {
+      const target = e.target as HTMLElement;
+      if (
+        canvasContainerRef.current?.contains(target) ||
+        target.closest('.canvas-workspace-area')
+      ) {
+        if (e.cancelable) {
+          e.preventDefault();
+        }
+      }
+    };
+    window.addEventListener('touchmove', preventDefaultTouch, { passive: false });
+
     let active = true;
     let canvasInstance: any = null;
 
@@ -392,11 +406,12 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
 
     try {
       const c = new fabric.Canvas(el, {
-        width: CANVAS_WIDTH,
-        height: CANVAS_HEIGHT,
+        width: CANVAS_WIDTH * scaleFactor,
+        height: CANVAS_HEIGHT * scaleFactor,
         backgroundColor: '#f8fafc',
         allowTouchScrolling: false,
       });
+      c.setZoom(scaleFactor);
       canvasInstance = c;
       fabricCanvas.current = c;
       (window as any).canvasInitStatus = 'Success (FabricJS)';
@@ -553,6 +568,118 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
       checkPrintHealth();
     });
 
+    // Multi-touch, Pinch, Pan & Gesture System
+    let isDragging = false;
+    let selectionBeforeDrag = true;
+    let lastPosX = 0;
+    let lastPosY = 0;
+
+    // Two-finger pinch and pan variables
+    let isPinching = false;
+    let startDistance = 0;
+    let startZoom = 1;
+
+    fabricCanvas.current.on('mouse:down', (opt: any) => {
+      const evt = opt.e;
+      const target = opt.target;
+
+      // Alt+Click Duplicate
+      if (target && evt.altKey) {
+        evt.preventDefault();
+        target.clone().then((cloned: any) => {
+          cloned.set({
+            left: target.left + 15,
+            top: target.top + 15,
+            evented: true
+          });
+          fabricCanvas.current?.add(cloned);
+          fabricCanvas.current?.setActiveObject(cloned);
+          fabricCanvas.current?.requestRenderAll();
+          updateLayersList();
+          pushToHistory();
+        });
+        return;
+      }
+
+      // Handle multi-touch (two fingers) for pan and pinch zoom
+      if (evt.touches && evt.touches.length === 2) {
+        isPinching = true;
+        const touch1 = evt.touches[0];
+        const touch2 = evt.touches[1];
+        startDistance = Math.hypot(touch2.clientX - touch1.clientX, touch2.clientY - touch1.clientY);
+        startZoom = fabricCanvas.current?.getZoom() || 1;
+        isDragging = false;
+        fabricCanvas.current?.discardActiveObject();
+        fabricCanvas.current?.requestRenderAll();
+        return;
+      }
+
+      // If Alt is pressed without clicking an object, or drawing mode, or space is pressed, or if user is panning
+      if (evt.altKey || (evt.touches && evt.touches.length === 2)) {
+        isDragging = true;
+        if (fabricCanvas.current) {
+          selectionBeforeDrag = fabricCanvas.current.selection;
+          fabricCanvas.current.selection = false;
+          const pointer = evt.touches ? evt.touches[0] : evt;
+          lastPosX = pointer.clientX;
+          lastPosY = pointer.clientY;
+          fabricCanvas.current.discardActiveObject();
+          fabricCanvas.current.requestRenderAll();
+        }
+      }
+    });
+
+    fabricCanvas.current.on('mouse:move', (opt: any) => {
+      const evt = opt.e;
+
+      if (isPinching && evt.touches && evt.touches.length === 2) {
+        const touch1 = evt.touches[0];
+        const touch2 = evt.touches[1];
+        const currentDistance = Math.hypot(touch2.clientX - touch1.clientX, touch2.clientY - touch1.clientY);
+        
+        // Calculate new zoom factor
+        let newZoom = (currentDistance / startDistance) * startZoom;
+        // Clamp zoom
+        newZoom = Math.max(0.2, Math.min(newZoom, 5));
+        
+        // Midpoint of the two touches
+        const midX = (touch1.clientX + touch2.clientX) / 2;
+        const midY = (touch1.clientY + touch2.clientY) / 2;
+        
+        // Get coordinates relative to the canvas element
+        const canvasEl = canvasRef.current;
+        if (canvasEl && fabricCanvas.current) {
+          const rect = canvasEl.getBoundingClientRect();
+          const point = new fabric.Point(midX - rect.left, midY - rect.top);
+          fabricCanvas.current.zoomToPoint(point, newZoom);
+          
+          // Update the scaleFactor state to match
+          setScaleFactor(newZoom);
+        }
+        return;
+      }
+
+      if (isDragging && fabricCanvas.current) {
+        const pointer = evt.touches ? evt.touches[0] : evt;
+        const vpt = fabricCanvas.current.viewportTransform;
+        if (vpt) {
+          vpt[4] += pointer.clientX - lastPosX;
+          vpt[5] += pointer.clientY - lastPosY;
+          fabricCanvas.current.requestRenderAll();
+        }
+        lastPosX = pointer.clientX;
+        lastPosY = pointer.clientY;
+      }
+    });
+
+    fabricCanvas.current.on('mouse:up', (opt: any) => {
+      isDragging = false;
+      isPinching = false;
+      if (fabricCanvas.current) {
+        fabricCanvas.current.selection = selectionBeforeDrag;
+      }
+    });
+
     loadDesigns();
 
     // Spawn a welcoming shape on startup unless we restore autosave
@@ -592,10 +719,199 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
       pushToHistory();
     }
 
+    let clipboard: any = null;
+
+    const copyObject = () => {
+      if (!fabricCanvas.current) return;
+      const activeObj = fabricCanvas.current.getActiveObject();
+      if (!activeObj) return;
+      activeObj.clone().then((cloned: any) => {
+        clipboard = cloned;
+      });
+    };
+
+    const pasteObject = () => {
+      if (!fabricCanvas.current || !clipboard) return;
+      clipboard.clone().then((clonedObj: any) => {
+        fabricCanvas.current?.discardActiveObject();
+        clonedObj.set({
+          left: clonedObj.left + 20,
+          top: clonedObj.top + 20,
+          evented: true,
+        });
+        if (clonedObj.type === 'activeSelection') {
+          clonedObj.canvas = fabricCanvas.current;
+          clonedObj.forEachObject((obj: any) => {
+            fabricCanvas.current?.add(obj);
+          });
+          clonedObj.setCoords();
+        } else {
+          fabricCanvas.current?.add(clonedObj);
+        }
+        clipboard.top += 20;
+        clipboard.left += 20;
+        fabricCanvas.current?.setActiveObject(clonedObj);
+        fabricCanvas.current?.requestRenderAll();
+        updateLayersList();
+        pushToHistory();
+      });
+    };
+
+    const cutObject = () => {
+      if (!fabricCanvas.current) return;
+      const activeObj = fabricCanvas.current.getActiveObject();
+      if (!activeObj) return;
+      activeObj.clone().then((cloned: any) => {
+        clipboard = cloned;
+        if (activeObj.type === 'activeSelection') {
+          const activeSelection = activeObj as fabric.ActiveSelection;
+          activeSelection.forEachObject((obj) => {
+            fabricCanvas.current?.remove(obj);
+          });
+          fabricCanvas.current?.discardActiveObject();
+        } else {
+          fabricCanvas.current?.remove(activeObj);
+        }
+        fabricCanvas.current?.requestRenderAll();
+        updateLayersList();
+        pushToHistory();
+      });
+    };
+
+    const duplicateObject = () => {
+      if (!fabricCanvas.current) return;
+      const activeObj = fabricCanvas.current.getActiveObject();
+      if (!activeObj) return;
+      activeObj.clone().then((clonedObj: any) => {
+        fabricCanvas.current?.discardActiveObject();
+        clonedObj.set({
+          left: clonedObj.left + 15,
+          top: clonedObj.top + 15,
+          evented: true,
+        });
+        if (clonedObj.type === 'activeSelection') {
+          clonedObj.canvas = fabricCanvas.current;
+          clonedObj.forEachObject((obj: any) => {
+            fabricCanvas.current?.add(obj);
+          });
+          clonedObj.setCoords();
+        } else {
+          fabricCanvas.current?.add(clonedObj);
+        }
+        fabricCanvas.current?.setActiveObject(clonedObj);
+        fabricCanvas.current?.requestRenderAll();
+        updateLayersList();
+        pushToHistory();
+      });
+    };
+
+    // Keyboard delete listener
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!fabricCanvas.current || !active) return;
+
+      // Ignore if user is editing inside an input, textarea or any contenteditable element
+      const activeTag = document.activeElement?.tagName.toLowerCase();
+      if (activeTag === 'input' || activeTag === 'textarea' || document.activeElement?.hasAttribute('contenteditable')) {
+        return;
+      }
+      // Also ignore if a Fabric Text object is in editing mode
+      const activeObj = fabricCanvas.current.getActiveObject();
+      if (activeObj && (activeObj as any).isEditing) {
+        return;
+      }
+
+      const isCtrl = e.ctrlKey || e.metaKey;
+
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        // Proceed to delete selected object(s)
+        if (activeObj) {
+          e.preventDefault();
+          if (activeObj.type === 'activeSelection') {
+            const activeSelection = activeObj as fabric.ActiveSelection;
+            activeSelection.forEachObject((obj) => {
+              fabricCanvas.current?.remove(obj);
+            });
+            fabricCanvas.current?.discardActiveObject();
+          } else {
+            fabricCanvas.current?.remove(activeObj);
+          }
+          fabricCanvas.current?.requestRenderAll();
+          setSelectedObjType(null);
+          updateLayersList();
+          pushToHistory();
+          showStatus('success', 'Removed object from the digital proof.');
+        }
+      } else if (isCtrl && e.key.toLowerCase() === 'c') {
+        e.preventDefault();
+        copyObject();
+      } else if (isCtrl && e.key.toLowerCase() === 'v') {
+        e.preventDefault();
+        pasteObject();
+      } else if (isCtrl && e.key.toLowerCase() === 'x') {
+        e.preventDefault();
+        cutObject();
+      } else if (isCtrl && e.key.toLowerCase() === 'd') {
+        e.preventDefault();
+        duplicateObject();
+      } else if (isCtrl && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          redo();
+        } else {
+          undo();
+        }
+      } else if (isCtrl && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        redo();
+      } else if (isCtrl && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        // Select all objects
+        fabricCanvas.current.discardActiveObject();
+        const objs = fabricCanvas.current.getObjects();
+        if (objs.length > 0) {
+          const sel = new fabric.ActiveSelection(objs, {
+            canvas: fabricCanvas.current,
+          });
+          fabricCanvas.current.setActiveObject(sel);
+          fabricCanvas.current.requestRenderAll();
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        fabricCanvas.current.discardActiveObject();
+        fabricCanvas.current.requestRenderAll();
+      } else if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        if (activeObj) {
+          e.preventDefault();
+          const step = e.shiftKey ? 10 : 1;
+          switch (e.key) {
+            case 'ArrowUp':
+              activeObj.set('top', (activeObj.top || 0) - step);
+              break;
+            case 'ArrowDown':
+              activeObj.set('top', (activeObj.top || 0) + step);
+              break;
+            case 'ArrowLeft':
+              activeObj.set('left', (activeObj.left || 0) - step);
+              break;
+            case 'ArrowRight':
+              activeObj.set('left', (activeObj.left || 0) + step);
+              break;
+          }
+          activeObj.setCoords();
+          fabricCanvas.current.requestRenderAll();
+          pushToHistory();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
     return () => {
       active = false;
       fabricCanvas.current = null;
       canvasRef.current = null;
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('touchmove', preventDefaultTouch);
 
       // Restore original body scroll styles
       document.body.style.overflow = originalBodyOverflow;
@@ -633,6 +949,21 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
       }
     };
   }, []);
+
+  // Synchronize Fabric canvas zoom and dimensions when scaleFactor changes dynamically
+  useEffect(() => {
+    if (fabricCanvas.current && typeof fabricCanvas.current.setZoom === 'function') {
+      const canvas = fabricCanvas.current;
+      if (typeof canvas.setZoom === 'function' && typeof canvas.setDimensions === 'function') {
+        canvas.setZoom(scaleFactor);
+        canvas.setDimensions({
+          width: CANVAS_WIDTH * scaleFactor,
+          height: CANVAS_HEIGHT * scaleFactor
+        });
+        canvas.requestRenderAll();
+      }
+    }
+  }, [scaleFactor]);
 
   const loadDesigns = async () => {
     try {
@@ -1070,20 +1401,33 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
 
   // Layer adjustments
   const adjustLayerOrder = (action: 'front' | 'back' | 'delete') => {
-    const activeObj = fabricCanvas.current?.getActiveObject();
+    const canvas = fabricCanvas.current;
+    if (!canvas) return;
+    const activeObj = canvas.getActiveObject();
     if (!activeObj) return;
 
     if (action === 'front') {
-      fabricCanvas.current?.bringObjectToFront(activeObj);
+      canvas.bringObjectToFront(activeObj);
       showStatus('success', 'Moved object to the topmost front layer.');
     } else if (action === 'back') {
-      fabricCanvas.current?.sendObjectToBack(activeObj);
+      canvas.sendObjectToBack(activeObj);
       showStatus('success', 'Moved object to the back layer substrate.');
     } else if (action === 'delete') {
-      fabricCanvas.current?.remove(activeObj);
+      if (activeObj.type === 'activeSelection') {
+        const activeSelection = activeObj as fabric.ActiveSelection;
+        activeSelection.forEachObject((obj) => {
+          canvas.remove(obj);
+        });
+        canvas.discardActiveObject();
+      } else {
+        canvas.remove(activeObj);
+      }
+      setSelectedObjType(null);
       showStatus('success', 'Removed object from the digital proof.');
     }
-    fabricCanvas.current?.renderAll();
+    canvas.renderAll();
+    updateLayersList();
+    pushToHistory();
   };
 
   const handleBooleanOperation = (op: 'weld' | 'trim' | 'intersect' | 'crop') => {
@@ -1784,7 +2128,7 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
         </div>
 
         {/* FABRIC CANVAS DRAWING BOARD PLATFORM / PHOTOPEA PRO EDITOR */}
-        <div className="flex-1 bg-zinc-950 p-6 flex items-center justify-center overflow-auto relative">
+        <div className="flex-1 bg-zinc-950 p-6 flex items-center justify-center overflow-auto relative canvas-workspace-area">
           
           {/* ADOBE NEURAL COMPARISON DIFF WORKSPACE OVERLAY */}
           {adobeDiffPreview && adobeDiffPreview.isOpen && (
@@ -1996,21 +2340,27 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
           <div 
             className="flex items-center justify-center overflow-hidden"
             style={{ 
-              width: `${(CANVAS_WIDTH + 20) * scaleFactor}px`, 
-              height: `${(CANVAS_HEIGHT + 20) * scaleFactor}px` 
+              width: `${(CANVAS_WIDTH * scaleFactor) + 20}px`, 
+              height: `${(CANVAS_HEIGHT * scaleFactor) + 20}px` 
             }}
           >
             <div 
-              className="relative shadow-2xl bg-[#f8fafc] p-2.5 rounded-2xl border border-zinc-800 transition-all origin-center select-none touch-none"
+              className="relative shadow-2xl bg-[#f8fafc] p-2.5 rounded-2xl border border-zinc-800 transition-all select-none touch-none"
               style={{ 
                 opacity: activeTool === 'easy' ? 0 : 1, 
                 pointerEvents: activeTool === 'easy' ? 'none' : 'auto',
-                transform: `scale(${scaleFactor})`,
-                width: `${CANVAS_WIDTH + 20}px`,
-                height: `${CANVAS_HEIGHT + 20}px`
+                width: `${(CANVAS_WIDTH * scaleFactor) + 20}px`,
+                height: `${(CANVAS_HEIGHT * scaleFactor) + 20}px`
               }}
             >
-              <div ref={canvasContainerRef} className="touch-none" style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }} />
+              <div 
+                ref={canvasContainerRef} 
+                className="touch-none" 
+                style={{ 
+                  width: `${CANVAS_WIDTH * scaleFactor}px`, 
+                  height: `${CANVAS_HEIGHT * scaleFactor}px` 
+                }} 
+              />
             
             {/* Active tool overlay or isProcessing state */}
             <AnimatePresence>

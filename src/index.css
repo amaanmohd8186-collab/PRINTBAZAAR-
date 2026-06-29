@@ -174,3 +174,11 @@ html.dark ::-webkit-scrollbar-thumb:hover,
   transform-style: preserve-3d;
   -webkit-transform-style: preserve-3d;
 }
+
+/* Force touch-action none on canvas-container and canvas element to prevent iframe/body scrolling during drawing/drag gestures */
+.canvas-container, .canvas-container canvas {
+  touch-action: none !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -webkit-touch-callout: none !important;
+}
