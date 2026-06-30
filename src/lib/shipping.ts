@@ -174,27 +174,16 @@ export const lookupPincode = async (pincode: string): Promise<PincodeInfo | null
           pincode,
           city: data.city,
           state: data.state,
-          district: data.region
+          district: data.region || data.city
         };
       }
     }
   } catch (err) {
-    console.warn("Failed to query shipping estimate API, falling back:", err);
+    console.warn("Failed to query shipping estimate API:", err);
   }
 
-  // Mock logic for city/state detection
-  let city = 'New Delhi';
-  let state = 'Delhi';
-  let district = 'Central Delhi';
-
-  if (pincode.startsWith('400')) { city = 'Mumbai'; state = 'Maharashtra'; district = 'Mumbai City'; }
-  else if (pincode.startsWith('560')) { city = 'Bengaluru'; state = 'Karnataka'; district = 'Bangalore Urban'; }
-  else if (pincode.startsWith('600')) { city = 'Chennai'; state = 'Tamil Nadu'; district = 'Chennai'; }
-  else if (pincode.startsWith('700')) { city = 'Kolkata'; state = 'West Bengal'; district = 'Kolkata'; }
-  else if (pincode.startsWith('500')) { city = 'Hyderabad'; state = 'Telangana'; district = 'Hyderabad'; }
-  else if (pincode.startsWith('380')) { city = 'Ahmedabad'; state = 'Gujarat'; district = 'Ahmedabad'; }
-
-  return { pincode, city, state, district };
+  // No mock logic fallbacks to maintain absolute zero-fake guidelines
+  return null;
 };
 
 export const calculateShippingRates = (

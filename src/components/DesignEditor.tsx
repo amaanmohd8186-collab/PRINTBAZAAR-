@@ -1004,6 +1004,7 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
     fabricCanvas.current?.add(text);
     fabricCanvas.current?.setActiveObject(text);
     fabricCanvas.current?.renderAll();
+    showStatus('success', 'Added text layer');
   };
 
   const applyTemplate = (tpl: any) => {
@@ -1064,6 +1065,7 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
     fabricCanvas.current?.add(rect);
     fabricCanvas.current?.setActiveObject(rect);
     fabricCanvas.current?.renderAll();
+    showStatus('success', 'Added rectangle layer');
   };
 
   const addTriangle = () => {
@@ -1965,12 +1967,16 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
       </div>
 
       {/* SIDEBAR NAVIGATION - TOOL RAILS (Desktop: Left Sidebar, Mobile: Bottom/Floating Floating Toolbar) */}
-      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 lg:translate-x-0 lg:static lg:h-full lg:w-20 bg-zinc-950/90 lg:bg-zinc-950 backdrop-blur-xl lg:backdrop-blur-none border border-zinc-800 lg:border-t-0 lg:border-b-0 lg:border-l-0 lg:border-r lg:border-zinc-850 flex lg:flex-col items-center justify-between lg:justify-start py-2 lg:py-6 px-4 lg:px-0 gap-2 lg:gap-6 shrink-0 z-50 rounded-full lg:rounded-none shadow-2xl lg:shadow-none min-w-[320px] lg:min-w-0">
-        <div className="flex lg:flex-col gap-2 lg:gap-4 items-center w-full lg:w-auto overflow-x-auto no-scrollbar justify-center">
+      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 lg:translate-x-0 lg:static lg:h-full lg:w-20 bg-zinc-950 border border-zinc-800 lg:border-t-0 lg:border-b-0 lg:border-l-0 lg:border-r lg:border-zinc-850 flex lg:flex-col items-center justify-between lg:justify-start py-2 lg:py-6 px-4 lg:px-0 gap-2 lg:gap-6 shrink-0 z-[200] rounded-full lg:rounded-none shadow-2xl lg:shadow-none min-w-[320px] lg:min-w-0">
+        <div className="flex lg:flex-col gap-2 lg:gap-4 items-center w-full lg:w-auto overflow-x-auto no-scrollbar justify-center touch-manipulation">
           <button 
-            onClick={() => setActiveTool('select')}
+            onClick={() => {
+              setActiveTool('select');
+              if (isMobileScreen) setShowMobileInspector(true);
+            }}
             title="Layer Inspector"
-            className={`p-2.5 lg:p-3 rounded-full lg:rounded-xl transition shrink-0 ${activeTool === 'select' ? 'bg-[#FF4D00] text-white shadow-lg' : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'}`}
+            type="button"
+            className={`p-2.5 lg:p-3 rounded-full lg:rounded-xl transition shrink-0 cursor-pointer ${activeTool === 'select' ? 'bg-[#FF4D00] text-white shadow-lg' : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'}`}
           >
             <Layers size={20} className="lg:w-[22px] lg:h-[22px]" />
           </button>
@@ -1978,7 +1984,8 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
           <button 
             onClick={addText}
             title="Add Text Layer"
-            className="p-2.5 lg:p-3 rounded-full lg:rounded-xl text-zinc-400 hover:bg-zinc-900 hover:text-white transition shrink-0"
+            type="button"
+            className="p-2.5 lg:p-3 rounded-full lg:rounded-xl text-zinc-400 hover:bg-zinc-900 hover:text-white transition shrink-0 cursor-pointer"
           >
             <Type size={20} className="lg:w-[22px] lg:h-[22px]" />
           </button>
@@ -1986,7 +1993,8 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
           <button 
             onClick={addRect}
             title="Add Substrate Rectangle"
-            className="p-2.5 lg:p-3 rounded-full lg:rounded-xl text-zinc-400 hover:bg-zinc-900 hover:text-white transition shrink-0"
+            type="button"
+            className="p-2.5 lg:p-3 rounded-full lg:rounded-xl text-zinc-400 hover:bg-zinc-900 hover:text-white transition shrink-0 cursor-pointer"
           >
             <Square size={20} className="lg:w-[22px] lg:h-[22px]" />
           </button>
@@ -2000,59 +2008,12 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
         <div className="hidden lg:block h-px w-10 bg-zinc-800 my-2" />
         <div className="lg:hidden w-px h-6 bg-zinc-800 mx-1 shrink-0" />
 
-        <div className="flex lg:flex-col gap-2 lg:gap-4 items-center shrink-0">
-          <button 
-            onClick={() => setActiveTool('typography')}
-            title="Typography Engine"
-            className={`p-2.5 lg:p-3 rounded-full lg:rounded-xl transition shrink-0 ${activeTool === 'typography' ? 'bg-amber-600 text-white shadow-lg' : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'}`}
-          >
-            <Languages size={20} className="lg:w-[22px] lg:h-[22px]" />
-          </button>
-
-          <button 
-            onClick={() => setActiveTool('vector')}
-            title="Vector Bezier Tools"
-            className={`p-2.5 lg:p-3 rounded-full lg:rounded-xl transition shrink-0 ${activeTool === 'vector' ? 'bg-blue-600 text-white shadow-lg' : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'}`}
-          >
-            <Pen size={20} className="lg:w-[22px] lg:h-[22px]" />
-          </button>
-
-          <button 
-            onClick={() => setActiveTool('creative')}
-            title="AI Creative Suite"
-            className={`p-2.5 lg:p-3 rounded-full lg:rounded-xl transition shrink-0 ${activeTool === 'creative' ? 'bg-emerald-600 text-white shadow-lg' : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'}`}
-          >
-            <Sparkle size={20} className="lg:w-[22px] lg:h-[22px]" />
-          </button>
-
-          <button 
-            onClick={() => setActiveTool('ai')}
-            title="Generative Studio"
-            className={`p-2.5 lg:p-3 rounded-full lg:rounded-xl transition shrink-0 ${activeTool === 'ai' ? 'bg-purple-600 text-white shadow-lg' : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'}`}
-          >
-            <Sparkles size={20} className="lg:w-[22px] lg:h-[22px]" />
-          </button>
-
-          <button 
-            onClick={() => setActiveTool('easy')}
-            title="Smart Design Studio & AI Tools"
-            className={`p-2.5 lg:p-3 rounded-full lg:rounded-xl transition shrink-0 ${activeTool === 'easy' ? 'bg-[#7D2AE8] text-white shadow-lg shadow-[#7D2AE8]/25' : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'}`}
-          >
-            <Palette size={20} className="lg:w-[22px] lg:h-[22px]" />
-          </button>
-
-          <button 
-            onClick={() => setActiveTool('adobe')}
-            title="Adobe Firefly Neural Studio"
-            className={`p-2.5 lg:p-3 rounded-full lg:rounded-xl transition shrink-0 ${activeTool === 'adobe' ? 'bg-[#FF4D00] text-white shadow-lg shadow-[#FF4D00]/25' : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'}`}
-          >
-            <PenTool size={20} className="lg:w-[22px] lg:h-[22px]" />
-          </button>
-
+        <div className="flex lg:flex-col gap-2 lg:gap-4 items-center shrink-0 touch-manipulation">
           <button 
             onClick={() => setShowHistory(true)}
             title="Load Design History"
-            className="p-2.5 lg:p-3 rounded-full lg:rounded-xl text-zinc-400 hover:bg-zinc-900 hover:text-white transition shrink-0"
+            type="button"
+            className="p-2.5 lg:p-3 rounded-full lg:rounded-xl text-zinc-400 hover:bg-zinc-900 hover:text-white transition shrink-0 cursor-pointer"
           >
             <History size={20} className="lg:w-[22px] lg:h-[22px]" />
           </button>
@@ -2366,31 +2327,7 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
             </div>
           )}
 
-          {/* Smart Designer API UI */}
-          {activeTool === 'easy' && (
-            <div className="absolute inset-2 md:inset-4 z-[99] rounded-xl md:rounded-2xl overflow-hidden border border-zinc-800 shadow-2xl bg-[#f4f5f7] flex flex-col">
-              <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-zinc-200 shadow-sm shrink-0">
-                <div className="flex items-center gap-3">
-                  <div className="w-6 h-6 rounded shadow bg-gradient-to-br from-[#7D2AE8] to-[#FF4D00] flex items-center justify-center">
-                    <Palette className="w-3.5 h-3.5 text-white" />
-                  </div>
-                  <span className="text-zinc-800 font-black text-[11px] uppercase tracking-wider font-sans">PrintBazaar Smart Studio</span>
-                </div>
-                <button
-                  onClick={() => setActiveTool('select')}
-                  className="px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-600 hover:text-zinc-900 text-[10px] font-black uppercase tracking-widest rounded-lg border border-zinc-200 transition flex items-center gap-1.5 cursor-pointer"
-                >
-                  <X size={12} />
-                  Return to Master Print Room
-                </button>
-              </div>
-              <iframe 
-                src="https://studio.polotno.com" 
-                className="w-full flex-1 border-none outline-none overflow-hidden bg-[#f4f5f7]" 
-                title="Smart Print Designer Integration"
-              />
-            </div>
-          )}
+          {/* Smart Designer API UI removed */}
 
           <div 
             className="flex items-center justify-center overflow-hidden"
@@ -2402,8 +2339,8 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
             <div 
               className="relative shadow-2xl bg-[#f8fafc] p-2.5 rounded-2xl border border-zinc-800 transition-all select-none touch-none"
               style={{ 
-                opacity: activeTool === 'easy' ? 0 : 1, 
-                pointerEvents: activeTool === 'easy' ? 'none' : 'auto',
+                opacity: 1, 
+                pointerEvents: 'auto',
                 width: `${(CANVAS_WIDTH * scaleFactor) + 20}px`,
                 height: `${(CANVAS_HEIGHT * scaleFactor) + 20}px`
               }}
@@ -2469,545 +2406,7 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
 
       {/* DYNAMICS RIGHT WORKSPACE CONTROL PANELS & SLIDERS */}
       <AnimatePresence mode="wait">
-        {activeTool === 'typography' && (
-          <motion.div 
-            key="typography-hub"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
-            className="w-full lg:w-80 bg-zinc-950 border-t lg:border-t-0 lg:border-l border-zinc-850 p-6 overflow-y-auto shrink-0 flex flex-col gap-6 pb-24 lg:pb-6"
-          >
-            <div className="flex items-center justify-between border-b border-zinc-850 pb-4">
-              <span className="text-xs font-black uppercase tracking-wider text-amber-500 flex items-center gap-1.5 font-mono">
-                <Languages className="w-4 h-4" />
-                <span>Typography Engine 2026</span>
-              </span>
-              <button onClick={() => setActiveTool('select')} className="text-zinc-500 hover:text-white transition">
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-widest font-mono">Multilingual Input</span>
-              <div className="grid grid-cols-2 gap-2">
-                {['English', 'Hindi', 'Marathi', 'Gujarati', 'Arabic', 'Urdu'].map(lang => (
-                  <button key={lang} className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-[9px] font-black uppercase text-zinc-400 hover:border-amber-500 transition">
-                    {lang}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-4">
-               <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-widest font-mono">AI Font Pairing</span>
-                  <Sparkles size={14} className="text-amber-500" />
-               </div>
-               <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-2xl space-y-3">
-                  <div className="space-y-1">
-                     <p className="text-[9px] font-black uppercase text-zinc-500">Suggested Pair</p>
-                     <p className="text-xs font-black uppercase text-white">Inter Black + JetBrains Mono</p>
-                  </div>
-                  <button className="w-full py-2 bg-amber-600 text-white rounded-lg text-[9px] font-black uppercase tracking-widest">Apply Pairing</button>
-               </div>
-            </div>
-
-            <div className="space-y-4">
-               <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-widest font-mono">Text Effects</span>
-               <div className="grid grid-cols-3 gap-2">
-                  <button className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center space-y-1">
-                     <div className="w-4 h-4 bg-white/20 rounded mx-auto" />
-                     <span className="text-[8px] font-black uppercase text-zinc-500">Shadow</span>
-                  </button>
-                  <button className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center space-y-1">
-                     <div className="w-4 h-4 border border-white/40 rounded mx-auto" />
-                     <span className="text-[8px] font-black uppercase text-zinc-500">Outline</span>
-                  </button>
-                  <button className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center space-y-1">
-                     <div className="w-4 h-4 bg-gradient-to-r from-blue-500 to-amber-500 rounded mx-auto" />
-                     <span className="text-[8px] font-black uppercase text-zinc-500">Gradient</span>
-                  </button>
-               </div>
-            </div>
-          </motion.div>
-        )}
-
-        {activeTool === 'vector' && (
-          <motion.div 
-            key="vector-hub"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
-            className="w-full lg:w-80 bg-zinc-950 border-t lg:border-t-0 lg:border-l border-zinc-850 p-6 overflow-y-auto shrink-0 flex flex-col gap-6 pb-24 lg:pb-6"
-          >
-            <div className="flex items-center justify-between border-b border-zinc-850 pb-4">
-              <span className="text-xs font-black uppercase tracking-wider text-blue-500 flex items-center gap-1.5 font-mono">
-                <Pen className="w-4 h-4" />
-                <span>Vector Studio 2026</span>
-              </span>
-              <button onClick={() => setActiveTool('select')} className="text-zinc-500 hover:text-white transition">
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-widest font-mono">Drawing Modes</span>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { id: 'pen', label: 'Pen Tool', icon: Pen },
-                  { id: 'bezier', label: 'Bezier Path', icon: Spline },
-                  { id: 'node', label: 'Node Edit', icon: MousePointer2 },
-                  { id: 'shape', label: 'Shapes', icon: Shapes }
-                ].map((mode) => (
-                  <button
-                    key={mode.id}
-                    onClick={() => setVectorMode(mode.id as any)}
-                    className={`flex flex-col items-center justify-center gap-2 p-4 rounded-2xl border transition ${
-                      vectorMode === mode.id 
-                        ? 'bg-blue-600 border-blue-500 text-white shadow-lg' 
-                        : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700'
-                    }`}
-                  >
-                    <mode.icon size={20} />
-                    <span className="text-[9px] font-black uppercase tracking-widest">{mode.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-widest font-mono">Boolean Operations</span>
-              <div className="grid grid-cols-4 gap-2">
-                <button 
-                  onClick={() => handleBooleanOperation('weld')} 
-                  title="Weld / Combine" 
-                  className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-400 hover:bg-zinc-800 transition cursor-pointer"
-                >
-                  <Combine size={16} />
-                </button>
-                <button 
-                  onClick={() => handleBooleanOperation('trim')} 
-                  title="Trim / Subtract" 
-                  className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-400 hover:bg-zinc-800 transition cursor-pointer"
-                >
-                  <Scissors size={16} />
-                </button>
-                <button 
-                  onClick={() => handleBooleanOperation('intersect')} 
-                  title="Intersect" 
-                  className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-400 hover:bg-zinc-800 transition cursor-pointer"
-                >
-                  <Ghost size={16} />
-                </button>
-                <button 
-                  onClick={() => handleBooleanOperation('crop')} 
-                  title="Crop Area" 
-                  className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-400 hover:bg-zinc-800 transition cursor-pointer"
-                >
-                  <Crop size={16} />
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-widest font-mono">Arrangement</span>
-              <div className="grid grid-cols-2 gap-2">
-                 <button 
-                   onClick={() => adjustLayerOrder('front')} 
-                   className="flex items-center gap-2 px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-[10px] font-black uppercase text-zinc-400 hover:bg-zinc-800 hover:text-white transition cursor-pointer justify-center"
-                 >
-                    <BringToFront size={14} /> Front
-                 </button>
-                 <button 
-                   onClick={() => adjustLayerOrder('back')} 
-                   className="flex items-center gap-2 px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-[10px] font-black uppercase text-zinc-400 hover:bg-zinc-800 hover:text-white transition cursor-pointer justify-center"
-                 >
-                    <SendToBack size={14} /> Back
-                 </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-
-        {activeTool === 'creative' && (
-          <motion.div 
-            key="creative-hub"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
-            className="w-full lg:w-80 bg-zinc-950 border-t lg:border-t-0 lg:border-l border-zinc-850 p-6 overflow-y-auto shrink-0 flex flex-col gap-6 pb-24 lg:pb-6"
-          >
-            <div className="flex items-center justify-between border-b border-zinc-850 pb-4">
-              <span className="text-xs font-black uppercase tracking-wider text-emerald-500 flex items-center gap-1.5 font-mono">
-                <Sparkle className="w-4 h-4" />
-                <span>Creative Suite AI</span>
-              </span>
-              <button onClick={() => setActiveTool('select')} className="text-zinc-500 hover:text-white transition">
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-widest font-mono">Generation Engines</span>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { id: 'logo', label: 'AI Logo Gen', icon: Sparkle },
-                  { id: 'image', label: 'AI Image Gen', icon: ImageIcon },
-                  { id: 'flyer', label: 'AI Flyer Gen', icon: FileText },
-                  { id: 'banner', label: 'AI Banner Gen', icon: Layout }
-                ].map((tool) => (
-                  <button
-                    key={tool.id}
-                    onClick={() => setCreativeTool(tool.id as any)}
-                    className={`flex flex-col items-center justify-center gap-2 p-4 rounded-2xl border transition ${
-                      creativeTool === tool.id 
-                        ? 'bg-emerald-600 border-emerald-500 text-white shadow-lg shadow-emerald-600/20' 
-                        : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700'
-                    }`}
-                  >
-                    <tool.icon size={20} />
-                    <span className="text-[9px] font-black uppercase tracking-widest">{tool.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-widest font-mono">Creative Prompt</span>
-              <textarea 
-                value={aiPrompt}
-                onChange={(e) => setAiPrompt(e.target.value)}
-                placeholder={`Describe your ${creativeTool} specifications...`}
-                className="w-full h-24 bg-zinc-900 border border-zinc-800 rounded-xl p-3.5 text-xs text-zinc-100 placeholder-zinc-500 resize-none outline-none focus:border-emerald-500 transition"
-              />
-              <button 
-                onClick={() => processAI('image-gen')}
-                className="w-full py-3.5 bg-emerald-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition shadow-xl shadow-emerald-600/10 cursor-pointer hover:bg-emerald-500"
-              >
-                <Zap className="w-3.5 h-3.5" />
-                <span>Execute Creative Studio</span>
-              </button>
-            </div>
-
-            <div className="h-px bg-zinc-850" />
-
-            <div className="space-y-3">
-               <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-widest font-mono">Advanced Utilities</span>
-               <div className="grid grid-cols-2 gap-2">
-                  <button 
-                    onClick={() => {
-                      fabricCanvas.current?.clear();
-                      // redraw or reset
-                      fabricCanvas.current?.renderAll();
-                      showStatus('success', 'Cleared workspace canvas completely.');
-                    }}
-                    className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center space-y-1 hover:border-emerald-500 transition cursor-pointer"
-                  >
-                    <RefreshCw className="w-4 h-4 text-emerald-400 mx-auto" />
-                    <span className="text-[9px] font-black uppercase text-zinc-300 block">Reset All</span>
-                  </button>
-                  <button 
-                    onClick={() => adjustLayerOrder('delete')}
-                    className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center space-y-1 hover:border-emerald-500 transition cursor-pointer"
-                  >
-                    <Eraser className="w-4 h-4 text-emerald-400 mx-auto" />
-                    <span className="text-[9px] font-black uppercase text-zinc-300 block">Eraser</span>
-                  </button>
-               </div>
-            </div>
-          </motion.div>
-        )}
-
-        {activeTool === 'ai' && (
-          <motion.div 
-            key="ai-hub"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="w-full lg:w-80 bg-zinc-950 border-t lg:border-t-0 lg:border-l border-zinc-850 p-6 overflow-y-auto shrink-0 flex flex-col gap-6 pb-24 lg:pb-6"
-          >
-            <div className="flex items-center justify-between border-b border-zinc-850 pb-4">
-              <span className="text-xs font-black uppercase tracking-wider text-[#FF4D00] flex items-center gap-1.5 font-mono">
-                <Sparkles className="w-4 h-4" />
-                <span>Generative AI Hub</span>
-              </span>
-              <button onClick={() => setActiveTool('select')} className="text-zinc-500 hover:text-white transition">
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* AI PROCESSOR ENGINE SELECTION */}
-            <div className="space-y-2 bg-zinc-900 border border-zinc-805 border-zinc-800 p-3.5 rounded-2xl">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-wider font-mono">Engine Provider</span>
-                <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded uppercase font-sans ${aiProvider === 'adobe' ? 'bg-[#FF4D00]/10 text-[#FF4D00]' : 'bg-purple-900/40 text-purple-300'}`}>
-                  {aiProvider === 'adobe' ? 'Adobe Firefly' : 'Gemini Cloud'}
-                </span>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-1 p-1 bg-zinc-950 border border-zinc-850 rounded-xl">
-                <button
-                  type="button"
-                  onClick={() => setAiProvider('gemini')}
-                  className={`py-1 rounded-lg text-[9px] font-extrabold uppercase tracking-wider transition cursor-pointer text-center ${aiProvider === 'gemini' ? 'bg-purple-700 text-white shadow-md' : 'text-zinc-400 hover:text-white'}`}
-                >
-                  Gemini
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAiProvider('adobe')}
-                  className={`py-1 rounded-lg text-[9px] font-extrabold uppercase tracking-wider transition cursor-pointer text-center ${aiProvider === 'adobe' ? 'bg-[#FF4D00] text-white shadow-md' : 'text-zinc-400 hover:text-[#FF4D00]'}`}
-                >
-                  Adobe AI
-                </button>
-              </div>
-
-              {aiProvider === 'adobe' && (
-                <div className="pt-1 mt-1 border-t border-zinc-850">
-                  <p className="text-[8px] text-zinc-405 text-zinc-405 text-zinc-400 leading-normal">
-                    Enterprise direct authentication via <code className="font-bold bg-zinc-950 px-1 py-0.5 rounded text-zinc-300">ADOBE_CLIENT_ID</code>.
-                  </p>
-                  <p className="text-[8px] text-[#FF4D00] font-black uppercase tracking-wider font-mono mt-0.5">
-                    ⚡ AI Studio processing active!
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Substrate prompt inputs */}
-            <div className="space-y-2">
-              <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest font-mono">Prompt specifications</span>
-              <textarea 
-                value={aiPrompt}
-                onChange={(e) => setAiPrompt(e.target.value)}
-                placeholder="e.g., Ultra sharp corporate layout template with gold accents"
-                className="w-full h-24 bg-zinc-900 border border-zinc-800 rounded-xl p-3.5 text-xs text-zinc-100 placeholder-zinc-500 resize-none outline-none focus:border-purple-650"
-              />
-              <button 
-                onClick={() => processAI('template-gen')}
-                className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-[11px] uppercase tracking-wider flex items-center justify-center gap-2 transition cursor-pointer shadow-md shadow-purple-600/10"
-              >
-                <Wand2 className="w-3.5 h-3.5" />
-                <span>Execute Layout Draft</span>
-              </button>
-            </div>
-
-            <div className="h-px bg-zinc-850" />
-
-            {/* AI Segment Isolation Suite */}
-            <div className="space-y-3">
-              <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest font-mono">Generative Co-pilot Tools</span>
-              <div className="grid grid-cols-2 gap-2">
-                <button 
-                  onClick={() => processAI('background-removal')}
-                  className="flex flex-col items-center justify-center gap-2 p-3 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-2xl text-center transition cursor-pointer hover:border-purple-500"
-                >
-                  <Eraser className="w-4 h-4 text-purple-400" />
-                  <span className="text-[10px] font-bold uppercase text-zinc-300">Cut Background</span>
-                </button>
-
-                <button 
-                  onClick={() => processAI('upscale')}
-                  className="flex flex-col items-center justify-center gap-2 p-3 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 rounded-2xl text-center transition cursor-pointer hover:border-purple-500"
-                >
-                  <Maximize2 className="w-4 h-4 text-indigo-400" />
-                  <span className="text-[10px] font-bold uppercase text-zinc-300">2x Sharp Upscale</span>
-                </button>
-              </div>
-
-              <button 
-                onClick={() => processAI('enhancement')}
-                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold uppercase tracking-wider rounded-xl transition cursor-pointer"
-              >
-                Execute Color Calibration
-              </button>
-            </div>
-
-            <div className="mt-auto bg-zinc-900 p-4 rounded-2xl border border-zinc-800 flex items-start gap-2.5">
-              <Info className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
-              <p className="text-[9px] text-zinc-400 leading-normal">
-                Generates luxury offset high definition template blueprints. High-upscale leverages complex synthesis loops.
-              </p>
-            </div>
-          </motion.div>
-        )}
-
-        {activeTool === 'adobe' && (
-          <motion.div 
-            key="adobe-hub"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
-            className="w-full lg:w-80 bg-zinc-950 border-t lg:border-t-0 lg:border-l border-zinc-850 p-6 overflow-y-auto shrink-0 flex flex-col gap-6 pb-24 lg:pb-6"
-          >
-            <div className="flex items-center justify-between border-b border-zinc-850 pb-4">
-              <span className="text-xs font-black uppercase tracking-wider text-[#FF4D00] flex items-center gap-1.5 font-mono">
-                <PenTool className="w-4 h-4 text-[#FF4D00]" />
-                <span>Adobe Firefly AI</span>
-              </span>
-              <button onClick={() => setActiveTool('select')} className="text-zinc-500 hover:text-white transition cursor-pointer">
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Predefined Adobe AI Tool List */}
-            <div className="space-y-2">
-              <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-widest font-mono">Select Adobe AI Tool</span>
-              <div className="grid grid-cols-1 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setAdobeSelectedTool('generative-fill')}
-                  className={`p-3 rounded-xl border text-left transition relative cursor-pointer ${
-                    adobeSelectedTool === 'generative-fill' 
-                      ? 'bg-gradient-to-r from-[#FF4D00]/10 to-[#FF4D00]/5 border-[#FF4D00]/50 text-white shadow-md' 
-                      : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700'
-                  }`}
-                >
-                  <div className="flex items-start gap-2.5">
-                    <Sparkles className={`w-3.5 h-3.5 mt-0.5 ${adobeSelectedTool === 'generative-fill' ? 'text-[#FF4D00]' : 'text-zinc-500'}`} />
-                    <div>
-                      <div className="text-[11px] font-black uppercase leading-tight">Generative Fill</div>
-                      <div className="text-[9px] text-zinc-400 mt-1 leading-normal">Extend/insert parts onto images (15 Cr)</div>
-                    </div>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setAdobeSelectedTool('style-transfer')}
-                  className={`p-3 rounded-xl border text-left transition relative cursor-pointer ${
-                    adobeSelectedTool === 'style-transfer' 
-                      ? 'bg-gradient-to-r from-[#FF4D00]/10 to-[#FF4D00]/5 border-[#FF4D00]/50 text-white shadow-md' 
-                      : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700'
-                  }`}
-                >
-                  <div className="flex items-start gap-2.5">
-                    <Palette className={`w-3.5 h-3.5 mt-0.5 ${adobeSelectedTool === 'style-transfer' ? 'text-[#FF4D00]' : 'text-zinc-500'}`} />
-                    <div>
-                      <div className="text-[11px] font-black uppercase leading-tight">Style Transfer</div>
-                      <div className="text-[9px] text-zinc-400 mt-1 leading-normal">Repaint designs onto artistic presets (10 Cr)</div>
-                    </div>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setAdobeSelectedTool('upscaling')}
-                  className={`p-3 rounded-xl border text-left transition relative cursor-pointer ${
-                    adobeSelectedTool === 'upscaling' 
-                      ? 'bg-gradient-to-r from-[#FF4D00]/10 to-[#FF4D00]/5 border-[#FF4D00]/50 text-white shadow-md' 
-                      : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700'
-                  }`}
-                >
-                  <div className="flex items-start gap-2.5">
-                    <Maximize2 className={`w-3.5 h-3.5 mt-0.5 ${adobeSelectedTool === 'upscaling' ? 'text-[#FF4D00]' : 'text-zinc-500'}`} />
-                    <div>
-                      <div className="text-[11px] font-black uppercase leading-tight">Resolution Upscaling</div>
-                      <div className="text-[9px] text-zinc-400 mt-1 leading-normal">Neural 2x/4x lanczos refinement (8 Cr)</div>
-                    </div>
-                  </div>
-                </button>
-              </div>
-            </div>
-
-            <div className="h-px bg-zinc-850" />
-
-            {/* Custom inputs based on the selected tool */}
-            {adobeSelectedTool === 'generative-fill' && (
-              <div className="space-y-3">
-                <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-widest font-mono">Generative Prompt</span>
-                <textarea 
-                  value={aiPrompt}
-                  onChange={(e) => setAiPrompt(e.target.value)}
-                  placeholder="Describe your generative fill replacement details..."
-                  className="w-full h-20 bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-100 placeholder-zinc-500 resize-none outline-none focus:border-[#FF4D00] transition"
-                />
-              </div>
-            )}
-
-            {adobeSelectedTool === 'style-transfer' && (
-              <div className="space-y-3">
-                <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-widest font-mono">Pre-selected Art Theme</span>
-                <div className="grid grid-cols-2 gap-1.5 p-1 bg-zinc-900 border border-zinc-805 rounded-xl">
-                  {[
-                    { id: 'vector', name: 'Vector Art' },
-                    { id: 'renaissance', name: 'Oil Painting' },
-                    { id: 'neon', name: 'Cyberpunk Neon' },
-                    { id: 'pastel', name: 'Pastel Minimalist' }
-                  ].map((preset) => (
-                    <button
-                      key={preset.id}
-                      type="button"
-                      onClick={() => setAdobeStylePreset(preset.id)}
-                      className={`py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition cursor-pointer text-center ${
-                        adobeStylePreset === preset.id 
-                          ? 'bg-[#FF4D00] text-white shadow-sm' 
-                          : 'text-zinc-400 hover:text-white'
-                      }`}
-                    >
-                      {preset.name}
-                    </button>
-                  ))}
-                </div>
-                
-                <div className="space-y-2">
-                  <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-widest font-mono">Prompt Customizations</span>
-                  <textarea 
-                    value={aiPrompt}
-                    onChange={(e) => setAiPrompt(e.target.value)}
-                    placeholder="Describe content objects or aesthetic moods..."
-                    className="w-full h-16 bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-100 placeholder-zinc-500 resize-none outline-none focus:border-[#FF4D00] transition"
-                  />
-                </div>
-              </div>
-            )}
-
-            {adobeSelectedTool === 'upscaling' && (
-              <div className="space-y-3">
-                <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-widest font-mono">Super Scaling Modifiers</span>
-                <div className="grid grid-cols-2 gap-2">
-                  {[2, 4].map((scale) => (
-                    <button
-                      key={scale}
-                      type="button"
-                      onClick={() => setAdobeUpscaleScale(scale)}
-                      className={`py-2 rounded-xl border text-[11px] font-black transition cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
-                        adobeUpscaleScale === scale 
-                          ? 'border-[#FF4D00] bg-[#FF4D00]/5 text-white' 
-                          : 'border-zinc-800 bg-zinc-900 text-zinc-500 hover:text-white'
-                      }`}
-                    >
-                      <span>{scale}X</span>
-                      <span className="text-[8px] tracking-normal font-normal opacity-70">Neural Enhance</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Main Action Call */}
-            <div className="pt-2">
-              <button
-                type="button"
-                onClick={processAdobeAI}
-                className="w-full py-3 bg-[#FF4D00] hover:bg-[#E03E00] text-white rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition cursor-pointer shadow-lg shadow-[#FF4D00]/10"
-              >
-                <PenTool className="w-3.5 h-3.5" />
-                <span>Execute Adobe AI</span>
-              </button>
-            </div>
-
-            {/* Adobe Enterprise Certification Disclaimer */}
-            <div className="mt-auto bg-zinc-900 p-4 rounded-xl border border-zinc-805 flex items-start gap-2.5">
-              <Info className="w-3.5 h-3.5 text-[#FF4D00] shrink-0 mt-0.5" />
-              <p className="text-[9px] text-zinc-400 leading-normal">
-                Generates a live Side-by-Side compare panel in the editor view first. Deducts credits only upon Keep & Commit action.
-              </p>
-            </div>
-          </motion.div>
-        )}
-
-        {activeTool !== 'ai' && activeTool !== 'easy' && activeTool !== 'adobe' && (!isMobileScreen || showMobileInspector) && (
+        {(!isMobileScreen || showMobileInspector) && (
           /* STANDARD EDITOR CONTROL PANEL (SLIDERS, PALETTE, LAYER MODIFIERS) */
           <motion.div 
             key="standard-editor"
